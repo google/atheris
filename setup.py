@@ -24,7 +24,7 @@ from setuptools import Extension
 from setuptools import setup
 from setuptools.command.build_ext import build_ext
 
-__version__ = "1.0.0"
+__version__ = "1.0.3"
 
 clang_install_instructions = """download and build the latest version of Clang:
     git clone https://github.com/llvm/llvm-project.git
@@ -150,8 +150,14 @@ def cpp_flag(compiler):
   if os.getenv("FORCE_MIN_VERSION"):
     # Use for testing, to make sure Atheris supports C++11
     flags = ["-std=c++11"]
+  elif os.getenv("FORCE_VERSION"):
+    flags = ["-std=c++" + os.getenv("FORCE_VERSION")]
   else:
-    flags = ["-std=c++17", "-std=c++14", "-std=c++11"]
+    flags = [
+      #"-std=c++17",  C++17 disabled unless explicitly requested, to work
+      # around https://github.com/pybind/pybind11/issues/1818
+      "-std=c++14",
+      "-std=c++11"]
 
   for flag in flags:
     if has_flag(compiler, flag):
@@ -212,9 +218,9 @@ setup(
     author="Bitshift",
     author_email="atheris@google.com",
     url="https://pypi.org/project/atheris/",
-    description="A coverage-guided fuzzer for Python, built on libFuzzer.",
-    long_description="""Atheris is a tool for Python fuzz testing. It supports coverage-guided fuzzing of Python code and native extensions written for CPython. Atheris is based off of libFuzzer. When fuzzing native code, Atheris can be used in combination with Address Sanitizer or Undefined Behavior Sanitizer to catch extra bugs.
-""",
+    description="A coverage-guided fuzzer for Python and Python extensions.",
+    long_description=open("README.md", "r").read(),
+    long_description_content_type="text/markdown",
     ext_modules=ext_modules,
     setup_requires=["pybind11>=2.5.0"],
     cmdclass={"build_ext": BuildExt},

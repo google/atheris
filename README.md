@@ -65,10 +65,10 @@ Opcode coverage must be enabled to support features like intelligent string comp
 
 In order for native fuzzing to be effective, such native extensions must be built with Clang, using the argument `-fsanitize=fuzzer-no-link`. They should be built with the same `clang` as was used when building Atheris.
 
-The mechanics of building with Clang depend on your native extension. However, if your library is built with setuptools (e.g. `pip` and setup.py), simply overriding the `CC` and `CXX` environment variables is often sufficient:
+The mechanics of building with Clang depend on your native extension. However, if your library is built with setuptools (e.g. `pip` and setup.py), the following is often sufficient:
 
 ```
-CC=/usr/bin/clang CXX=/usr/bin/clang++ pip install .
+CC="/usr/bin/clang" CFLAGS="-fsanitize=fuzzer-no-link" CXX="/usr/bin/clang++" CXXFLAGS="-fsanitize=fuzzer-no-link" pip install .
 ```
 
 When fuzzing a native extension, you must `LD_PRELOAD` the atheris dynamic library. Otherwise, you will receive an error such as `undefined symbol: __sancov_lowest_stack`.  Atheris provides a feature to do this: you can find the atheris dynamic library with the following command:
@@ -87,7 +87,11 @@ If fuzzing a native extension without a significant Python component, you'll get
 
 #### Using Sanitizers
 
-We strongly recommend using a Clang sanitizer, such as `-fsanitize=address`, when fuzzing native extensions. Atheris supports Address Sanitizer (`-fsanitize=address`) and Undefined Behavior Sanitizer (`-fsanitize=undefined`). It does not support Memory Sanitizer or Thread Sanitizer, as those require whole-program linking.
+We strongly recommend using a Clang sanitizer, such as `-fsanitize=address`, when fuzzing native extensions. Atheris supports Address Sanitizer (`-fsanitize=address`) and Undefined Behavior Sanitizer (`-fsanitize=undefined`). It does not support Memory Sanitizer or Thread Sanitizer, as those require whole-program linking. Usually, you can compile a sanitized extension like this:
+
+```
+CC="/usr/bin/clang" CFLAGS="-fsanitize=address,fuzzer-no-link" CXX="/usr/bin/clang++" CXXFLAGS="-fsanitize=address,fuzzer-no-link" pip install .
+```
 
 When using a sanitizer, you'll typically need to preload the sanitizer's dynamic library as well. You can find the clang libraries with the command `clang -print-search-dirs`. The sanitizers will typically be located under the first "libraries" entry.
 
