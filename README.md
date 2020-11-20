@@ -39,6 +39,7 @@ CLANG_BIN="$(pwd)/bin/clang" pip3 install atheris
 ### Example:
 
 ```
+import sys
 import atheris
 
 def TestOneInput(data):
