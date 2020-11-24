@@ -39,8 +39,8 @@ CLANG_BIN="$(pwd)/bin/clang" pip3 install atheris
 ### Example:
 
 ```
-import sys
 import atheris
+import sys
 
 def TestOneInput(data):
   if data == b"bad":
@@ -279,3 +279,4 @@ atheris.Fuzz()
 
 [See here for more details](https://hypothesis.readthedocs.io/en/latest/details.html#use-with-external-fuzzers),
 or [here for what you can generate](https://hypothesis.readthedocs.io/en/latest/data.html).
+

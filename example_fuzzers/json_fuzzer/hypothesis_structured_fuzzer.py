@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """This fuzzer is an example harness using Hypothesis for structured inputs.
 
 It would be possible, though more difficult, to write this test in terms
@@ -54,7 +55,6 @@ UJSON_ENCODE_KWARGS = {
     "sort_keys": st.booleans(),
     "indent": st.integers(0, 20),
 }
-
 
 @given(obj=JSON_OBJECTS, kwargs=st.fixed_dictionaries(UJSON_ENCODE_KWARGS))
 def test_ujson_roundtrip(obj, kwargs):

@@ -21,7 +21,7 @@ build_install_ujson.sh), and the Python fuzzer should be executed under ASAN.
 As an example:
     LD_PRELOAD="/usr/lib/llvm-9/lib/clang/9.0.1/lib/linux/libclang_rt.asan-x86_64.so
     $(python3 -c "import atheris; print(atheris.path())")" python3
-    ./ujson_fuzzer.py -detect_leaks=0
+    ./json_differential_fuzzer.py -detect_leaks=0
 
 This fuzzer has found a bug with inconsistent handling of integers with
 too-high magnitude. uJSON sometimes refuses to process numbers that are too far
@@ -61,8 +61,8 @@ def TestOneInput(input_bytes):
   original = fdp.ConsumeUnicode(sys.maxsize)
 
   try:
-    json_data = json.loads(original)
     ujson_data = ujson.loads(original)
+    json_data = json.loads(original)
   except Exception as e:
     # It would be interesting to enforce that if one of the libraries throws an
     # exception, the other does too. However, uJSON accepts many invalid inputs
