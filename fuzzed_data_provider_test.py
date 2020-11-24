@@ -20,7 +20,7 @@ import sys
 
 import atheris
 
-from google3.testing.pybase import googletest
+import unittest
 
 if sys.version_info[0] >= 3:
   codepoint = chr
@@ -49,7 +49,7 @@ BYTE_ORDER_BIG_ENDIAN = to_bytes(0xFEFF, length=2)
 BYTE_ORDER_LITTLE_ENDIAN = to_bytes(0xFEFF, length=2)
 
 
-class FuzzedDataProviderTest(googletest.TestCase):
+class FuzzedDataProviderTest(unittest.TestCase):
 
   def testUnicodeActuallyAscii(self):
     fdp = atheris.FuzzedDataProvider(ASCII_BYTEMARK + b"abc123\0\x7f" +
@@ -252,7 +252,7 @@ class FuzzedDataProviderTest(googletest.TestCase):
     fdp = atheris.FuzzedDataProvider(arr)
 
     l = fdp.ConsumeIntList(4321, 1)
-    self.assertLen(l, 4321)
+    self.assertEqual(len(l), 4321)
     for i in range(0, 1000):
       if arr[i] < 0:
         arr[i] += 256
@@ -273,7 +273,7 @@ class FuzzedDataProviderTest(googletest.TestCase):
     fdp = atheris.FuzzedDataProvider(arr)
 
     l = fdp.ConsumeIntList(4321, 9)
-    self.assertLen(l, 4321)
+    self.assertEqual(len(l), 4321)
 
     for i in range(0, 1000):
       self.assertGreaterEqual(l[i], -2**71)
@@ -399,4 +399,4 @@ class FuzzedDataProviderTest(googletest.TestCase):
 
 
 if __name__ == "__main__":
-  googletest.main()
+  unittest.main()
