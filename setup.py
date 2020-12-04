@@ -15,6 +15,7 @@
 """Setuptools for Atheris."""
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -109,8 +110,20 @@ def get_libfuzzer_lib():
 ext_modules = [
     Extension(
         "atheris",
-        # Sort input source files to ensure bit-for-bit reproducible builds
-        # (https://github.com/pybind/python_example/pull/53)
+        sorted([
+            "atheris.cc",
+            "libfuzzer.cc",
+            "tracer.cc",
+            "util.cc",
+            "fuzzed_data_provider.cc",
+        ]),
+        include_dirs=[
+            # Path to pybind11 headers
+            PybindIncludeGetter(),
+        ],
+        language="c++"),
+    Extension(
+        "atheris_no_libfuzzer",
         sorted([
             "atheris.cc",
             "libfuzzer.cc",
@@ -172,6 +185,7 @@ class BuildExt(build_ext):
 
   def build_extensions(self):
     libfuzzer = get_libfuzzer_lib()
+    orig_libfuzzer_name = os.path.basename(libfuzzer)
     version = check_libfuzzer_version(libfuzzer)
 
     if sys.platform == "darwin" and version != "up-to-date":
@@ -193,7 +207,7 @@ class BuildExt(build_ext):
     sys.stderr.write("Your libFuzzer is up-to-date.\n")
 
     c_opts = []
-    l_opts = [libfuzzer]
+    l_opts = []
 
     if sys.platform == "darwin":
       darwin_opts = ["-stdlib=libc++", "-mmacosx-version-min=10.7"]
@@ -206,10 +220,27 @@ class BuildExt(build_ext):
 
     for ext in self.extensions:
       ext.define_macros = [("VERSION_INFO",
-                            "'{}'".format(self.distribution.get_version()))]
+                            "'{}'".format(self.distribution.get_version())),
+                           ("ATHERIS_MODULE_NAME", ext.name)]
       ext.extra_compile_args = c_opts
-      ext.extra_link_args = l_opts
+      if ext.name == "atheris_no_libfuzzer":
+        ext.extra_link_args = l_opts
+      else:
+        ext.extra_link_args = l_opts + [libfuzzer]
     build_ext.build_extensions(self)
+
+    try:
+      self.deploy_libfuzzer(libfuzzer, orig_libfuzzer_name)
+    except Exception as e:
+      sys.stderr.write(e)
+      sys.stderr.write("\n")
+      pass
+
+  def deploy_libfuzzer(self, libfuzzer, orig_libfuzzer_name):
+    atheris = self.get_ext_fullpath("atheris")
+    dest_libfuzzer = os.path.join(os.path.dirname(atheris), orig_libfuzzer_name)
+
+    shutil.copy(libfuzzer, dest_libfuzzer)
 
 
 setup(

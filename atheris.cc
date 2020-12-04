@@ -25,7 +25,11 @@
 
 namespace atheris {
 
-PYBIND11_MODULE(atheris, m) {
+#ifndef ATHERIS_MODULE_NAME
+#define ATHERIS_MODULE_NAME atheris
+#endif  // ATHERIS_MODULE_NAME
+
+PYBIND11_MODULE(ATHERIS_MODULE_NAME, m) {
   Init();
 
   m.def("Setup", &Setup);

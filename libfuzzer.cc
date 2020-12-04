@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <dlfcn.h>
 
 #include <exception>
 #include <iostream>
@@ -29,6 +30,27 @@ using UserCb = int (*)(const uint8_t* Data, size_t Size);
 extern "C" int LLVMFuzzerRunDriver(int* argc, char*** argv,
                                    int (*UserCb)(const uint8_t* Data,
                                                  size_t Size));
+
+extern "C" void __sanitizer_cov_pcs_init(const uintptr_t* pcs_beg,
+                              const uintptr_t* pcs_end);
+
+NO_SANITIZE
+std::string GetLibFuzzerSymbolsLocation() {
+  Dl_info dl_info;
+  if (!dladdr((void*)&LLVMFuzzerRunDriver, &dl_info)) {
+    return "<Not a shared object>";
+  }
+  return (dl_info.dli_fname);
+}
+
+NO_SANITIZE
+std::string GetCoverageSymbolsLocation() {
+  Dl_info dl_info;
+  if (!dladdr((void*)&__sanitizer_cov_pcs_init, &dl_info)) {
+    return "<Not a shared object>";
+  }
+  return (dl_info.dli_fname);
+}
 
 namespace atheris {
 
@@ -100,6 +122,10 @@ std::vector<std::string> Setup(
 
   if (enable_python_coverage) {
     SetupTracer(enable_python_opcode_coverage);
+  }
+
+  if (GetCoverageSymbolsLocation() != GetLibFuzzerSymbolsLocation()) {
+    std::cerr << Colorize(STDERR_FILENO, "WARNING: Coverage symbols are being provided by a library other than libFuzzer. This will result in broken Python code coverage and severely impacted native extension code coverage. Symbols are coming from this library: " + GetCoverageSymbolsLocation() + "\nYou can likely resolve this issue by linking libFuzzer into Python directly, and using `atheris_no_libfuzzer` instead of `atheris`. See using_sanitizers.md for details.");
   }
 
   return ret;
