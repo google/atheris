@@ -1,0 +1,59 @@
+commit 9be295c3ab6b8536b08d93197800e7d6da9c6dce
+Author: Ian Eldred Pudney <puddles@google.com>
+Date:   Sun Nov 22 14:21:50 2020 -0800
+
+    Patch to link libFuzzer into CPython
+
+diff --git a/Makefile.pre.in b/Makefile.pre.in
+index a914a9c70f..7ee16d51a4 100644
+--- a/Makefile.pre.in
++++ b/Makefile.pre.in
+@@ -36,7 +36,7 @@ abs_builddir=	@abs_builddir@
+ CC=		@CC@
+ CXX=		@CXX@
+ MAINCC=		@MAINCC@
+-LINKCC=		@LINKCC@
++LINKCC=		@CXX@
+ AR=		@AR@
+ READELF=	@READELF@
+ SOABI=		@SOABI@
+@@ -156,7 +156,7 @@ CONFINCLUDEPY=	$(CONFINCLUDEDIR)/python$(LDVERSION)
+ SHLIB_SUFFIX=	@SHLIB_SUFFIX@
+ EXT_SUFFIX=	@EXT_SUFFIX@
+ LDSHARED=	@LDSHARED@ $(PY_LDFLAGS)
+-BLDSHARED=	@BLDSHARED@ $(PY_CORE_LDFLAGS)
++BLDSHARED=	$(CXX) -shared $(PY_CORE_LDFLAGS)
+ LDCXXSHARED=	@LDCXXSHARED@
+ DESTSHARED=	$(BINLIBDEST)/lib-dynload
+ 
+@@ -563,7 +563,7 @@ clinic: check-clean-src $(srcdir)/Modules/_blake2/blake2s_impl.c
+ 
+ # Build the interpreter
+ $(BUILDPYTHON):	Programs/python.o $(LIBRARY) $(LDLIBRARY) $(PY3LIBRARY)
+-	$(LINKCC) $(PY_CORE_LDFLAGS) $(LINKFORSHARED) -o $@ Programs/python.o $(BLDLIBRARY) $(LIBS) $(MODLIBS) $(SYSLIBS)
++	$(CXX) $(PY_CORE_LDFLAGS) $(LINKFORSHARED) -o $@ Programs/python.o $(BLDLIBRARY) $(LIBS) $(MODLIBS) $(SYSLIBS)
+ 
+ platform: $(BUILDPYTHON) pybuilddir.txt
+ 	$(RUNSHARED) $(PYTHON_FOR_BUILD) -c 'import sys ; from sysconfig import get_platform ; print("%s-%d.%d" % (get_platform(), *sys.version_info[:2]))' >platform
+@@ -614,14 +614,18 @@ sharedmods: $(BUILDPYTHON) pybuilddir.txt Modules/_math.o
+ # Build static library
+ $(LIBRARY): $(LIBRARY_OBJS)
+ 	-rm -f $@
+-	$(AR) $(ARFLAGS) $@ $(LIBRARY_OBJS)
++	-rm -rf fuzzer_extracted
++	mkdir fuzzer_extracted
++	( cd fuzzer_extracted && ar x ${LIBFUZZER_VERSION} )
++	ld -r fuzzer_extracted/* $(LIBRARY_OBJS) -o libpython3.8.o
++	$(AR) $(ARFLAGS) $@ libpython3.8.o
+ 
+ libpython$(LDVERSION).so: $(LIBRARY_OBJS) $(DTRACE_OBJS)
+ 	if test $(INSTSONAME) != $(LDLIBRARY); then \
+-		$(BLDSHARED) -Wl,-h$(INSTSONAME) -o $(INSTSONAME) $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM); \
++		$(BLDSHARED) -Wl,-h$(INSTSONAME) -o $(INSTSONAME) $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) -Wl,--whole-archive ${LIBFUZZER_VERSION} -Wl,--no-whole-archive -lstdc++; \
+ 		$(LN) -f $(INSTSONAME) $@; \
+ 	else \
+-		$(BLDSHARED) -o $@ $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM); \
++		$(BLDSHARED) -o $@ $(LIBRARY_OBJS) $(MODLIBS) $(SHLIBS) $(LIBC) $(LIBM) -lstdc++; \
+ 	fi
+ 
+ libpython3.so:	libpython$(LDVERSION).so

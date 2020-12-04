@@ -13,25 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 # At the time of this writing, Atheris requires a very new (unreleased) version
 # of libFuzzer. We expect very few people to have this version. However, it's
-# possible to do an in-place upgrade of libFuzzer just by fiddling with a symbol
-# in the archive. This script attempts to do that.
+# possible to do an in-place upgrade of libFuzzer by adding a thin wrapper into
+# the archive. Let's do that.
 
 set -e
 
 libfuzzer="$1"
-tmpfile_1="$(mktemp --suffix=.a)"
-tmpfile_2="$(mktemp --suffix=.a)"
+tmp_libfuzzer="$(mktemp --suffix=.a)"
+tmp_wrapper="$(mktemp --suffix=.o)"
 
-objcopy --redefine-sym=_ZN6fuzzer12FuzzerDriverEPiPPPcPFiPKhmE=LLVMFuzzerRunDriver \
+objcopy --globalize-symbol=_ZN6fuzzer12FuzzerDriverEPiPPPcPFiPKhmE \
           "$libfuzzer" \
-          "$tmpfile_1"
+          "$tmp_libfuzzer"
 
-objcopy --globalize-symbol=LLVMFuzzerRunDriver \
-          "$tmpfile_1" \
-          "$tmpfile_2"
+if [ -z "$CXX" ]; then
+  export CXX="clang++"
+fi
 
-echo "$tmpfile_2"
+(
+  DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+  cd "$DIR"
+  "$CXX" fuzzer_run_driver_wrapper.cc -c -o "$tmp_wrapper"
+)
+ar r "$tmp_libfuzzer" "$tmp_wrapper"
+
+echo "$tmp_libfuzzer"
 exit 0

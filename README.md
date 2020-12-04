@@ -88,19 +88,7 @@ If fuzzing a native extension without a significant Python component, you'll get
 
 #### Using Sanitizers
 
-We strongly recommend using a Clang sanitizer, such as `-fsanitize=address`, when fuzzing native extensions. Atheris supports Address Sanitizer (`-fsanitize=address`) and Undefined Behavior Sanitizer (`-fsanitize=undefined`). It does not support Memory Sanitizer or Thread Sanitizer, as those require whole-program linking. Usually, you can compile a sanitized extension like this:
-
-```
-CC="/usr/bin/clang" CFLAGS="-fsanitize=address,fuzzer-no-link" CXX="/usr/bin/clang++" CXXFLAGS="-fsanitize=address,fuzzer-no-link" pip install .
-```
-
-When using a sanitizer, you'll typically need to preload the sanitizer's dynamic library as well. You can find the clang libraries with the command `clang -print-search-dirs`. The sanitizers will typically be located under the first "libraries" entry.
-
-You can `LD_PRELOAD` multiple things by separating them with spaces. Be sure to put the ASan library first. Here's an example:
-
-```
-LD_PRELOAD="path/to/libclang_rt.asan-x86_64.so  path/to/atheris.so" python ./your_fuzzer.py
-```
+We strongly recommend using a Clang sanitizer, such as `-fsanitize=address`, when fuzzing native extensions. However, there are complexities involved in doing this; see [using_sanitizers.md](using_sanitizers.md) for details.
 
 ## API
 

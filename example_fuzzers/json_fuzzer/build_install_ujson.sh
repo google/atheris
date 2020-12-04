@@ -15,12 +15,9 @@
 # limitations under the License.
 
 # This is an example - You might need to change some parameters. This builds
-# ujson with coverage and ASAN enabled. Note that if you use ujson as part of
-# regular Python software, this may break it, as the new version of
-# ujson will require ASAN. You should reinstall it without the environment
-# variables defined to fix this.
+# ujson with coverage.
 git clone https://github.com/ultrajson/ultrajson
 (
   cd ultrajson;
-  CC="/usr/bin/clang" CFLAGS="-fsanitize=address,fuzzer-no-link" CXX="/usr/bin/clang++" CXXFLAGS="-fsanitize=address,fuzzer-no-link" pip3 install .
+  CC="/usr/bin/clang" CFLAGS="-fsanitize=fuzzer-no-link" CXX="/usr/bin/clang++" CXXFLAGS="-fsanitize=fuzzer-no-link" pip3 install .
 )
