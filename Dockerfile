@@ -1,4 +1,9 @@
 FROM python:3.8-buster
+# Example command:
+# $ git clone https://github.com/google/atheris.git
+# $ cd atheris
+# $ sudo docker build -t local/atheris .
+# $ sudo docker run -ti --rm local/atheris 
 
 # Default to the development branch of LLVM (currently 12)
 # User can override this to a stable branch (like 10 or 11)
