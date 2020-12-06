@@ -34,13 +34,16 @@ RUN set -eux; \
         clang-${LLVM_VERSION} \
         lld-${LLVM_VERSION} \
         llvm-${LLVM_VERSION} && \
-    CLANG_BIN="/usr/lib/llvm-12/bin/clang" pip install atheris hypothesis && \
+    chmod -f +x /usr/lib/llvm-${LLVM_VERSION}/bin/* && \
+    update-alternatives --install /usr/bin/clang   clang   /usr/bin/clang-${LLVM_VERSION} 999 && \
+    update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${LLVM_VERSION} 999 && \
+    CLANG_BIN="/usr/bin/clang" pip install atheris hypothesis && \
     rm -rf /var/lib/apt/lists/*
 
 # Build from the sources
 # WORKDIR /usr/src/atheris
 # COPY . .
 # RUN set -eux; \
-#     CLANG_BIN="/usr/lib/llvm-12/bin/clang"  pip install -e .
+#     CLANG_BIN="/usr/bin/clang"  pip install -e .
 ### Test build from sources
-###  python example_fuzzers/fuzzing_example.py 
+###  python example_fuzzers/fuzzing_example.py
