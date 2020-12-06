@@ -45,7 +45,7 @@ import sys
 def TestOneInput(data):
   if data == b"bad":
     raise RuntimeError("Badness!")
-    
+
 atheris.Setup(sys.argv, TestOneInput)
 atheris.Fuzz()
 ```
@@ -135,7 +135,7 @@ def ConsumeBytes(count: int)
 ```
 Consume `count` bytes.
 
-  
+
 ```
 def ConsumeUnicode(count: int)
 ```
@@ -255,6 +255,7 @@ input.  For example:
 
 ```
 import atheris
+import sys
 from hypothesis import given, strategies as st
 
 @given(st.from_regex(r"\w+!?", fullmatch=True))
@@ -267,4 +268,3 @@ atheris.Fuzz()
 
 [See here for more details](https://hypothesis.readthedocs.io/en/latest/details.html#use-with-external-fuzzers),
 or [here for what you can generate](https://hypothesis.readthedocs.io/en/latest/data.html).
-
