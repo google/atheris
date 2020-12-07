@@ -1,9 +1,31 @@
-FROM python:3.8-buster
-# Example command:
+# Copyright 2020 Valeriy Soloviov
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Dockerfile extending the generic Python image with atheris inside.
+
+# To build the image, it is necessary that docker build be invoked from the
+# parent folder of this file.
+# Example container execution command:
+#
 # $ git clone https://github.com/google/atheris.git
 # $ cd atheris
-# $ sudo docker build -t local/atheris .
-# $ sudo docker run -ti --rm local/atheris 
+# $ docker build -t local/atheris .
+# $ docker run -ti --rm local/atheris \
+#   -v <PathToTheSourceFilesFolder>:/usr/src/app \
+#   -it python /usr/src/app/<YourSourceFile>
+#
+FROM python:3.8-buster
 
 # Default to the development branch of LLVM (currently 12)
 # User can override this to a stable branch (like 10 or 11)
@@ -42,13 +64,15 @@ RUN set -eux; \
     chmod -f +x /usr/lib/llvm-${LLVM_VERSION}/bin/* && \
     update-alternatives --install /usr/bin/clang   clang   /usr/bin/clang-${LLVM_VERSION} 999 && \
     update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${LLVM_VERSION} 999 && \
-    CLANG_BIN="/usr/bin/clang" pip install atheris hypothesis && \
+    pip install atheris hypothesis && \
     rm -rf /var/lib/apt/lists/*
 
-# Build from the sources
+# Uncomment this to build from the sources
 # WORKDIR /usr/src/atheris
 # COPY . .
 # RUN set -eux; \
 #     CLANG_BIN="/usr/bin/clang"  pip install -e .
 ### Test build from sources
 ###  python example_fuzzers/fuzzing_example.py
+
+WORKDIR /usr/src/app
