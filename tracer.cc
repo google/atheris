@@ -116,21 +116,23 @@ auto& key_to_reg_module = *new std::unordered_map<TraceKey, ModuleEntry>();
 auto& key_to_func_module = *new std::unordered_map<TraceKey, ModuleEntry>();
 
 NO_SANITIZE
-const ModuleEntry& FindOrAddModuleData(TraceKey key, bool is_func_entry) {
+std::pair<const ModuleEntry*, bool /*is_new*/> FindOrAddModuleData(
+    TraceKey key, bool is_func_entry) {
   PyGILState_Ensure();
 
   auto& map = (is_func_entry ? key_to_func_module : key_to_reg_module);
   auto& ret = map[key];
-  if (!ret.module) {
-    auto& deq = (is_func_entry ? func_modules : reg_modules);
-    ret.module = &deq.back();
-    ret.idx = ret.module->size++;
-    if (ret.module->capacity == ret.module->size) {
-      deq.push_back(MakeModule(ret.module->capacity * 2, is_func_entry));
-    }
+
+  if (ret.module) return {&ret, false};
+
+  auto& deq = (is_func_entry ? func_modules : reg_modules);
+  ret.module = &deq.back();
+  ret.idx = ret.module->size++;
+  if (ret.module->capacity == ret.module->size) {
+    deq.push_back(MakeModule(ret.module->capacity * 2, is_func_entry));
   }
 
-  return ret;
+  return {&ret, true};
 }
 
 NO_SANITIZE
@@ -138,6 +140,17 @@ void MarkEntryVisited(const ModuleEntry& entry) {
   unsigned char& ctr = entry.module->counters[entry.idx];
   ++ctr;
   if (ctr == 0) --ctr;
+}
+
+int printed_funcs = 0;
+int max_printed_funcs = 1;
+
+void PrintFunc(PyFrameObject* frame) {
+  std::cerr << "\tNEW_PY_FUNC[" << printed_funcs << "/" << max_printed_funcs
+            << "]: " << py::handle(frame->f_code->co_name).cast<std::string>()
+            << "() "
+            << py::handle(frame->f_code->co_filename).cast<std::string>() << ":"
+            << frame->f_lineno << std::endl;
 }
 
 #ifdef HAS_OPCODE_TRACE
@@ -267,17 +280,24 @@ int Tracer(void* pyobj, PyFrameObject* frame, int what, PyObject* arg_unused) {
   // Anything else (e.g. LINE events) is redundant, as we'll also get one or
   // more OPCODE events for those lines.
   if (what == PyTrace_CALL || what == PyTrace_OPCODE) {
-    const ModuleEntry& entry = FindOrAddModuleData(key, what == PyTrace_CALL);
-    MarkEntryVisited(entry);
+    auto entry_data = FindOrAddModuleData(key, what == PyTrace_CALL);
+    MarkEntryVisited(*entry_data.first);
 
     if (what == PyTrace_OPCODE) {
       unsigned int opcode =
           PyBytes_AsString(frame->f_code->co_code)[frame->f_lasti];
       if (opcode == COMPARE_OP) {
-        TraceCompareOp(entry, frame);
+        TraceCompareOp(*entry_data.first, frame);
       }
     }
+
+    if (what == PyTrace_CALL && entry_data.second &&
+        printed_funcs < max_printed_funcs) {
+      ++printed_funcs;
+      PrintFunc(frame);
+    }
   }
+
   return 0;
 }
 
@@ -288,15 +308,24 @@ int TracerNoOpcodes(void* pyobj, PyFrameObject* frame, int what,
                     PyObject* arg_unused) {
   // When not using OPCODE tracing, trace every kind of event we can.
   auto key = CompositeHash(frame->f_lineno, what, frame->f_code);
-  const ModuleEntry& entry = FindOrAddModuleData(key, what == PyTrace_CALL);
-  MarkEntryVisited(entry);
+  auto entry_data = FindOrAddModuleData(key, what == PyTrace_CALL);
+  MarkEntryVisited(*entry_data.first);
+
+  if (what == PyTrace_CALL && entry_data.second &&
+      printed_funcs < max_printed_funcs) {
+    ++printed_funcs;
+    PrintFunc(frame);
+  }
+
   return 0;
 }
 
 NO_SANITIZE
-void SetupTracer(bool enable_opcode_tracing) {
+void SetupTracer(int max_print_funcs, bool enable_opcode_tracing) {
   reg_modules.push_back(MakeModule(512, false));
   func_modules.push_back(MakeModule(512, true));
+
+  max_printed_funcs = max_print_funcs;
 
 #ifdef HAS_OPCODE_TRACE
 
@@ -321,5 +350,9 @@ void SetupTracer(bool enable_opcode_tracing) {
   PyEval_SetTrace((Py_tracefunc)TracerNoOpcodes, (PyObject*)nullptr);
 #endif
 }
+
+// Called before every TestOneInput.
+NO_SANITIZE
+void TracerStartInput() { printed_funcs = 0; }
 
 }  // namespace atheris

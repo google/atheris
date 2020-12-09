@@ -95,6 +95,16 @@ std::vector<std::string> Setup(
 
   args_global = args;
   test_one_input_global = test_one_input;
+
+  int print_funcs = 2;
+
+  // Parse out any libFuzzer flags we also care about.
+  for (const std::string& arg : args) {
+    if (arg.substr(0, 13) == "-print_funcs=") {
+      print_funcs = std::stoul(arg.substr(13, std::string::npos));
+    }
+  }
+
   // Strip libFuzzer arguments (single dash).
   std::vector<std::string> ret;
   for (const std::string& arg : args) {
@@ -121,7 +131,7 @@ std::vector<std::string> Setup(
   }
 
   if (enable_python_coverage) {
-    SetupTracer(enable_python_opcode_coverage);
+    SetupTracer(print_funcs, enable_python_opcode_coverage);
   }
 
   if (GetCoverageSymbolsLocation() != GetLibFuzzerSymbolsLocation()) {
@@ -133,6 +143,7 @@ std::vector<std::string> Setup(
 
 NO_SANITIZE
 int TestOneInput(const uint8_t* data, size_t size) {
+  TracerStartInput();
   try {
     test_one_input_global(py::bytes(reinterpret_cast<const char*>(data), size));
     return 0;
