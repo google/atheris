@@ -185,6 +185,7 @@ class BuildExt(build_ext):
 
   def build_extensions(self):
     libfuzzer = get_libfuzzer_lib()
+    orig_libfuzzer = libfuzzer
     orig_libfuzzer_name = os.path.basename(libfuzzer)
     version = check_libfuzzer_version(libfuzzer)
 
@@ -230,17 +231,72 @@ class BuildExt(build_ext):
     build_ext.build_extensions(self)
 
     try:
-      self.deploy_libfuzzer(libfuzzer, orig_libfuzzer_name)
+      self.deploy_file(libfuzzer, orig_libfuzzer_name)
     except Exception as e:
-      sys.stderr.write(e)
+      sys.stderr.write(str(e))
       sys.stderr.write("\n")
       pass
 
-  def deploy_libfuzzer(self, libfuzzer, orig_libfuzzer_name):
-    atheris = self.get_ext_fullpath("atheris")
-    dest_libfuzzer = os.path.join(os.path.dirname(atheris), orig_libfuzzer_name)
+    # Deploy versions of ASan and UBSan that have been merged with libFuzzer
+    asan_name = orig_libfuzzer.replace(".fuzzer_no_main-", ".asan-")
+    merged_asan_name = os.path.splitext(
+        os.path.basename(
+            orig_libfuzzer.replace(".fuzzer_no_main-",
+                                   ".asan_with_fuzzer-")))[0] + ".so"
+    self.merge_deploy_libfuzzer_sanitizer(
+        libfuzzer, asan_name, merged_asan_name,
+        "asan_preinit.cc.o asan_preinit.cpp.o")
 
-    shutil.copy(libfuzzer, dest_libfuzzer)
+    ubsan_name = orig_libfuzzer.replace(".fuzzer_no_main-",
+                                        ".ubsan_standalone-")
+    merged_ubsan_name = os.path.splitext(
+        os.path.basename(
+            orig_libfuzzer.replace(
+                ".fuzzer_no_main-",
+                ".ubsan_standalone_with_fuzzer-")))[0] + ".so"
+    self.merge_deploy_libfuzzer_sanitizer(
+        libfuzzer, ubsan_name, merged_ubsan_name,
+        "ubsan_init_standalone_preinit.cc.o ubsan_init_standalone_preinit.cpp.o"
+    )
+
+    ubsanxx_name = orig_libfuzzer.replace(".fuzzer_no_main-",
+                                          ".ubsan_standalone_cxx-")
+    merged_ubsanxx_name = os.path.splitext(
+        os.path.basename(
+            orig_libfuzzer.replace(
+                ".fuzzer_no_main-",
+                ".ubsan_standalone_cxx_with_fuzzer-")))[0] + ".so"
+    self.merge_deploy_libfuzzer_sanitizer(
+        libfuzzer, ubsanxx_name, merged_ubsanxx_name,
+        "ubsan_init_standalone_preinit.cc.o ubsan_init_standalone_preinit.cpp.o"
+    )
+
+  def deploy_file(self, name, target_filename):
+    atheris = self.get_ext_fullpath("atheris")
+    dest_file = os.path.join(os.path.dirname(atheris), target_filename)
+
+    shutil.copy(name, dest_file)
+
+  def merge_libfuzzer_sanitizer(self, libfuzzer, sanitizer, strip_preinit):
+    """Generate a .so that contains both libFuzzer and a sanitizer."""
+    current_path = os.path.dirname(os.path.realpath(__file__))
+
+    new_sanitizer = subprocess.check_output([
+        os.path.join(current_path, "setup_utils/merge_libfuzzer_sanitizer.sh"),
+        libfuzzer, sanitizer, strip_preinit
+    ])
+
+    return new_sanitizer.strip().decode("utf-8")
+
+  def merge_deploy_libfuzzer_sanitizer(self, libfuzzer, lib_name,
+                                       merged_lib_name, preinit):
+    try:
+      merged_asan = self.merge_libfuzzer_sanitizer(libfuzzer, lib_name, preinit)
+      self.deploy_file(merged_asan, merged_lib_name)
+    except Exception as e:
+      sys.stderr.write(str(e))
+      sys.stderr.write("\n")
+      pass
 
 
 setup(
