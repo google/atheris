@@ -30,7 +30,7 @@ cp "$sanitizer" "$tmp_sanitizer"
 
 ar d "$tmp_sanitizer" $strip_preinit  # Intentionally not quoted
 
-"$CXX" -Wl,--whole-archive "$libfuzzer" "$tmp_sanitizer" -Wl,--no-whole-archive -shared -o "$tmp_merged"
+"$CXX" -Wl,--whole-archive "$libfuzzer" "$tmp_sanitizer" -Wl,--no-whole-archive -lpthread -shared -o "$tmp_merged"
 
 echo "$tmp_merged"
 exit 0
