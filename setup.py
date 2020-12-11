@@ -25,7 +25,7 @@ from setuptools import Extension
 from setuptools import setup
 from setuptools.command.build_ext import build_ext
 
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 
 clang_install_instructions = """download and build the latest version of Clang:
     git clone https://github.com/llvm/llvm-project.git
@@ -239,21 +239,14 @@ class BuildExt(build_ext):
 
     # Deploy versions of ASan and UBSan that have been merged with libFuzzer
     asan_name = orig_libfuzzer.replace(".fuzzer_no_main-", ".asan-")
-    merged_asan_name = os.path.splitext(
-        os.path.basename(
-            orig_libfuzzer.replace(".fuzzer_no_main-",
-                                   ".asan_with_fuzzer-")))[0] + ".so"
+    merged_asan_name = "asan_with_fuzzer.so"
     self.merge_deploy_libfuzzer_sanitizer(
         libfuzzer, asan_name, merged_asan_name,
         "asan_preinit.cc.o asan_preinit.cpp.o")
 
     ubsan_name = orig_libfuzzer.replace(".fuzzer_no_main-",
                                         ".ubsan_standalone-")
-    merged_ubsan_name = os.path.splitext(
-        os.path.basename(
-            orig_libfuzzer.replace(
-                ".fuzzer_no_main-",
-                ".ubsan_standalone_with_fuzzer-")))[0] + ".so"
+    merged_ubsan_name = "ubsan_with_fuzzer.so"
     self.merge_deploy_libfuzzer_sanitizer(
         libfuzzer, ubsan_name, merged_ubsan_name,
         "ubsan_init_standalone_preinit.cc.o ubsan_init_standalone_preinit.cpp.o"
@@ -261,11 +254,7 @@ class BuildExt(build_ext):
 
     ubsanxx_name = orig_libfuzzer.replace(".fuzzer_no_main-",
                                           ".ubsan_standalone_cxx-")
-    merged_ubsanxx_name = os.path.splitext(
-        os.path.basename(
-            orig_libfuzzer.replace(
-                ".fuzzer_no_main-",
-                ".ubsan_standalone_cxx_with_fuzzer-")))[0] + ".so"
+    merged_ubsanxx_name = "ubsan_cxx_with_fuzzer.so"
     self.merge_deploy_libfuzzer_sanitizer(
         libfuzzer, ubsanxx_name, merged_ubsanxx_name,
         "ubsan_init_standalone_preinit.cc.o ubsan_init_standalone_preinit.cpp.o"
@@ -291,8 +280,8 @@ class BuildExt(build_ext):
   def merge_deploy_libfuzzer_sanitizer(self, libfuzzer, lib_name,
                                        merged_lib_name, preinit):
     try:
-      merged_asan = self.merge_libfuzzer_sanitizer(libfuzzer, lib_name, preinit)
-      self.deploy_file(merged_asan, merged_lib_name)
+      merged_lib = self.merge_libfuzzer_sanitizer(libfuzzer, lib_name, preinit)
+      self.deploy_file(merged_lib, merged_lib_name)
     except Exception as e:
       sys.stderr.write(str(e))
       sys.stderr.write("\n")
