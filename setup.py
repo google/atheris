@@ -25,7 +25,7 @@ from setuptools import Extension
 from setuptools import setup
 from setuptools.command.build_ext import build_ext
 
-__version__ = "1.0.6"
+__version__ = "1.0.7"
 
 clang_install_instructions = """download and build the latest version of Clang:
     git clone https://github.com/llvm/llvm-project.git
