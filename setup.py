@@ -25,7 +25,11 @@ from setuptools import Extension
 from setuptools import setup
 from setuptools.command.build_ext import build_ext
 
-__version__ = "1.0.7"
+__version__ = os.getenv("ATHERIS_VERSION", "1.0.7")
+
+if len(sys.argv) > 1 and sys.argv[1] == "print_version":
+  print(__version__)
+  quit()
 
 clang_install_instructions = """download and build the latest version of Clang:
     git clone https://github.com/llvm/llvm-project.git
