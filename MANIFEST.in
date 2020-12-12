@@ -2,3 +2,4 @@ include *
 recursive-include * *
 recursive-exclude .git *
 recursive-exclude dist *
+recursive-exclude deployment *
