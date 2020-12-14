@@ -16,12 +16,10 @@
 """ An example native JSON vs uJSON differential fuzzer.
 
 This fuzzer looks for differences between the built-in json library and the
-native ujson library. The ujson library should be built for coverage (see
-build_install_ujson.sh), and the Python fuzzer should be executed under ASAN.
-As an example:
-    LD_PRELOAD="/usr/lib/llvm-9/lib/clang/9.0.1/lib/linux/libclang_rt.asan-x86_64.so
-    $(python3 -c "import atheris; print(atheris.path())")" python3
-    ./json_differential_fuzzer.py -detect_leaks=0
+native ujson library. The ujson library should be built for coverage and,
+optionally, Address Sanitizer.
+(see build_install_ujson.sh and the instructions for sanitizers:
+https://github.com/google/atheris/blob/master/using_sanitizers.md)
 
 This fuzzer has found a bug with inconsistent handling of integers with
 too-high magnitude. uJSON sometimes refuses to process numbers that are too far
@@ -37,7 +35,13 @@ values that are too big or too small is techincally fine; however,
 misinterpreting them is not.
 """
 
-import atheris
+
+# See using_sanitizers.md for what this is about.
+try:
+  import atheris_no_libfuzzer as atheris
+except ImportError:
+  import atheris
+
 import json
 import ujson
 import sys
@@ -91,4 +95,3 @@ def main():
 
 if __name__ == "__main__":
   main()
-

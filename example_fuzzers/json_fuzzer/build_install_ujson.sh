@@ -15,9 +15,9 @@
 # limitations under the License.
 
 # This is an example - You might need to change some parameters. This builds
-# ujson with coverage.
+# ujson with coverage and Address Sanitizer.
 git clone https://github.com/ultrajson/ultrajson
 (
   cd ultrajson;
-  CC="/usr/bin/clang" CFLAGS="-fsanitize=fuzzer-no-link" CXX="/usr/bin/clang++" CXXFLAGS="-fsanitize=fuzzer-no-link" pip3 install .
+  CC="/usr/bin/clang" CFLAGS="-fsanitize=fuzzer-no-link,address" CXX="/usr/bin/clang++" CXXFLAGS="-fsanitize=fuzzer-no-link,address" pip3 install .
 )
