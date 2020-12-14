@@ -72,23 +72,13 @@ The mechanics of building with Clang depend on your native extension. However, i
 CC="/usr/bin/clang" CFLAGS="-fsanitize=fuzzer-no-link" CXX="/usr/bin/clang++" CXXFLAGS="-fsanitize=fuzzer-no-link" pip install .
 ```
 
-When fuzzing a native extension, you must `LD_PRELOAD` the atheris dynamic library. Otherwise, you will receive an error such as `undefined symbol: __sancov_lowest_stack`.  Atheris provides a feature to do this: you can find the atheris dynamic library with the following command:
-
-```
-python -c "import atheris; print(atheris.path())"
-```
-
-Then, run Python with `LD_PRELOAD`:
-
-```
-LD_PRELOAD="path/to/atheris.so" python ./your_fuzzer.py
-```
-
-If fuzzing a native extension without a significant Python component, you'll get better performance by specifying `enable_python_coverage=False` as an argument to `Setup()`.
-
 #### Using Sanitizers
 
-We strongly recommend using a Clang sanitizer, such as `-fsanitize=address`, when fuzzing native extensions. However, there are complexities involved in doing this; see [using_sanitizers.md](using_sanitizers.md) for details.
+When fuzzing a native extension, **we strongly recommend you use a sanitizer**, such as Address Sanitizer or Undefined Behavior Sanitizer. However, there are complexities involved in doing this; see [using_sanitizers.md](using_sanitizers.md) for details.
+
+## Integration with OSS-Fuzz
+
+Atheris is fully supported by [OSS-Fuzz](https://github.com/google/oss-fuzz), Google's continuous fuzzing service for open source projects. For integrating with OSS-Fuzz, please see [https://google.github.io/oss-fuzz/getting-started/new-project-guide/python-lang](https://google.github.io/oss-fuzz/getting-started/new-project-guide/python-lang).
 
 ## API
 

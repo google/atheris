@@ -15,21 +15,19 @@
 # limitations under the License.
 """This fuzzer is an example of native extension fuzzing with coverage.
 
-This requires that the fuzzer be built with coverage:
-see build_install_ujson.sh.
-The fuzzer should then be executed under ASAN.
-
-As an example, this is the run command under the author's machine:
-    LD_PRELOAD="/usr/lib/llvm-9/lib/clang/9.0.1/lib/linux/libclang_rt.asan-x86_64.so
-    $(python3 -c "import atheris; print(atheris.path())")" python3
-    ./ujson_fuzzer.py -detect_leaks=0
+The ujson library should be built for coverage and,
+optionally, Address Sanitizer.
+(see build_install_ujson.sh and the instructions for sanitizers:
+https://github.com/google/atheris/blob/master/using_sanitizers.md)
+(see build_install_ujson.sh and the instructions for sanitizers:
+https://github.com/google/atheris/blob/master/using_sanitizers.md)
 
 This fuzzer is provided mainly as an example for how to deal with native
 coverage.
 """
 
 import sys
-import atheris
+import atheris_no_libfuzzer as atheris
 import ujson
 
 
