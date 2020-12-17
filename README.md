@@ -96,6 +96,7 @@ Configure the Atheris Python Fuzzer. You must call `atheris.Setup()` before `ath
 
 Args:
  - `args`: A list of strings: the process arguments to pass to the fuzzer, typically `sys.argv`. This argument list may be modified in-place, to remove arguments consumed by the fuzzer.
+   See [the LibFuzzer docs](https://llvm.org/docs/LibFuzzer.html#options) for a list of such options.
  - `test_one_input`: your fuzzer's entry point. Must take a single `bytes` argument (`str` in Python 2). This will be repeatedly invoked with a single bytes container.
 
 Optional Args:
@@ -108,9 +109,14 @@ def Fuzz():
 
 This starts the fuzzer. You must have called `Setup()` before calling this function. This function does not return.
 
+In many cases `Setup()` and `Fuzz()` could be combined into a single function, but they are
+separated because you may want the fuzzer to consume the command-line arguments it handles
+before passing any remaining arguments to another setup function.
+
 ### FuzzedDataProvider
 
 Often, a `bytes` object is not convenient input to your code being fuzzed. Similar to libFuzzer, we provide a FuzzedDataProvider to translate these bytes into other input forms.
+Alternatively, you can use [Hypothesis](https://hypothesis.readthedocs.io/) as described below.
 
 You can construct the FuzzedDataProvider with:
 
