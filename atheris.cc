@@ -21,6 +21,7 @@
 #include "pybind11/functional.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
+#include "tracer.h"
 #include "util.h"
 
 namespace atheris {
@@ -34,6 +35,14 @@ PYBIND11_MODULE(ATHERIS_MODULE_NAME, m) {
 
   m.def("Setup", &Setup);
   m.def("Fuzz", &Fuzz);
+  m.def("TraceThisThread", [](pybind11::kwargs kwargs){
+      bool enable_python_opcode_coverage = true;
+      if (kwargs.contains("enable_python_opcode_coverage")) {
+        enable_python_opcode_coverage =
+            kwargs["enable_python_opcode_coverage"].cast<bool>();
+      }
+      TraceThisThread(enable_python_opcode_coverage);
+  });
 
   py::class_<FuzzedDataProvider>(m, "FuzzedDataProvider")
       .def(py::init<py::bytes>())
