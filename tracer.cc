@@ -115,6 +115,8 @@ auto& func_modules = *new std::deque<Module>{};
 auto& key_to_reg_module = *new std::unordered_map<TraceKey, ModuleEntry>();
 auto& key_to_func_module = *new std::unordered_map<TraceKey, ModuleEntry>();
 
+bool tracer_setup = false;
+
 NO_SANITIZE
 std::pair<const ModuleEntry*, bool /*is_new*/> FindOrAddModuleData(
     TraceKey key, bool is_func_entry) {
@@ -268,6 +270,8 @@ NO_SANITIZE
 int Tracer(void* pyobj, PyFrameObject* frame, int what, PyObject* arg_unused) {
   frame->f_trace_opcodes = true;
 
+  if (!tracer_setup) return 0;
+
   TraceKey key = 0;
   if (what == PyTrace_CALL) {
     key = CompositeHash(frame->f_lineno, what, frame->f_code);
@@ -306,6 +310,8 @@ int Tracer(void* pyobj, PyFrameObject* frame, int what, PyObject* arg_unused) {
 NO_SANITIZE
 int TracerNoOpcodes(void* pyobj, PyFrameObject* frame, int what,
                     PyObject* arg_unused) {
+  if (!tracer_setup) return 0;
+
   // When not using OPCODE tracing, trace every kind of event we can.
   auto key = CompositeHash(frame->f_lineno, what, frame->f_code);
   auto entry_data = FindOrAddModuleData(key, what == PyTrace_CALL);
@@ -324,22 +330,22 @@ NO_SANITIZE
 void SetupTracer(int max_print_funcs, bool enable_opcode_tracing) {
   reg_modules.push_back(MakeModule(512, false));
   func_modules.push_back(MakeModule(512, true));
-
   max_printed_funcs = max_print_funcs;
+
+  TraceThisThread(enable_opcode_tracing);
 
 #ifdef HAS_OPCODE_TRACE
 
   if (enable_opcode_tracing) {
     std::cerr << "INFO: Configured for Python tracing with opcodes."
               << std::endl;
-    PyEval_SetTrace((Py_tracefunc)Tracer, (PyObject*)nullptr);
   } else {
     std::cerr << "INFO: Configured for Python tracing without opcodes."
               << std::endl;
-    PyEval_SetTrace((Py_tracefunc)TracerNoOpcodes, (PyObject*)nullptr);
   }
 
 #else
+
   if (enable_opcode_tracing) {
     std::cerr << Colorize(STDERR_FILENO,
                           "Opcode tracing requested, but this feature is only "
@@ -347,6 +353,20 @@ void SetupTracer(int max_print_funcs, bool enable_opcode_tracing) {
               << std::endl;
   }
   std::cerr << "INFO: Configured for Python tracing." << std::endl;
+
+#endif
+
+  tracer_setup = true;
+}
+
+void TraceThisThread(bool enable_opcode_tracing) {
+#ifdef HAS_OPCODE_TRACE
+  if (enable_opcode_tracing) {
+    PyEval_SetTrace((Py_tracefunc)Tracer, (PyObject*)nullptr);
+  } else {
+    PyEval_SetTrace((Py_tracefunc)TracerNoOpcodes, (PyObject*)nullptr);
+  }
+#else
   PyEval_SetTrace((Py_tracefunc)TracerNoOpcodes, (PyObject*)nullptr);
 #endif
 }

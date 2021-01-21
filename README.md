@@ -113,6 +113,23 @@ In many cases `Setup()` and `Fuzz()` could be combined into a single function, b
 separated because you may want the fuzzer to consume the command-line arguments it handles
 before passing any remaining arguments to another setup function.
 
+```python
+def TraceThisThread(enable_python_opcode_coverage=True):
+```
+
+While we don't recommend using threads during fuzzing if you can avoid it,
+Atheris does support it.
+
+This function enables the collection of coverage information for the current
+thread. Python coverage collection must be enabled in `Setup()` or this has no
+effect. (Thread coverage still works if this function is called before
+`Setup()`, and `Setup()` is subsequently called with
+`enable_python_coverage=True`).
+
+Optional Args:
+ - `enable_python_opcode_coverage`: boolean. Controls whether to collect Python opcode trace events for this thread. You typically want this enabled. Defaults to `True` ; ignored and unsupported if using a version of Python prior to 3.8.
+
+
 ### FuzzedDataProvider
 
 Often, a `bytes` object is not convenient input to your code being fuzzed. Similar to libFuzzer, we provide a FuzzedDataProvider to translate these bytes into other input forms.

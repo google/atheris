@@ -28,6 +28,7 @@
 namespace atheris {
 
 void SetupTracer(int max_print_funcs, bool enable_opcode_tracing);
+void TraceThisThread(bool enable_opcode_tracing);
 
 void TracerStartInput();
 
