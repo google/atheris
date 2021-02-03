@@ -15,8 +15,6 @@
 
 set -e
 
->&2 echo "Do not run this script in google3 - it will leak internal code. Instead, run Copybara to deploy to git, and run this script from that repo."; exit 1;  # copybara:strip(google3-internal)
-
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "${DIR}/../"
 
