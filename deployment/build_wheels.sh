@@ -13,28 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$DIR"
 
-libfuzzer="$1"
-sanitizer="$2"
-strip_preinit="$3"
-
-tmp_sanitizer="$(mktemp --suffix=.a)"
-tmp_merged="$(mktemp --suffix=.so)"
-
-if [ -z "$CXX" ]; then
-  if which clang++ > /dev/null 2>&1; then
-    export CXX="clang++"
-  else
-    export CXX="g++"
-  fi
-fi
-
-cp "$sanitizer" "$tmp_sanitizer"
-
-ar d "$tmp_sanitizer" $strip_preinit  # Intentionally not quoted
-
-"$CXX" -Wl,--whole-archive "$libfuzzer" "$tmp_sanitizer" -Wl,--no-whole-archive -lpthread -shared -o "$tmp_merged"
-
-echo "$tmp_merged"
-exit 0
+sudo docker build -t atheris-builder ./
+sudo docker run -it --env ATHERIS_VERSION="$ATHERIS_VERSION" --mount type=bind,source=$PWD/../,target=/atheris atheris-builder

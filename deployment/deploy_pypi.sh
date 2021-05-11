@@ -42,6 +42,7 @@ fi
   set -e -x
   # Build and push
   python3 setup.py sdist
+  deployment/build_wheels.sh
   python3 -m twine upload --repository "$pypi" dist/*
 )
 
