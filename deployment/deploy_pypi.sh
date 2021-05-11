@@ -41,8 +41,12 @@ fi
 (
   set -e -x
   # Build and push
-  python3 setup.py sdist
-  deployment/build_wheels.sh
+  if [ "$(uname)" == "Darwin" ]; then
+    deployment/build_wheels_mac.sh
+  else
+    python3 setup.py sdist
+    deployment/build_wheels.sh
+  fi
   python3 -m twine upload --repository "$pypi" dist/*
 )
 
