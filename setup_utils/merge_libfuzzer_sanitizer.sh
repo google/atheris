@@ -19,8 +19,9 @@ libfuzzer="$1"
 sanitizer="$2"
 strip_preinit="$3"
 
-tmp_sanitizer="$(mktemp --suffix=.a)"
-tmp_merged="$(mktemp --suffix=.so)"
+tmpdir="$(mktemp -d)"
+tmp_sanitizer="${tmpdir}/sanitizer.a"
+tmp_merged="${tmpdir}/sanitizer.so"
 
 if [ -z "$CXX" ]; then
   if which clang++ > /dev/null 2>&1; then
