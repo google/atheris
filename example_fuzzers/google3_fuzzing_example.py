@@ -21,7 +21,7 @@ import atheris
 with atheris.instrument():
   import struct
   import sys
-  import example_library
+  from google3.third_party.py.atheris.example_fuzzers import example_library
 
 
 def TestOneInput(data):

@@ -38,10 +38,10 @@ misinterpreting them is not.
 
 # See using_sanitizers.md for what this is about.
 import atheris
-
-import json
-import ujson
-import sys
+atheris.instrument():
+  import json
+  import ujson
+  import sys
 
 
 def ClearAllIntegers(data):

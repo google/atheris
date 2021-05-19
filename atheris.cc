@@ -15,27 +15,25 @@
 
 #include "atheris.h"
 
+#include <Python.h>
+#include <dlfcn.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <dlfcn.h>
 
-#include <Python.h>
 #include <exception>
 #include <iostream>
-#include <sstream>
 #include <limits>
+#include <sstream>
 
+#include "atheris.h"
 #include "fuzzed_data_provider.h"
 #include "macros.h"
 #include "pybind11/functional.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
 #include "util.h"
-#include "atheris.h"
 
 namespace atheris {
-    
-namespace py = pybind11;
 
 namespace {
 
@@ -46,32 +44,36 @@ std::function<void(py::bytes data)>& test_one_input_global =
     });
 
 std::vector<std::string>& args_global = *new std::vector<std::string>();
-unsigned long long num_counters = 0;
+uint64_t num_counters = 0;
 bool internal_libfuzzer = true;
 bool setup_called = false;
 
 }  // namespace
 
+// These versions of _trace_branch, _trace_cmp, and _reserve_counters are called
+// before fuzzing has begun.
+
 NO_SANITIZE
-void _trace_branch(unsigned long long idx) {
-  
+void prefuzz_trace_branch(uint64_t idx) {
+  // We don't care about tracing before fuzzing starts, do nothing.
 }
 
 NO_SANITIZE
-void _reserve_counters(unsigned long long num) {
-  num_counters += num;
-}
-
-NO_SANITIZE
-py::handle _trace_cmp(py::handle left, py::handle right, int opid, unsigned long long idx, bool left_is_const) {
+py::handle prefuzz_trace_cmp(py::handle left, py::handle right, int opid,
+                             uint64_t idx, bool left_is_const) {
+  // We don't care about tracing before fuzzing starts, but _trace_cmp actually
+  // *replaces* the comparison, so just do a compare.
   PyObject* ret = PyObject_RichCompare(left.ptr(), right.ptr(), opid);
-  
+
   if (ret == nullptr) {
     throw py::error_already_set();
   } else {
     return ret;
   }
 }
+
+NO_SANITIZE
+void prefuzz_reserve_counters(uint64_t num) { num_counters += num; }
 
 NO_SANITIZE
 std::vector<std::string> Setup(
@@ -97,7 +99,7 @@ std::vector<std::string> Setup(
     }
     ret.push_back(arg);
   }
-  
+
   if (kwargs.contains("internal_libfuzzer")) {
     internal_libfuzzer = kwargs["internal_libfuzzer"].cast<bool>();
   }
@@ -114,32 +116,29 @@ void Fuzz() {
     exit(1);
   }
 
-  py::module atheris = (py::module) py::module::import("sys").attr("modules")["atheris"];
+  py::module atheris =
+      (py::module)py::module::import("sys").attr("modules")["atheris"];
   py::module core;
-  
+
   if (internal_libfuzzer) {
     core = py::module::import("atheris.core_with_libfuzzer");
   } else {
     core = py::module::import("atheris.core_without_libfuzzer");
   }
-  
+
   atheris.attr("_trace_cmp") = core.attr("_trace_cmp");
-  atheris.attr("_reserve_counters") = core.attr("_reserve_counters");
   atheris.attr("_trace_branch") = core.attr("_trace_branch");
-  
+  atheris.attr("_reserve_counters") = core.attr("_reserve_counters");
+
   core.attr("start_fuzzing")(args_global, test_one_input_global, num_counters);
 }
 
-#ifndef ATHERIS_MODULE_NAME
-#error Need ATHERIS_MODULE_NAME
-#endif  // ATHERIS_MODULE_NAME
-
-PYBIND11_MODULE(ATHERIS_MODULE_NAME, m) {
+PYBIND11_MODULE(atheris, m) {
   m.def("Setup", &Setup);
   m.def("Fuzz", &Fuzz);
-  m.def("_trace_branch", &_trace_branch);
-  m.def("_reserve_counters", &_reserve_counters);
-  m.def("_trace_cmp", &_trace_cmp, py::return_value_policy::move);
+  m.def("_trace_branch", &prefuzz_trace_branch);
+  m.def("_trace_cmp", &prefuzz_trace_cmp, py::return_value_policy::move);
+  m.def("_reserve_counters", &prefuzz_reserve_counters);
 
   py::class_<FuzzedDataProvider>(m, "FuzzedDataProvider")
       .def(py::init<py::bytes>())

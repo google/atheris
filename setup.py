@@ -26,7 +26,7 @@ from setuptools import Extension
 from setuptools import setup
 from setuptools.command.build_ext import build_ext
 
-__version__ = os.getenv("ATHERIS_VERSION", "1.0.11")
+__version__ = os.getenv("ATHERIS_VERSION", "2.0.0")
 
 if len(sys.argv) > 1 and sys.argv[1] == "print_version":
   print(__version__)
@@ -309,6 +309,7 @@ setup(
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
     packages=["atheris"],
+    package_dir={'atheris': ''},
     ext_modules=ext_modules,
     setup_requires=["pybind11>=2.5.0"],
     cmdclass={"build_ext": BuildExt},

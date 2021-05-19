@@ -31,7 +31,7 @@
 #include "pybind11/stl.h"
 
 namespace atheris {
-    
+
 namespace py = pybind11;
 
 std::vector<std::string> Setup(
@@ -41,9 +41,10 @@ std::vector<std::string> Setup(
 
 void Fuzz();
 
-py::handle _trace_cmp (py::handle left, py::handle right, int opid, unsigned long long idx, bool left_is_const);
-void _reserve_counters(unsigned long long num);
-void _trace_branch(unsigned long long idx);
+py::handle _trace_cmp(py::handle left, py::handle right, int opid, uint64_t idx,
+                      bool left_is_const);
+void _reserve_counters(uint64_t num);
+void _trace_branch(uint64_t idx);
 
 }  // namespace atheris
 

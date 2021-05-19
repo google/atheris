@@ -4,7 +4,7 @@ Atheris is a coverage-guided Python fuzzing engine. It supports fuzzing of Pytho
 
 ## Installation Instructions
 
-Atheris supports Linux (32- and 64-bit) and Mac OS X.    
+Atheris supports Linux (32- and 64-bit) and Mac OS X.
 Only python versions 3.6 - 3.9 are supported.
 
 ### Linux
@@ -40,11 +40,11 @@ CLANG_BIN="$(pwd)/bin/clang" pip3 install atheris
 ### Example:
 
 ```python
-import sys
 import atheris
 
 with atheris.instrument():
   import some_library
+  import sys
 
 def TestOneInput(data):
   some_library.parse(data)
@@ -87,19 +87,22 @@ with atheris.instrument():
     # library_b will get instrumented
     import library_b
 ```
-Define a fuzzer entry point function and pass it to `atheris.Setup()` along with the fuzzer's arguments (typically `sys.argv`). Finally, call `atheris.Fuzz()` to start fuzzing. You must call `atheris.Setup()` before `atheris.Fuzz()`.
+
+Generally, it's best to import `atheris` first and then import all other libraries inside of a `with atheris.instrument()` block.
+
+Next, define a fuzzer entry point function and pass it to `atheris.Setup()` along with the fuzzer's arguments (typically `sys.argv`). Finally, call `atheris.Fuzz()` to start fuzzing. You must call `atheris.Setup()` before `atheris.Fuzz()`.
 
 #### `instrument(include=[], exclude=[])`
 - `include`: A list of fully-qualified module names that shall be instrumented. If this is not specified every module will get instrumented.
-- `exclude`: A list of fully-qualified module names that shall NOT be instrumented. 
+- `exclude`: A list of fully-qualified module names that shall NOT be instrumented.
 
-This has to be used together with a `with`-Statement.
+This should be used together with a `with`-Statement.
 
 #### `Setup(args, test_one_input, internal_libfuzzer=True)`
  - `args`: A list of strings: the process arguments to pass to the fuzzer, typically `sys.argv`. This argument list may be modified in-place, to remove arguments consumed by the fuzzer.
    See [the LibFuzzer docs](https://llvm.org/docs/LibFuzzer.html#options) for a list of such options.
  - `test_one_input`: your fuzzer's entry point. Must take a single `bytes` argument. This will be repeatedly invoked with a single bytes container.
- - `internal_libfuzzer`: Indicates whether libfuzzer shall be provided by atheris or an external library (see [using_sanitizers.md](./using_sanitizers.md)).
+ - `internal_libfuzzer`: Indicates whether libfuzzer will be provided by atheris or by an external library (see [using_sanitizers.md](./using_sanitizers.md)). If fuzzing pure Python, leave this as `True`.
 
 #### `Fuzz()`
 

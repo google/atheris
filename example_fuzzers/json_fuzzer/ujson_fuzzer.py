@@ -29,9 +29,9 @@ coverage.
 import sys
 import atheris
 
-# Here atheris.instrument() is not necessary
-# because ujson is just an extension.
-# Only python code is instrumented with atheris.instrument(); 
+# Here atheris.instrument() is not necessary because ujson is just an extension,
+# and we don't have any Python code we want to fuzz.
+# Only python code is instrumented with atheris.instrument();
 # extensions are instrumented at compile-time.
 import ujson
 

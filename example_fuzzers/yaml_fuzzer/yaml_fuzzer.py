@@ -25,13 +25,13 @@ ValueError to be raised. The worst consequences of this is likely
 denial-of-service for code that only expects a YAMLError to be raised; however,
 it may indicate more interesting parsing problems.
 """
-import sys
-import warnings
 
 import atheris
 
-with atheris.instrument(include=["ruamel.yaml"]):
-    from ruamel import yaml as ruamel_yaml
+with atheris.instrument():
+  from ruamel import yaml as ruamel_yaml
+  import sys
+  import warnings
 
 # Suppress all warnings.
 warnings.simplefilter("ignore")

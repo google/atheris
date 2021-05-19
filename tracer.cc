@@ -32,9 +32,10 @@
 #include "util.h"
 
 extern "C" {
-  void __sanitizer_cov_trace_const_cmp8(uint64_t arg1, uint64_t arg2);
-  void __sanitizer_cov_trace_cmp8(uint64_t arg1, uint64_t arg2);
-  void __sanitizer_weak_hook_memcmp(void* caller_pc, const void* s1, const void* s2, size_t n, int result);
+void __sanitizer_cov_trace_const_cmp8(uint64_t arg1, uint64_t arg2);
+void __sanitizer_cov_trace_cmp8(uint64_t arg1, uint64_t arg2);
+void __sanitizer_weak_hook_memcmp(void* caller_pc, const void* s1,
+                                  const void* s2, size_t n, int result);
 }
 
 namespace atheris {
@@ -92,7 +93,7 @@ void TraceCompareUnicode(PyObject* left, PyObject* right, void* pc) {
   }
 }
 
-// This function hooks COMPARE_OP, inserts calls for dataflow tracing 
+// This function hooks COMPARE_OP, inserts calls for dataflow tracing
 // and performs an actual comparison at the end.
 // pc is a pointer belonging exclusively to the current comparison.
 // left and right are the objects to compare.
@@ -100,10 +101,12 @@ void TraceCompareUnicode(PyObject* left, PyObject* right, void* pc) {
 // left_is_const states whether the left argument is a constant.
 // When two values are compared, only one constant can be involved
 // otherwise this function wouldn't get called. And if a constant
-// is involved it is always brought to the left because __sanitizer_cov_trace_const_cmp8
-// expects the first argument to be the constant.
+// is involved it is always brought to the left because
+// __sanitizer_cov_trace_const_cmp8 expects the first argument to be the
+// constant.
 NO_SANITIZE
-PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid, bool left_is_const) {
+PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid,
+                         bool left_is_const) {
   if (PyLong_Check(left) && PyLong_Check(right)) {
     // Integer-integer comparison. If both integers fit into 64 bits, report
     // an integer comparison.
@@ -117,9 +120,9 @@ PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid, bo
       }
     }
   } else if (PyBytes_Check(left) && PyBytes_Check(right)) {
-    // If comparing bytes, report a memcmp. Report that we're comparing the size,
-    // and then if that passes, compare the contents ourselves and report the
-    // results.
+    // If comparing bytes, report a memcmp. Report that we're comparing the
+    // size, and then if that passes, compare the contents ourselves and report
+    // the results.
     uint64_t left_size = PyBytes_Size(left);
     uint64_t right_size = PyBytes_Size(right);
     __sanitizer_cov_trace_cmp8(left_size, right_size);
@@ -127,12 +130,13 @@ PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid, bo
       const void* left_bytes = PyBytes_AsString(left);
       const void* right_bytes = PyBytes_AsString(right);
       int differ = NoSanitizeMemcmp(left_bytes, right_bytes, left_size);
-      __sanitizer_weak_hook_memcmp(pc, left_bytes, right_bytes, left_size, differ);
+      __sanitizer_weak_hook_memcmp(pc, left_bytes, right_bytes, left_size,
+                                   differ);
     }
   } else if (PyUnicode_Check(left) && PyUnicode_Check(right)) {
     TraceCompareUnicode(left, right, pc);
   }
-  
+
   return PyObject_RichCompare(left, right, opid);
 }
 

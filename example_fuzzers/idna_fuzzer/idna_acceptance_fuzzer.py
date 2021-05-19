@@ -40,20 +40,13 @@ including :
    bidirectional metadata some codepoints.
 """
 
-import sys
-import unicodedata
-
 import atheris
 
-with atheris.instrument(include=["idna"]):
-    import idna
-
-# libidn2 is just an extension.
-# Only python code is instrumented with atheris.instrument(); 
-# extensions are instrumented at compile-time
-# so a call to atheris.instrument() is not
-# necessary here.
-import libidn2
+with atheris.instrument():
+  import idna
+  import libidn2
+  import sys
+  import unicodedata
 
 
 def ShouldFail(domain):
