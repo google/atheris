@@ -38,7 +38,6 @@ RUN set -e -x -v; \
 WORKDIR /atheris
 
 CMD export LIBFUZZER_LIB="/root/llvm-project/build/lib/clang/$(ls /root/llvm-project/build/lib/clang/)/lib/linux/libclang_rt.fuzzer_no_main-x86_64.a"; \
-	/opt/python/cp35-cp35m/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
 	/opt/python/cp36-cp36m/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
 	/opt/python/cp37-cp37m/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
 	/opt/python/cp38-cp38/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
