@@ -43,7 +43,10 @@ import sys
 import unicodedata
 
 import atheris
-import idna
+
+with atheris.Instrument("idna"):
+    import idna
+
 import libidn2
 
 

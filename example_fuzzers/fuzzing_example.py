@@ -20,11 +20,8 @@ import sys
 
 import atheris
 
-
-def CodeBeingFuzzed(number):
-  """Raises an exception if number is 17."""
-  if number == 17:
-    raise RuntimeError('Number was seventeen!')
+with atheris.Instrument("example_library"):
+  from example_library import CodeBeingFuzzed
 
 
 def TestOneInput(data):
