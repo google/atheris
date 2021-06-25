@@ -28,7 +28,9 @@ import sys
 import warnings
 
 import atheris
-from ruamel import yaml as ruamel_yaml
+
+with atheris.Instrument("ruamel.yaml"):
+    from ruamel import yaml as ruamel_yaml
 
 # Suppress all warnings.
 warnings.simplefilter("ignore")

@@ -40,10 +40,14 @@ domain as valid; but it relies on `libunistring`, which only supports
 Unicode 9 and therefore produces incorrect metadata about Unicode 11 characters.
 """
 import atheris
-import idna
 import sys
 import unicodedata
 
+with atheris.Instrument("idna"):
+    import idna
+
+# libidn2 is just an extension.
+# Only python code can be instrumented.
 import libidn2
 
 
