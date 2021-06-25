@@ -317,11 +317,12 @@ class Instrumentor:
         Get an offset into the co_consts list or
         create a new entry if `const` is not found.
         """
-        try:
-            return self.consts.index(constant)
-        except ValueError:
-            self.consts.append(constant)
-            return len(self.consts) - 1
+        for i in range(len(self.consts)):
+            if type(self.consts[i]) == type(constant) and self.consts[i] == constant:
+                return i
+        
+        self.consts.append(constant)
+        return len(self.consts) - 1
         
     def _get_counter(self):
         counter = self._start_idx + self.num_counters
