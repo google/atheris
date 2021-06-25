@@ -13,13 +13,15 @@ from _frozen_importlib import BuiltinImporter, FrozenImporter
 
 from .instrument_bytecode import patch_code
 
-TARGET_PACKAGES = set()
-
 class AtherisMetaPathFinder(MetaPathFinder):
+    def __init__(self, packages):
+        super().__init__()
+        self._target_packages = packages
+    
     def find_spec(self, fullname, path, target=None):
         package_name = fullname.split(".")[0]
         
-        if not TARGET_PACKAGES or package_name in TARGET_PACKAGES:
+        if not self._target_packages or package_name in self._target_packages:
             spec = PathFinder.find_spec(fullname, path, target)
             
             if spec is None or spec.loader is None:
@@ -63,6 +65,9 @@ class AtherisSourcelessFileLoader(SourcelessFileLoader):
             return patch_code(code, True)
 
 class HookManager:
+    def __init__(self, packages):
+        self._target_packages = packages
+    
     def __enter__(self):
         i = 0
         while i < len(sys.meta_path):
@@ -74,7 +79,7 @@ class HookManager:
         while i < len(sys.meta_path) and sys.meta_path[i] in [BuiltinImporter, FrozenImporter]:
             i += 1
         
-        sys.meta_path.insert(i, AtherisMetaPathFinder())
+        sys.meta_path.insert(i, AtherisMetaPathFinder(self._target_packages))
         
         return self
         
@@ -85,8 +90,6 @@ class HookManager:
                 sys.meta_path.pop(i)
             else:
                 i += 1
-        
-        TARGET_PACKAGES.clear()
 
 def instrument(*modules):
     """
@@ -95,12 +98,19 @@ def instrument(*modules):
     The arguments to this function are names of modules or packages.
     If it is a fully qualified module name, the name of its package will be used.
     """
-    global TARGET_PACKAGES
+    target_packages = set()
     
     for module_name in modules:
+        if not isinstance(module_name, str):
+            raise RuntimeError("atheris.Instrument() expects names of modules of type <str>")
+        elif not module_name:
+            raise RuntimeError(f"atheris.Instrument(): Invalid module name: {module_name}")
+        elif module_name[0] == ".":
+            raise RuntimeError("atheris.Instrument(): Please specify fully qualified module names (absolute not relative)")
+        
         if "." in module_name:
             module_name = module_name.split(".")[0]
     
-        TARGET_PACKAGES.add(module_name)
+        target_packages.add(module_name)
     
-    return HookManager()
+    return HookManager(target_packages)
