@@ -22,17 +22,15 @@
 
 #include "atheris.h"
 #include "macros.h"
-#include "tracer.h"
 #include "util.h"
+#include "tracer.h"
 
-using UserCb = int (*)(const uint8_t* Data, size_t Size);
-
-extern "C" int LLVMFuzzerRunDriver(int* argc, char*** argv,
-                                   int (*UserCb)(const uint8_t* Data,
-                                                 size_t Size));
-
-extern "C" void __sanitizer_cov_pcs_init(const uintptr_t* pcs_beg,
-                              const uintptr_t* pcs_end);
+using UserCb = int (*)(const uint8_t* Data, size_t Size);              
+                              
+extern "C" {
+  int LLVMFuzzerRunDriver(int* argc, char*** argv, int (*UserCb)(const uint8_t* Data, size_t Size));
+  void __sanitizer_cov_8bit_counters_init(uint8_t* start, uint8_t* stop);
+}
 
 NO_SANITIZE
 std::string GetLibFuzzerSymbolsLocation() {
@@ -46,7 +44,7 @@ std::string GetLibFuzzerSymbolsLocation() {
 NO_SANITIZE
 std::string GetCoverageSymbolsLocation() {
   Dl_info dl_info;
-  if (!dladdr((void*)&__sanitizer_cov_pcs_init, &dl_info)) {
+  if (!dladdr((void*)&__sanitizer_cov_8bit_counters_init, &dl_info)) {
     return "<Not a shared object>";
   }
   return (dl_info.dli_fname);
@@ -68,7 +66,27 @@ std::vector<std::string>& args_global = *new std::vector<std::string>();
 
 bool setup_called = false;
 
+unsigned long long num_counters = 0;
+unsigned char* counters = NULL;
+
 }  // namespace
+
+NO_SANITIZE
+void _loc(unsigned long long idx) {
+  if (counters && idx < num_counters) {
+    counters[idx]++;
+  }
+}
+
+NO_SANITIZE
+void _reg(unsigned long long num) {
+  num_counters += num;
+}
+
+NO_SANITIZE
+py::handle _cmp (py::handle left, py::handle right, int opid, unsigned long long idx, bool left_is_const) {
+  return TraceCompareOp(counters + idx, left.ptr(), right.ptr(), opid, left_is_const);
+}
 
 NO_SANITIZE
 void Init() {
@@ -113,27 +131,7 @@ std::vector<std::string> Setup(
     }
     ret.push_back(arg);
   }
-
-  bool enable_python_coverage = true;
-  if (kwargs.contains("enable_python_coverage")) {
-    enable_python_coverage = kwargs["enable_python_coverage"].cast<bool>();
-  }
-
-#ifdef HAS_OPCODE_TRACE
-  bool enable_python_opcode_coverage = true;
-#else
-  bool enable_python_opcode_coverage = false;
-#endif
-
-  if (kwargs.contains("enable_python_opcode_coverage")) {
-    enable_python_opcode_coverage =
-        kwargs["enable_python_opcode_coverage"].cast<bool>();
-  }
-
-  if (enable_python_coverage) {
-    SetupTracer(print_funcs, enable_python_opcode_coverage);
-  }
-
+  
   if (GetCoverageSymbolsLocation() != GetLibFuzzerSymbolsLocation()) {
     std::cerr << Colorize(STDERR_FILENO, "WARNING: Coverage symbols are being provided by a library other than libFuzzer. This will result in broken Python code coverage and severely impacted native extension code coverage. Symbols are coming from this library: " + GetCoverageSymbolsLocation() + "\nYou can likely resolve this issue by linking libFuzzer into Python directly, and using `atheris_no_libfuzzer` instead of `atheris`. See using_sanitizers.md for details.");
   }
@@ -143,7 +141,6 @@ std::vector<std::string> Setup(
 
 NO_SANITIZE
 int TestOneInput(const uint8_t* data, size_t size) {
-  TracerStartInput();
   try {
     test_one_input_global(py::bytes(reinterpret_cast<const char*>(data), size));
     return 0;
@@ -172,6 +169,13 @@ void Fuzz() {
               << std::endl;
     exit(1);
   }
+  
+  if (!num_counters) {
+    std::cerr << Colorize(STDERR_FILENO,
+                          "Nothing has been instrumented. Did you use atheris.instrument()?")
+              << std::endl;
+    exit(1);
+  }
 
   std::vector<char*> args;
   args.reserve(args_global.size() + 1);
@@ -181,6 +185,12 @@ void Fuzz() {
   args.push_back(nullptr);
   char** args_ptr = &args[0];
   int args_size = args_global.size();
+
+  counters = new unsigned char[num_counters];
+  
+  memset(counters, 0, num_counters);
+  
+  __sanitizer_cov_8bit_counters_init(counters, counters + num_counters);
 
   exit(LLVMFuzzerRunDriver(&args_size, &args_ptr, &TestOneInput));
 }

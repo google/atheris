@@ -113,7 +113,7 @@ def get_libfuzzer_lib():
 
 ext_modules = [
     Extension(
-        "atheris",
+        "atheris.atheris",
         sorted([
             "atheris.cc",
             "libfuzzer.cc",
@@ -127,7 +127,7 @@ ext_modules = [
         ],
         language="c++"),
     Extension(
-        "atheris_no_libfuzzer",
+        "atheris_no_libfuzzer.atheris",
         sorted([
             "atheris.cc",
             "libfuzzer.cc",
@@ -226,9 +226,9 @@ class BuildExt(build_ext):
     for ext in self.extensions:
       ext.define_macros = [("VERSION_INFO",
                             "'{}'".format(self.distribution.get_version())),
-                           ("ATHERIS_MODULE_NAME", ext.name)]
+                           ("ATHERIS_MODULE_NAME", "atheris")]
       ext.extra_compile_args = c_opts
-      if ext.name == "atheris_no_libfuzzer":
+      if ext.name == "atheris_no_libfuzzer.atheris":
         ext.extra_link_args = l_opts
       else:
         ext.extra_link_args = l_opts + [libfuzzer]
@@ -239,7 +239,6 @@ class BuildExt(build_ext):
     except Exception as e:
       sys.stderr.write(str(e))
       sys.stderr.write("\n")
-      pass
 
     # Deploy versions of ASan and UBSan that have been merged with libFuzzer
     asan_name = orig_libfuzzer.replace(".fuzzer_no_main-", ".asan-")
@@ -289,7 +288,6 @@ class BuildExt(build_ext):
     except Exception as e:
       sys.stderr.write(str(e))
       sys.stderr.write("\n")
-      pass
 
 
 setup(
@@ -301,6 +299,7 @@ setup(
     description="A coverage-guided fuzzer for Python and Python extensions.",
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
+    packages=["atheris", "atheris_no_libfuzzer"],
     ext_modules=ext_modules,
     setup_requires=["pybind11>=2.5.0"],
     cmdclass={"build_ext": BuildExt},

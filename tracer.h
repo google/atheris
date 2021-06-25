@@ -19,18 +19,9 @@
 
 #include <Python.h>
 
-#if PY_MAJOR_VERSION >= 3
-#if PY_MINOR_VERSION >= 7
-#define HAS_OPCODE_TRACE
-#endif
-#endif
-
 namespace atheris {
 
-void SetupTracer(int max_print_funcs, bool enable_opcode_tracing);
-void TraceThisThread(bool enable_opcode_tracing);
-
-void TracerStartInput();
+PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid, bool left_is_const);
 
 }  // namespace atheris
 
