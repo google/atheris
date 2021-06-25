@@ -1,10 +1,8 @@
 """
-Atheris instruments all modules that get imported after atheris.
-It does so by installing an import hook into sys.meta_path.
-A filter can be set by calling SetTarget() with the name of the
-target module.
-The hook can be unregistered by calling UnregisterImportHook()
-and be manually re-registered by calling RegisterImportHook().
+atheris instruments modules at import-time.
+The Instrument() function temporarily installs an import hook (AtherisMetaPathFinder)
+in sys.meta_path that employs a custom loader 
+(AtherisSourceFileLoader, AtherisSourcelessFileLoader).
 """
 
 import sys
@@ -15,13 +13,13 @@ from _frozen_importlib import BuiltinImporter, FrozenImporter
 
 from .instrument_bytecode import patch_code
 
-TARGET_PACKAGES = None
+TARGET_PACKAGES = set()
 
 class AtherisMetaPathFinder(MetaPathFinder):
     def find_spec(self, fullname, path, target=None):
         package_name = fullname.split(".")[0]
         
-        if TARGET_PACKAGES is None or package_name in TARGET_PACKAGES:
+        if not TARGET_PACKAGES or package_name in TARGET_PACKAGES:
             spec = PathFinder.find_spec(fullname, path, target)
             
             if spec is None or spec.loader is None:
@@ -36,7 +34,6 @@ class AtherisMetaPathFinder(MetaPathFinder):
             
             spec.loader_state = None
             
-            #TODO: better output ?
             print(f"Instrumenting {fullname}")
             
             return spec
@@ -49,44 +46,61 @@ class AtherisMetaPathFinder(MetaPathFinder):
     
 class AtherisSourceFileLoader(SourceFileLoader):
     def get_code(self, fullname):
-        return patch_code(super().get_code(fullname), True)
+        code = super().get_code(fullname)
+        
+        if code is None:
+            return None
+        else:
+            return patch_code(code, True)
     
 class AtherisSourcelessFileLoader(SourcelessFileLoader):
     def get_code(self, fullname):
-        return patch_code(super().get_code(fullname), True)
+        code = super().get_code(fullname)
+        
+        if code is None:
+            return None
+        else:
+            return patch_code(code, True)
 
-def set_target_module(module_name):
+class HookManager:
+    def __enter__(self):
+        i = 0
+        while i < len(sys.meta_path):
+            if isinstance(sys.meta_path[i], AtherisMetaPathFinder):
+                return self
+            i += 1
+        
+        i = 0
+        while i < len(sys.meta_path) and sys.meta_path[i] in [BuiltinImporter, FrozenImporter]:
+            i += 1
+        
+        sys.meta_path.insert(i, AtherisMetaPathFinder())
+        
+        return self
+        
+    def __exit__(self, *args):
+        i = 0
+        while i < len(sys.meta_path):
+            if isinstance(sys.meta_path[i], AtherisMetaPathFinder):
+                sys.meta_path.pop(i)
+            else:
+                i += 1
+        
+        TARGET_PACKAGES.clear()
+
+def instrument(*modules):
+    """
+    This function temporarily installs an import hook which instruments
+    all imported modules.
+    The arguments to this function are names of modules or packages.
+    If it is a fully qualified module name, the name of its package will be used.
+    """
     global TARGET_PACKAGES
     
-    if TARGET_PACKAGES is None:
-        TARGET_PACKAGES = set()
+    for module_name in modules:
+        if "." in module_name:
+            module_name = module_name.split(".")[0]
     
-    if "." in module_name:
-        module_name = module_name.split(".")[0]
+        TARGET_PACKAGES.add(module_name)
     
-    TARGET_PACKAGES.add(module_name)
-
-def unregister_import_hook():
-    i = 0
-    while i < len(sys.meta_path):
-        if isinstance(sys.meta_path[i], AtherisMetaPathFinder):
-            sys.meta_path.pop(i)
-        else:
-            i += 1
-
-def register_import_hook():
-    # Don't register twice
-    i = 0
-    while i < len(sys.meta_path):
-        if isinstance(sys.meta_path[i], AtherisMetaPathFinder):
-            return
-        i += 1
-    
-    i = 0
-    while i < len(sys.meta_path) and sys.meta_path[i] in [BuiltinImporter, FrozenImporter]:
-        i += 1
-    
-    sys.meta_path.insert(i, AtherisMetaPathFinder())
-    
-# Automatically register import hook
-register_import_hook()
+    return HookManager()
