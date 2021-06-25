@@ -169,13 +169,6 @@ void Fuzz() {
               << std::endl;
     exit(1);
   }
-  
-  if (!num_counters) {
-    std::cerr << Colorize(STDERR_FILENO,
-                          "Nothing has been instrumented. Did you use atheris.Instrument()?")
-              << std::endl;
-    exit(1);
-  }
 
   std::vector<char*> args;
   args.reserve(args_global.size() + 1);
@@ -185,12 +178,12 @@ void Fuzz() {
   args.push_back(nullptr);
   char** args_ptr = &args[0];
   int args_size = args_global.size();
-
-  counters = new unsigned char[num_counters];
   
-  memset(counters, 0, num_counters);
-  
-  __sanitizer_cov_8bit_counters_init(counters, counters + num_counters);
+  if (num_counters) {
+    counters = new unsigned char[num_counters];
+    memset(counters, 0, num_counters);
+    __sanitizer_cov_8bit_counters_init(counters, counters + num_counters);
+  }
 
   exit(LLVMFuzzerRunDriver(&args_size, &args_ptr, &TestOneInput));
 }
