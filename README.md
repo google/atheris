@@ -4,7 +4,8 @@ Atheris is a coverage-guided Python fuzzing engine. It supports fuzzing of Pytho
 
 ## Installation Instructions
 
-Atheris supports Linux (32- and 64-bit) and Mac OS X.
+Atheris supports Linux (32- and 64-bit) and Mac OS X.    
+Only python versions 3.6 - 3.9 are supported.
 
 ### Linux
 
@@ -39,28 +40,21 @@ CLANG_BIN="$(pwd)/bin/clang" pip3 install atheris
 ### Example:
 
 ```python
-import atheris
 import sys
+import atheris
+
+with atheris.Instrument():
+  import some_library
 
 def TestOneInput(data):
-  if data == b"bad":
-    raise RuntimeError("Badness!")
+  some_library.parse(data)
 
 atheris.Setup(sys.argv, TestOneInput)
 atheris.Fuzz()
 ```
 
 Atheris supports fuzzing Python code, and uses Python code coverage information for this purpose.
-
-### Fuzzing Python Code
-
-While Atheris supports Python 2.7 and Python 3.3+, its Python code coverage support is *significantly better* when used with Python 3.8+, as it supports opcode-by-opcode coverage. If fuzzing Python code, we strongly recommend using Python 3.8+ where possible.
-
 When fuzzing Python, Atheris will report a failure if the Python code under test throws an uncaught exception.
-
-Be sure to pass `enable_python_coverage=True` as an argument to `Setup()`. You can additionally pass `enable_python_opcode_coverage=[True/False]` to turn on and off opcode coverage. Opcode coverage is typically beneficial, but may provide more performance impact than benefit on large Python projects. This option defaults to `True` on Python 3.8+, or `False` otherwise.
-
-Opcode coverage must be enabled to support features like intelligent string comparison fuzzing for Python code.
 
 ### Fuzzing Native Extensions
 
@@ -82,30 +76,22 @@ Atheris is fully supported by [OSS-Fuzz](https://github.com/google/oss-fuzz), Go
 
 ## API
 
-### Main Interface
+The `atheris` module provides three key functions: `Instrument()`, `Setup()` and `Fuzz()`.
 
-The `atheris` module provides two key functions: `Setup()` and `Fuzz()`.
+In your source file, when you import your target library make sure that this happens inside a `with atheris.Instrument():`-block.
+Define a fuzzer entry point function and pass it to `atheris.Setup()` along with the fuzzer's arguments (typically `sys.argv`). Finally, call `atheris.Fuzz()` to start fuzzing. You must call `atheris.Setup()` before `atheris.Fuzz()`.
 
-In your source file, define a fuzzer entry point function, and pass it to `atheris.Setup()`, along with the fuzzer's arguments (typically `sys.argv`). Finally, call `atheris.Fuzz()` to start fuzzing. Here's an example:
+### `Instrument(*modules)`
+- `modules`: A list of module names that filters which modules shall be instrumented. If no names are specified every module gets instrumented.
 
-```python
-def Setup(args, callback, enable_python_coverage=True, enable_python_opcode_coverage=True):
-```
+This has to be used together with a `with`-Statement. All modules that get imported in the `with`-block get instrumented for coverage collection.
 
-Configure the Atheris Python Fuzzer. You must call `atheris.Setup()` before `atheris.Fuzz()`.
-
-Args:
+### `Setup(args, test_one_input)`
  - `args`: A list of strings: the process arguments to pass to the fuzzer, typically `sys.argv`. This argument list may be modified in-place, to remove arguments consumed by the fuzzer.
    See [the LibFuzzer docs](https://llvm.org/docs/LibFuzzer.html#options) for a list of such options.
- - `test_one_input`: your fuzzer's entry point. Must take a single `bytes` argument (`str` in Python 2). This will be repeatedly invoked with a single bytes container.
+ - `test_one_input`: your fuzzer's entry point. Must take a single `bytes` argument. This will be repeatedly invoked with a single bytes container.
 
-Optional Args:
- - `enable_python_coverage`: boolean. Controls whether to collect coverage information on Python code. Defaults to `True`. If fuzzing a native extension with minimal Python code, set to `False` for a performance increase.
- - `enable_python_opcode_coverage`: boolean. Controls whether to collect Python opcode trace events. You typically want this enabled. Defaults to `True` on Python 3.8+, and `False` otherwise. Ignored if `enable_python_coverage=False`, or if using a version of Python prior to 3.8.
-
-```python
-def Fuzz():
-```
+### `Fuzz()`
 
 This starts the fuzzer. You must have called `Setup()` before calling this function. This function does not return.
 
@@ -113,24 +99,7 @@ In many cases `Setup()` and `Fuzz()` could be combined into a single function, b
 separated because you may want the fuzzer to consume the command-line arguments it handles
 before passing any remaining arguments to another setup function.
 
-```python
-def TraceThisThread(enable_python_opcode_coverage=True):
-```
-
-While we don't recommend using threads during fuzzing if you can avoid it,
-Atheris does support it.
-
-This function enables the collection of coverage information for the current
-thread. Python coverage collection must be enabled in `Setup()` or this has no
-effect. (Thread coverage still works if this function is called before
-`Setup()`, and `Setup()` is subsequently called with
-`enable_python_coverage=True`).
-
-Optional Args:
- - `enable_python_opcode_coverage`: boolean. Controls whether to collect Python opcode trace events for this thread. You typically want this enabled. Defaults to `True` ; ignored and unsupported if using a version of Python prior to 3.8.
-
-
-### FuzzedDataProvider
+### `FuzzedDataProvider`
 
 Often, a `bytes` object is not convenient input to your code being fuzzed. Similar to libFuzzer, we provide a FuzzedDataProvider to translate these bytes into other input forms.
 Alternatively, you can use [Hypothesis](https://hypothesis.readthedocs.io/) as described below.
