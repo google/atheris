@@ -172,7 +172,7 @@ void Fuzz() {
   
   if (!num_counters) {
     std::cerr << Colorize(STDERR_FILENO,
-                          "Nothing has been instrumented. Did you use atheris.instrument()?")
+                          "Nothing has been instrumented. Did you use atheris.Instrument()?")
               << std::endl;
     exit(1);
   }
