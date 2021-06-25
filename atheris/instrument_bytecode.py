@@ -445,12 +445,10 @@ class Instrumentor:
                         delta_lineno = 0
                 
             code += new_code
-            
-        assert(self._code.co_stacksize <= stacksize)
         
         return get_code_object(
             self._code,
-            stacksize,
+            max(self._code.co_stacksize, stacksize),
             code,
             tuple(self.consts),
             tuple(self._names),
