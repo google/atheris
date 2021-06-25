@@ -45,7 +45,7 @@ These files will be called:
 If these files are present, it means Atheris succesfully generated the files at installation time, and you can use this option. Simply `LD_PRELOAD` the right `.so` file, and you're good to go. Here's a complete example:
 
 ```
-LD_PRELOAD="$(python -c "import atheris; import os; print(os.path.dirname(atheris.path()))")/asan_with_fuzzer.so" python ./my_fuzzer.py
+LD_PRELOAD="$(python -c "import atheris; import os; print(os.path.dirname(atheris.path()))")/../asan_with_fuzzer.so" python ./my_fuzzer.py
 ```
 
 ### Option 2: Linking libFuzzer into Python
