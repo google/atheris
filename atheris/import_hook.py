@@ -21,7 +21,7 @@ class AtherisMetaPathFinder(MetaPathFinder):
     def find_spec(self, fullname, path, target=None):
         package_name = fullname.split(".")[0]
         
-        if not self._target_packages or package_name in self._target_packages:
+        if (not self._target_packages or package_name in self._target_packages) and package_name != "atheris":
             spec = PathFinder.find_spec(fullname, path, target)
             
             if spec is None or spec.loader is None:
