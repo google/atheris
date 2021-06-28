@@ -390,7 +390,6 @@ class Instrumentor:
         listing = self._get_linear_instruction_listing()
         lnotab = []
         code = bytes()
-        stacksize = 0
         
         if self._code.co_firstlineno != listing[0].lineno:
             lnotab.append(0)
@@ -403,9 +402,6 @@ class Instrumentor:
             new_code = bytes()
             
             while i < len(listing) and listing[i].lineno == current_lineno:
-                stack_effect = listing[i].get_stack_effect()
-                stacksize = max(stacksize, stacksize + stack_effect)
-                
                 new_code += listing[i].to_bytes()
                 i += 1
             
@@ -445,10 +441,16 @@ class Instrumentor:
                         delta_lineno = 0
                 
             code += new_code
+            
+        stacksize = 0
+        for instr in listing:
+            stacksize = max(stacksize, stacksize + instr.get_stack_effect())
+            
+        assert(self._code.co_stacksize <= stacksize)
         
         return get_code_object(
             self._code,
-            max(self._code.co_stacksize, stacksize),
+            stacksize,
             code,
             tuple(self.consts),
             tuple(self._names),
