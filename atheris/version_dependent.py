@@ -135,3 +135,58 @@ else:
             code_obj.co_freevars,
             code_obj.co_cellvars
         )
+        
+### Lnotab handling ###
+
+if (3,6) <= PYTHON_VERSION <= (3,9):
+    def get_lnotab(code, listing):
+        lnotab = []
+        current_lineno = listing[0].lineno
+        i = 0
+        
+        assert(listing[0].lineno >= code.co_firstlineno)
+        
+        if listing[0].lineno > code.co_firstlineno:
+            delta_lineno = listing[0].lineno - code.co_firstlineno
+            
+            while delta_lineno > 127:
+                lnotab.extend([0, 127])
+                delta_lineno -= 127
+            
+            lnotab.extend([0, delta_lineno])
+        
+        while True:
+            delta_bc = 0
+            
+            while i < len(listing) and listing[i].lineno == current_lineno:
+                delta_bc += listing[i].get_size()
+                i += 1
+                
+            if i >= len(listing):
+                break
+                
+            assert(delta_bc > 0)
+                
+            delta_lineno = listing[i].lineno - current_lineno
+            
+            while delta_bc > 255:
+                lnotab.extend([255, 0])
+                delta_bc -= 255
+            
+            if delta_lineno < 0:
+                while delta_lineno < -128:
+                    lnotab.extend([delta_bc, 0x80])
+                    delta_bc = 0
+                    delta_lineno += 128
+                    
+                delta_lineno %= 256
+            else:
+                while delta_lineno > 127:
+                    lnotab.extend([delta_bc, 127])
+                    delta_bc = 0
+                    delta_lineno -= 127
+                    
+            lnotab.extend([delta_bc, delta_lineno])
+            current_lineno = listing[i].lineno
+
+        return bytes(lnotab)

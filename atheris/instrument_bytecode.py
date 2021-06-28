@@ -12,7 +12,7 @@ import imp
 import dis
 from collections import OrderedDict
 
-from .version_dependent import get_code_object, CONDITIONAL_JUMPS, UNCONDITIONAL_JUMPS, ENDS_FUNCTION, HAVE_REL_REFERENCE, HAVE_ABS_REFERENCE, REVERSE_CMP_OP
+from .version_dependent import get_code_object, get_lnotab, CONDITIONAL_JUMPS, UNCONDITIONAL_JUMPS, ENDS_FUNCTION, HAVE_REL_REFERENCE, HAVE_ABS_REFERENCE, REVERSE_CMP_OP
 
 current_index = 0
 current_pc = 0
@@ -388,65 +388,12 @@ class Instrumentor:
     def to_code(self):
         self._check_state()
         listing = self._get_linear_instruction_listing()
-        lnotab = []
-        code = bytes()
-        
-        if self._code.co_firstlineno != listing[0].lineno:
-            lnotab.append(0)
-            lnotab.append(listing[0].lineno - self._code.co_firstlineno)
-            
-        i = 0
-        
-        while i < len(listing):
-            current_lineno = listing[i].lineno
-            new_code = bytes()
-            
-            while i < len(listing) and listing[i].lineno == current_lineno:
-                new_code += listing[i].to_bytes()
-                i += 1
-            
-            if i < len(listing):
-                term_zero = False
-                delta_bc = len(new_code)
-                delta_lineno = listing[i].lineno - current_lineno
-                
-                if delta_lineno <= -128 or delta_lineno >= 127 or delta_bc >= 255:
-                    term_zero = True
-                
-                while True:
-                    lnotab.append(min(delta_bc, 255)) 
-                    
-                    if delta_lineno < 0:
-                        lnotab.append((max(delta_lineno, -128)) % 256)
-                    else:
-                        lnotab.append(min(delta_lineno, 127))
-                    
-                    if term_zero:
-                        if delta_bc == 0 and delta_lineno == 0:
-                            break
-                    else:
-                        if delta_bc < 255 and delta_lineno in range(-127, 128):
-                            break
-                            
-                    if delta_bc >= 255:
-                        delta_bc -= 255
-                    else:
-                        delta_bc = 0
-                    
-                    if delta_lineno <= -128:
-                        delta_lineno += 128
-                    elif delta_lineno >= 127:
-                        delta_lineno -= 127
-                    else:
-                        delta_lineno = 0
-                
-            code += new_code
-            
+        code = bytes()        
         stacksize = 0
+        
         for instr in listing:
+            code += instr.to_bytes()
             stacksize = max(stacksize, stacksize + instr.get_stack_effect())
-            
-        assert(self._code.co_stacksize <= stacksize)
         
         return get_code_object(
             self._code,
@@ -454,7 +401,7 @@ class Instrumentor:
             code,
             tuple(self.consts),
             tuple(self._names),
-            bytes(lnotab)
+            get_lnotab(self._code, listing)
         )
     
     def _generate_loc_invocation(self, lineno, offset):
