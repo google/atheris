@@ -14,9 +14,10 @@ from _frozen_importlib import BuiltinImporter, FrozenImporter
 from .instrument_bytecode import patch_code
 
 class AtherisMetaPathFinder(MetaPathFinder):
-    def __init__(self, packages):
+    def __init__(self, packages, trace_dataflow):
         super().__init__()
         self._target_packages = packages
+        self._trace_dataflow = trace_dataflow
     
     def find_spec(self, fullname, path, target=None):
         package_name = fullname.split(".")[0]
@@ -28,15 +29,15 @@ class AtherisMetaPathFinder(MetaPathFinder):
                 return None
             
             if isinstance(spec.loader, SourceFileLoader):
-                spec.loader = AtherisSourceFileLoader(spec.loader.name, spec.loader.path)
+                spec.loader = AtherisSourceFileLoader(spec.loader.name, spec.loader.path, self._trace_dataflow)
             elif isinstance(spec.loader, SourcelessFileLoader):
-                spec.loader = AtherisSourcelessFileLoader(spec.loader.name, spec.loader.path)
+                spec.loader = AtherisSourcelessFileLoader(spec.loader.name, spec.loader.path, self._trace_dataflow)
             else:
                 return None
             
             spec.loader_state = None
             
-            print(f"Instrumenting {fullname}")
+            print(f"INFO: Instrumenting {fullname}")
             
             return spec
         
@@ -47,26 +48,35 @@ class AtherisMetaPathFinder(MetaPathFinder):
         return PathFinder.invalidate_caches()
     
 class AtherisSourceFileLoader(SourceFileLoader):
+    def __init__(self, name, path, trace_dataflow):
+        super().__init__(name, path)
+        self._trace_dataflow = trace_dataflow
+    
     def get_code(self, fullname):
         code = super().get_code(fullname)
         
         if code is None:
             return None
         else:
-            return patch_code(code, True)
+            return patch_code(code, self._trace_dataflow)
     
 class AtherisSourcelessFileLoader(SourcelessFileLoader):
+    def __init__(self, name, path, trace_dataflow):
+        super().__init__(name, path)
+        self._trace_dataflow = trace_dataflow
+    
     def get_code(self, fullname):
         code = super().get_code(fullname)
         
         if code is None:
             return None
         else:
-            return patch_code(code, True)
+            return patch_code(code, self._trace_dataflow)
 
 class HookManager:
-    def __init__(self, packages):
+    def __init__(self, packages, trace_dataflow):
         self._target_packages = packages
+        self._trace_dataflow = trace_dataflow
     
     def __enter__(self):
         i = 0
@@ -79,7 +89,7 @@ class HookManager:
         while i < len(sys.meta_path) and sys.meta_path[i] in [BuiltinImporter, FrozenImporter]:
             i += 1
         
-        sys.meta_path.insert(i, AtherisMetaPathFinder(self._target_packages))
+        sys.meta_path.insert(i, AtherisMetaPathFinder(self._target_packages, self._trace_dataflow))
         
         return self
         
@@ -91,7 +101,7 @@ class HookManager:
             else:
                 i += 1
 
-def instrument(*modules):
+def instrument(*modules, trace_dataflow=True):
     """
     This function temporarily installs an import hook which instruments
     all imported modules.
@@ -113,4 +123,4 @@ def instrument(*modules):
     
         target_packages.add(module_name)
     
-    return HookManager(target_packages)
+    return HookManager(target_packages, trace_dataflow)
