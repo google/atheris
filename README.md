@@ -89,10 +89,11 @@ with atheris.instrument():
 ```
 Define a fuzzer entry point function and pass it to `atheris.Setup()` along with the fuzzer's arguments (typically `sys.argv`). Finally, call `atheris.Fuzz()` to start fuzzing. You must call `atheris.Setup()` before `atheris.Fuzz()`.
 
-#### `instrument(*modules)`
-- `modules`: A list of module names that filters which modules shall be instrumented. If no names are specified every module gets instrumented.
+#### `instrument(include=[], exclude=[])`
+- `include`: A list of fully-qualified module names that shall be instrumented. If this is not specified every module will get instrumented.
+- `exclude`: A list of fully-qualified module names that shall NOT be instrumented. 
 
-This has to be used together with a `with`-Statement. All modules that get imported in the `with`-block get instrumented for coverage collection.
+This has to be used together with a `with`-Statement.
 
 #### `Setup(args, test_one_input)`
  - `args`: A list of strings: the process arguments to pass to the fuzzer, typically `sys.argv`. This argument list may be modified in-place, to remove arguments consumed by the fuzzer.
