@@ -64,29 +64,35 @@ std::function<void(py::bytes data)>& test_one_input_global =
     });
 
 std::vector<std::string>& args_global = *new std::vector<std::string>();
-
+std::vector<unsigned char>& counters = *new std::vector<unsigned char>();
 bool setup_called = false;
-
-unsigned long long num_counters = 0;
-unsigned char* counters = nullptr;
+bool fuzz_called = false;
 
 }  // namespace
 
 NO_SANITIZE
 void _trace_branch(unsigned long long idx) {
-  if (counters && idx < num_counters) {
+  if (idx < counters.size()) {
     counters[idx]++;
   }
 }
 
 NO_SANITIZE
 void _reserve_counters(unsigned long long num) {
-  num_counters += num;
+  if (num > 0) {
+    unsigned int old_size = counters.size();
+    
+    counters.resize(old_size + num, 0);
+    
+    if (fuzz_called) {
+      __sanitizer_cov_8bit_counters_init(&counters[old_size], &counters[old_size] + num);
+    }
+  }
 }
 
 NO_SANITIZE
 py::handle _cmp (py::handle left, py::handle right, int opid, unsigned long long idx, bool left_is_const) {
-  return TraceCompareOp(counters + idx, left.ptr(), right.ptr(), opid, left_is_const);
+  return TraceCompareOp(&counters[0] + idx, left.ptr(), right.ptr(), opid, left_is_const);
 }
 
 NO_SANITIZE
@@ -170,6 +176,8 @@ void Fuzz() {
               << std::endl;
     exit(1);
   }
+  
+  fuzz_called = true;
 
   std::vector<char*> args;
   args.reserve(args_global.size() + 1);
@@ -180,10 +188,8 @@ void Fuzz() {
   char** args_ptr = &args[0];
   int args_size = args_global.size();
   
-  if (num_counters) {
-    counters = new unsigned char[num_counters];
-    memset(counters, 0, num_counters);
-    __sanitizer_cov_8bit_counters_init(counters, counters + num_counters);
+  if (counters.size()) {
+    __sanitizer_cov_8bit_counters_init(&counters[0], &counters[0] + counters.size());
   }
 
   exit(LLVMFuzzerRunDriver(&args_size, &args_ptr, &TestOneInput));
