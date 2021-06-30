@@ -32,8 +32,8 @@ current_index = 0
 current_pc = 0
 
 TARGET_MODULE = "atheris"
-REGISTER_FUNCTION = "_reg"
-COVERAGE_FUNCTION = "_loc"
+REGISTER_FUNCTION = "_reserve_counters"
+COVERAGE_FUNCTION = "_trace_branch"
 COMPARE_FUNCTION = "_cmp"
 
 class Instruction:
@@ -418,9 +418,9 @@ class Instrumentor:
             get_lnotab(self._code, listing)
         )
     
-    def _generate_loc_invocation(self, lineno, offset):
+    def _generate_trace_branch_invocation(self, lineno, offset):
         """
-        Builds the bytecode that calls atheris._loc()
+        Builds the bytecode that calls atheris._trace_branch()
         """
         to_insert = []
         start_offset = offset
@@ -515,21 +515,21 @@ class Instrumentor:
 
     def trace_control_flow(self):
         """
-        Insert a call to atheris._loc() in every basic block that
-        is a target of a branch. The argument of _loc() is an id for
+        Insert a call to atheris._trace_branch() in every basic block that
+        is a target of a branch. The argument of _trace_branch() is an id for
         the branch.
         
         The following bytecode gets inserted:
           LOAD_GLOBAL    atheris
-          LOAD_ATTR      _loc
+          LOAD_ATTR      _trace_branch
           LOAD_CONST     <id>
           CALL_FUNCTION  1
-          POP_TOP                  ; _loc() returns None, remove the return value
+          POP_TOP                  ; _trace_branch() returns None, remove the return value
         """
         already_instrumented = set()
         
         offset = self._cfg[0].instructions[0].offset
-        total_size, to_insert = self._generate_loc_invocation(self._cfg[0].instructions[0].lineno, offset)
+        total_size, to_insert = self._generate_trace_branch_invocation(self._cfg[0].instructions[0].lineno, offset)
         self._adjust(offset, total_size)
         self._cfg[0].instructions = to_insert + self._cfg[0].instructions
         
@@ -547,7 +547,7 @@ class Instrumentor:
                             if bb.id in source_bb.edges and source_bb.instructions[-1].reference == offset:
                                 source_instr.append(source_bb.instructions[-1])
                         
-                        total_size, to_insert = self._generate_loc_invocation(bb.instructions[0].lineno, offset)
+                        total_size, to_insert = self._generate_trace_branch_invocation(bb.instructions[0].lineno, offset)
                         
                         self._adjust(offset, total_size, *source_instr)
                         
@@ -558,7 +558,7 @@ class Instrumentor:
     def insert_registration(self, num_counters):
         """
         This function inserts an import of atheris and a call to 
-        atheris._reg() that tells atheris how many branches were instrumented.
+        atheris._reserve_counters() that tells atheris how many branches were instrumented.
         This function should only be called once for the root code object
         of a module after every nested code object has been instrumented.
         
@@ -568,12 +568,12 @@ class Instrumentor:
           IMPORT_NAME   atheris
           STORE_GLOBAL  atheris
           
-        The bytecode that calls _reg() looks like this:
+        The bytecode that calls _reserve_counters() looks like this:
           LOAD_GLOBAL    atheris
-          LOAD_ATTR      _reg
+          LOAD_ATTR      _reserve_counters
           LOAD_CONST     <num branches>
           CALL_FUNCTION  1
-          POP_TOP                         ; discard return value of _reg()
+          POP_TOP                         ; discard return value of _reserve_counters()
         """
         const_0 = self._get_const(0)
         const_None = self._get_const(None)
