@@ -32,7 +32,7 @@ import types
 PYTHON_VERSION = sys.version_info[:2]
 
 if PYTHON_VERSION < (3,6) or PYTHON_VERSION > (3,9):
-    raise RuntimeError(f"You are fuzzing on an unsupported python version: {PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.9 are supported.")
+    raise RuntimeError(f"You are fuzzing on an unsupported python version: {PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.9 are supported by atheris 2.0. Use atheris 1.0 for older python versions.")
 
 ### Instruction categories ###
 
