@@ -31,7 +31,8 @@ import atheris_no_libfuzzer as atheris
 
 # Here atheris.instrument() is not necessary
 # because ujson is just an extension.
-# Only python code can be instrumented.
+# Only python code is instrumented with atheris.instrument(); 
+# extensions are instrumented at compile-time.
 import ujson
 
 
