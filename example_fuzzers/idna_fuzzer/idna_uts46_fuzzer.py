@@ -44,7 +44,7 @@ import atheris
 import sys
 import unicodedata
 
-with atheris.instrument("idna"):
+with atheris.instrument(include=["idna"]):
     import idna
 
 # libidn2 is just an extension.

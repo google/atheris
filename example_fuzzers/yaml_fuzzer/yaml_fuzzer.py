@@ -30,7 +30,7 @@ import warnings
 
 import atheris
 
-with atheris.instrument("ruamel.yaml"):
+with atheris.instrument(include=["ruamel.yaml"]):
     from ruamel import yaml as ruamel_yaml
 
 # Suppress all warnings.

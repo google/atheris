@@ -28,15 +28,19 @@ from _frozen_importlib import BuiltinImporter, FrozenImporter
 from .instrument_bytecode import patch_code
 
 class AtherisMetaPathFinder(MetaPathFinder):
-    def __init__(self, packages, trace_dataflow):
+    def __init__(self, include_packages, exclude_modules, trace_dataflow):
         super().__init__()
-        self._target_packages = packages
+        self._include_packages = include_packages
+        self._exclude_modules = exclude_modules
         self._trace_dataflow = trace_dataflow
     
     def find_spec(self, fullname, path, target=None):
+        if fullname in self._exclude_modules:
+            return None
+        
         package_name = fullname.split(".")[0]
         
-        if (not self._target_packages or package_name in self._target_packages) and package_name != "atheris":
+        if (not self._include_packages or package_name in self._include_packages) and package_name != "atheris":
             spec = PathFinder.find_spec(fullname, path, target)
             
             if spec is None or spec.loader is None:
@@ -88,8 +92,9 @@ class AtherisSourcelessFileLoader(SourcelessFileLoader):
             return patch_code(code, self._trace_dataflow)
 
 class HookManager:
-    def __init__(self, packages, trace_dataflow):
-        self._target_packages = packages
+    def __init__(self, include_packages, exclude_modules, trace_dataflow):
+        self._include_packages = include_packages
+        self._exclude_modules = exclude_modules
         self._trace_dataflow = trace_dataflow
     
     def __enter__(self):
@@ -103,7 +108,7 @@ class HookManager:
         while i < len(sys.meta_path) and sys.meta_path[i] in [BuiltinImporter, FrozenImporter]:
             i += 1
         
-        sys.meta_path.insert(i, AtherisMetaPathFinder(self._target_packages, self._trace_dataflow))
+        sys.meta_path.insert(i, AtherisMetaPathFinder(self._include_packages, self._exclude_modules, self._trace_dataflow))
         
         return self
         
@@ -115,26 +120,28 @@ class HookManager:
             else:
                 i += 1
 
-def instrument(*modules, trace_dataflow=True):
+def instrument(include=[], exclude=[]):
     """
-    This function temporarily installs an import hook which instruments
-    all imported modules.
-    The arguments to this function are names of modules or packages.
-    If it is a fully qualified module name, the name of its package will be used.
+    This function temporarily installs an import hook which instruments the imported modules.
+    `include` is a list of module names that shall be instrumented.
+    `exclude` is a list of module names that shall not be instrumented.
+    Note that for every module name in `include` the whole package will
+    get instrumented.
     """
-    target_packages = set()
+    include_packages = set()
     
-    for module_name in modules:
+    for module_name in include + exclude:
         if not isinstance(module_name, str):
             raise RuntimeError("atheris.instrument() expects names of modules of type <str>")
         elif not module_name:
-            raise RuntimeError(f"atheris.instrument(): Invalid module name: {module_name}")
+            raise RuntimeError(f"atheris.instrument(): You supplied an empty module name")
         elif module_name[0] == ".":
             raise RuntimeError("atheris.instrument(): Please specify fully qualified module names (absolute not relative)")
-        
+    
+    for module_name in include:
         if "." in module_name:
             module_name = module_name.split(".")[0]
     
-        target_packages.add(module_name)
+        include_packages.add(module_name)
     
-    return HookManager(target_packages, trace_dataflow)
+    return HookManager(include_packages, set(exclude), trace_dataflow=True)
