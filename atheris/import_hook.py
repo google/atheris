@@ -14,7 +14,7 @@
 
 """
 atheris instruments modules at import-time.
-The Instrument() function temporarily installs an import hook (AtherisMetaPathFinder)
+The instrument() function temporarily installs an import hook (AtherisMetaPathFinder)
 in sys.meta_path that employs a custom loader 
 (AtherisSourceFileLoader, AtherisSourcelessFileLoader).
 """
@@ -126,11 +126,11 @@ def instrument(*modules, trace_dataflow=True):
     
     for module_name in modules:
         if not isinstance(module_name, str):
-            raise RuntimeError("atheris.Instrument() expects names of modules of type <str>")
+            raise RuntimeError("atheris.instrument() expects names of modules of type <str>")
         elif not module_name:
-            raise RuntimeError(f"atheris.Instrument(): Invalid module name: {module_name}")
+            raise RuntimeError(f"atheris.instrument(): Invalid module name: {module_name}")
         elif module_name[0] == ".":
-            raise RuntimeError("atheris.Instrument(): Please specify fully qualified module names (absolute not relative)")
+            raise RuntimeError("atheris.instrument(): Please specify fully qualified module names (absolute not relative)")
         
         if "." in module_name:
             module_name = module_name.split(".")[0]
