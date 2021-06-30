@@ -45,7 +45,7 @@ import unicodedata
 
 import atheris
 
-with atheris.Instrument("idna"):
+with atheris.instrument("idna"):
     import idna
 
 import libidn2

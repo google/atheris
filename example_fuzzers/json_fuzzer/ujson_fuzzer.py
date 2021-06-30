@@ -29,7 +29,7 @@ coverage.
 import sys
 import atheris_no_libfuzzer as atheris
 
-# Here atheris.Instrument() is not necessary
+# Here atheris.instrument() is not necessary
 # because ujson is just an extension.
 # Only python code can be instrumented.
 import ujson

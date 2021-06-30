@@ -21,7 +21,7 @@ import sys
 
 import atheris
 
-with atheris.Instrument("example_library"):
+with atheris.instrument("example_library"):
   from example_library import CodeBeingFuzzed
 
 

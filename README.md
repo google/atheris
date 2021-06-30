@@ -43,7 +43,7 @@ CLANG_BIN="$(pwd)/bin/clang" pip3 install atheris
 import sys
 import atheris
 
-with atheris.Instrument():
+with atheris.instrument():
   import some_library
 
 def TestOneInput(data):
@@ -76,22 +76,30 @@ Atheris is fully supported by [OSS-Fuzz](https://github.com/google/oss-fuzz), Go
 
 ## API
 
-The `atheris` module provides three key functions: `Instrument()`, `Setup()` and `Fuzz()`.
+The `atheris` module provides three key functions: `instrument()`, `Setup()` and `Fuzz()`.
 
-In your source file, when you import your target library make sure that this happens inside a `with atheris.Instrument():`-block.
+In your source file, import all libraries you wish to fuzz inside a `with atheris.instrument():`-block, like this:
+```py
+# library_a will not get instrumented
+import library_a
+
+with atheris.instrument():
+    # library_b will get instrumented
+    import library_b
+```
 Define a fuzzer entry point function and pass it to `atheris.Setup()` along with the fuzzer's arguments (typically `sys.argv`). Finally, call `atheris.Fuzz()` to start fuzzing. You must call `atheris.Setup()` before `atheris.Fuzz()`.
 
-### `Instrument(*modules)`
+#### `instrument(*modules)`
 - `modules`: A list of module names that filters which modules shall be instrumented. If no names are specified every module gets instrumented.
 
 This has to be used together with a `with`-Statement. All modules that get imported in the `with`-block get instrumented for coverage collection.
 
-### `Setup(args, test_one_input)`
+#### `Setup(args, test_one_input)`
  - `args`: A list of strings: the process arguments to pass to the fuzzer, typically `sys.argv`. This argument list may be modified in-place, to remove arguments consumed by the fuzzer.
    See [the LibFuzzer docs](https://llvm.org/docs/LibFuzzer.html#options) for a list of such options.
  - `test_one_input`: your fuzzer's entry point. Must take a single `bytes` argument. This will be repeatedly invoked with a single bytes container.
 
-### `Fuzz()`
+#### `Fuzz()`
 
 This starts the fuzzer. You must have called `Setup()` before calling this function. This function does not return.
 
@@ -99,7 +107,7 @@ In many cases `Setup()` and `Fuzz()` could be combined into a single function, b
 separated because you may want the fuzzer to consume the command-line arguments it handles
 before passing any remaining arguments to another setup function.
 
-### `FuzzedDataProvider`
+#### `FuzzedDataProvider`
 
 Often, a `bytes` object is not convenient input to your code being fuzzed. Similar to libFuzzer, we provide a FuzzedDataProvider to translate these bytes into other input forms.
 Alternatively, you can use [Hypothesis](https://hypothesis.readthedocs.io/) as described below.
