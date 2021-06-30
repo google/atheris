@@ -136,7 +136,7 @@ class Instruction:
         old_reference = self.reference
         old_size = self.get_size()
         
-        if  changed_offset == old_offset + 0.5:
+        if old_offset < changed_offset < old_offset + 1:
             if old_reference is not None:
                 if self._is_relative:
                     self.reference += size
