@@ -68,19 +68,19 @@ std::vector<std::string>& args_global = *new std::vector<std::string>();
 bool setup_called = false;
 
 unsigned long long num_counters = 0;
-unsigned char* counters = NULL;
+unsigned char* counters = nullptr;
 
 }  // namespace
 
 NO_SANITIZE
-void _loc(unsigned long long idx) {
+void _trace_branch(unsigned long long idx) {
   if (counters && idx < num_counters) {
     counters[idx]++;
   }
 }
 
 NO_SANITIZE
-void _reg(unsigned long long num) {
+void _reserve_counters(unsigned long long num) {
   num_counters += num;
 }
 
