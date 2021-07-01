@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <dlfcn.h>
 
+#include <Python.h>
 #include <exception>
 #include <iostream>
 #include <sstream>
@@ -79,20 +80,30 @@ void _trace_branch(unsigned long long idx) {
 
 NO_SANITIZE
 void _reserve_counters(unsigned long long num) {
+  if (fuzz_called) {
+    std::cerr << Colorize(STDERR_FILENO,
+                          "Tried to reserve counters after fuzzing has been started.")
+              << std::endl
+              << Colorize(STDERR_FILENO,
+                          "This is not supported. Instrument _all_ modules before calling atheris.Fuzz().")
+              << std::endl;
+    _exit(-1);
+  }
+
   if (num > 0) {
-    unsigned int old_size = counters.size();
-    
-    counters.resize(old_size + num, 0);
-    
-    if (fuzz_called) {
-      __sanitizer_cov_8bit_counters_init(&counters[old_size], &counters[old_size] + num);
-    }
+    counters.resize(counters.size() + num, 0);
   }
 }
 
 NO_SANITIZE
-py::handle _cmp (py::handle left, py::handle right, int opid, unsigned long long idx, bool left_is_const) {
-  return TraceCompareOp(&counters[0] + idx, left.ptr(), right.ptr(), opid, left_is_const);
+py::handle _cmp(py::handle left, py::handle right, int opid, unsigned long long idx, bool left_is_const) {
+  PyObject* ret = TraceCompareOp(&counters[0] + idx, left.ptr(), right.ptr(), opid, left_is_const);
+  
+  if (ret == nullptr) {
+    throw py::error_already_set();
+  } else {
+    return ret;
+  }
 }
 
 NO_SANITIZE
@@ -108,8 +119,7 @@ void Init() {
 NO_SANITIZE
 std::vector<std::string> Setup(
     const std::vector<std::string>& args,
-    const std::function<void(py::bytes data)>& test_one_input,
-    py::kwargs kwargs) {
+    const std::function<void(py::bytes data)>& test_one_input) {
   if (setup_called) {
     std::cerr << Colorize(STDERR_FILENO,
                           "Setup() must not be called more than once.")
@@ -120,15 +130,6 @@ std::vector<std::string> Setup(
 
   args_global = args;
   test_one_input_global = test_one_input;
-
-  int print_funcs = 2;
-
-  // Parse out any libFuzzer flags we also care about.
-  for (const std::string& arg : args) {
-    if (arg.substr(0, 13) == "-print_funcs=") {
-      print_funcs = std::stoul(arg.substr(13, std::string::npos));
-    }
-  }
 
   // Strip libFuzzer arguments (single dash).
   std::vector<std::string> ret;

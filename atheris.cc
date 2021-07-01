@@ -37,7 +37,7 @@ PYBIND11_MODULE(ATHERIS_MODULE_NAME, m) {
   m.def("Fuzz", &Fuzz);
   m.def("_trace_branch", &_trace_branch);
   m.def("_reserve_counters", &_reserve_counters);
-  m.def("_cmp", &_cmp);
+  m.def("_cmp", &_cmp, py::return_value_policy::move);
 
   py::class_<FuzzedDataProvider>(m, "FuzzedDataProvider")
       .def(py::init<py::bytes>())

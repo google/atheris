@@ -38,8 +38,7 @@ void Init();
 
 std::vector<std::string> Setup(
     const std::vector<std::string>& args,
-    const std::function<void(pybind11::bytes data)>& test_one_input,
-    pybind11::kwargs kwargs);
+    const std::function<void(py::bytes data)>& test_one_input);
 
 void Fuzz();
 
