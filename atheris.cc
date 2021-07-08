@@ -114,7 +114,7 @@ void Fuzz() {
     exit(1);
   }
 
-  py::module atheris = py::module::import("sys").attr("modules")["atheris"];
+  py::module atheris = (py::module) py::module::import("sys").attr("modules")["atheris"];
   py::module core;
   
   if (internal_libfuzzer) {
