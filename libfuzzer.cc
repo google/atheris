@@ -27,11 +27,17 @@
 #include "util.h"
 #include "tracer.h"
 
+struct PCTableEntry {
+    void* pc;
+    long  flags;
+};
+
 using UserCb = int (*)(const uint8_t* Data, size_t Size);              
                               
 extern "C" {
   int LLVMFuzzerRunDriver(int* argc, char*** argv, int (*UserCb)(const uint8_t* Data, size_t Size));
   void __sanitizer_cov_8bit_counters_init(uint8_t* start, uint8_t* stop);
+  void __sanitizer_cov_pcs_init(uint8_t *pcs_beg, uint8_t *pcs_end);
 }
 
 NO_SANITIZE
@@ -66,6 +72,7 @@ std::function<void(py::bytes data)>& test_one_input_global =
 
 std::vector<std::string>& args_global = *new std::vector<std::string>();
 std::vector<unsigned char>& counters = *new std::vector<unsigned char>();
+std::vector<struct PCTableEntry>& pctable = *new std::vector<struct PCTableEntry>();
 bool setup_called = false;
 bool fuzz_called = false;
 
@@ -92,6 +99,14 @@ void _reserve_counters(unsigned long long num) {
 
   if (num > 0) {
     counters.resize(counters.size() + num, 0);
+    
+    int old_pctable_size = pctable.size();
+    pctable.resize(old_pctable_size + num);
+    
+    for (int i = old_pctable_size; i < pctable.size(); ++i) {
+      pctable[i].pc = reinterpret_cast<void*>(i + 1);
+      pctable[i].flags = 0;
+    }
   }
 }
 
@@ -189,8 +204,9 @@ void Fuzz() {
   char** args_ptr = &args[0];
   int args_size = args_global.size();
   
-  if (counters.size()) {
+  if (!counters.empty()) {
     __sanitizer_cov_8bit_counters_init(&counters[0], &counters[0] + counters.size());
+    __sanitizer_cov_pcs_init(reinterpret_cast<uint8_t*>(&pctable[0]), reinterpret_cast<uint8_t*>(&pctable[0] + pctable.size()));
   }
 
   exit(LLVMFuzzerRunDriver(&args_size, &args_ptr, &TestOneInput));
