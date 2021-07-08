@@ -67,5 +67,5 @@ if __name__ == "__main__":
     test_ujson_roundtrip()
 
     # If that passed, we use Atheris to provide the inputs to our test:
-    atheris.Setup(sys.argv, test_ujson_roundtrip.hypothesis.fuzz_one_input)
+    atheris.Setup(sys.argv, test_ujson_roundtrip.hypothesis.fuzz_one_input, internal_libfuzzer=False)
     atheris.Fuzz()

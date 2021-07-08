@@ -48,6 +48,11 @@ import atheris
 with atheris.instrument(include=["idna"]):
     import idna
 
+# libidn2 is just an extension.
+# Only python code is instrumented with atheris.instrument(); 
+# extensions are instrumented at compile-time
+# so a call to atheris.instrument() is not
+# necessary here.
 import libidn2
 
 
