@@ -42,7 +42,7 @@ std::vector<std::string> Setup(
 
 void Fuzz();
 
-py::handle _cmp (py::handle left, py::handle right, int opid, unsigned long long idx, bool left_is_const);
+py::handle _trace_cmp (py::handle left, py::handle right, int opid, unsigned long long idx, bool left_is_const);
 void _reserve_counters(unsigned long long num);
 void _trace_branch(unsigned long long idx);
 

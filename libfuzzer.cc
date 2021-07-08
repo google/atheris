@@ -92,7 +92,7 @@ void _reserve_counters(unsigned long long num) {
                           "Tried to reserve counters after fuzzing has been started.")
               << std::endl
               << Colorize(STDERR_FILENO,
-                          "This is not supported. Instrument _all_ modules before calling atheris.Fuzz().")
+                          "This is not supported. Instrument the modules before calling atheris.Fuzz().")
               << std::endl;
     _exit(-1);
   }
@@ -111,7 +111,7 @@ void _reserve_counters(unsigned long long num) {
 }
 
 NO_SANITIZE
-py::handle _cmp(py::handle left, py::handle right, int opid, unsigned long long idx, bool left_is_const) {
+py::handle _trace_cmp(py::handle left, py::handle right, int opid, unsigned long long idx, bool left_is_const) {
   PyObject* ret = TraceCompareOp(&counters[0] + idx, left.ptr(), right.ptr(), opid, left_is_const);
   
   if (ret == nullptr) {
