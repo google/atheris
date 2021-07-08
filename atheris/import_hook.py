@@ -55,7 +55,7 @@ class AtherisMetaPathFinder(MetaPathFinder):
             
             spec.loader_state = None
             
-            print(f"INFO: Instrumenting {fullname}")
+            print(f"INFO: Instrumenting {fullname}", file=sys.stderr)
             
             return spec
         
