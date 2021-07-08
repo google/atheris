@@ -1,5 +1,6 @@
 /*
  * Copyright 2020 Google LLC
+ * Copyright 2021 Fraunhofer FKIE
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,15 +31,19 @@
 #include "pybind11/stl.h"
 
 namespace atheris {
-
-void Init();
+    
+namespace py = pybind11;
 
 std::vector<std::string> Setup(
     const std::vector<std::string>& args,
-    const std::function<void(pybind11::bytes data)>& test_one_input,
-    pybind11::kwargs kwargs);
+    const std::function<void(py::bytes data)>& test_one_input,
+    py::kwargs kwargs);
 
 void Fuzz();
+
+py::handle _trace_cmp (py::handle left, py::handle right, int opid, unsigned long long idx, bool left_is_const);
+void _reserve_counters(unsigned long long num);
+void _trace_branch(unsigned long long idx);
 
 }  // namespace atheris
 

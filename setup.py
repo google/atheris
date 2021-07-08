@@ -1,4 +1,5 @@
 # Copyright 2020 Google LLC
+# Copyright 2021 Fraunhofer FKIE
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -113,11 +114,9 @@ def get_libfuzzer_lib():
 
 ext_modules = [
     Extension(
-        "atheris",
+        "atheris.atheris",
         sorted([
             "atheris.cc",
-            "libfuzzer.cc",
-            "tracer.cc",
             "util.cc",
             "fuzzed_data_provider.cc",
         ]),
@@ -127,13 +126,23 @@ ext_modules = [
         ],
         language="c++"),
     Extension(
-        "atheris_no_libfuzzer",
+        "atheris.core_with_libfuzzer",
         sorted([
-            "atheris.cc",
-            "libfuzzer.cc",
+            "core.cc",
             "tracer.cc",
             "util.cc",
-            "fuzzed_data_provider.cc",
+        ]),
+        include_dirs=[
+            # Path to pybind11 headers
+            PybindIncludeGetter(),
+        ],
+        language="c++"),
+    Extension(
+        "atheris.core_without_libfuzzer",
+        sorted([
+            "core.cc",
+            "tracer.cc",
+            "util.cc",
         ]),
         include_dirs=[
             # Path to pybind11 headers
@@ -226,12 +235,12 @@ class BuildExt(build_ext):
     for ext in self.extensions:
       ext.define_macros = [("VERSION_INFO",
                             "'{}'".format(self.distribution.get_version())),
-                           ("ATHERIS_MODULE_NAME", ext.name)]
+                           ("ATHERIS_MODULE_NAME", ext.name.split(".")[1])]
       ext.extra_compile_args = c_opts
-      if ext.name == "atheris_no_libfuzzer":
-        ext.extra_link_args = l_opts
-      else:
+      if ext.name == "atheris.core_with_libfuzzer":
         ext.extra_link_args = l_opts + [libfuzzer]
+      else:
+        ext.extra_link_args = l_opts
     build_ext.build_extensions(self)
 
     try:
@@ -239,7 +248,6 @@ class BuildExt(build_ext):
     except Exception as e:
       sys.stderr.write(str(e))
       sys.stderr.write("\n")
-      pass
 
     # Deploy versions of ASan and UBSan that have been merged with libFuzzer
     asan_name = orig_libfuzzer.replace(".fuzzer_no_main-", ".asan-")
@@ -289,7 +297,6 @@ class BuildExt(build_ext):
     except Exception as e:
       sys.stderr.write(str(e))
       sys.stderr.write("\n")
-      pass
 
 
 setup(
@@ -301,6 +308,7 @@ setup(
     description="A coverage-guided fuzzer for Python and Python extensions.",
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
+    packages=["atheris"],
     ext_modules=ext_modules,
     setup_requires=["pybind11>=2.5.0"],
     cmdclass={"build_ext": BuildExt},

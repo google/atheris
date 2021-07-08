@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 # Copyright 2020 Google LLC
+# Copyright 2021 Fraunhofer FKIE
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +29,9 @@ import sys
 import warnings
 
 import atheris
-from ruamel import yaml as ruamel_yaml
+
+with atheris.instrument(include=["ruamel.yaml"]):
+    from ruamel import yaml as ruamel_yaml
 
 # Suppress all warnings.
 warnings.simplefilter("ignore")
