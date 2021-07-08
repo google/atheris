@@ -95,10 +95,11 @@ Define a fuzzer entry point function and pass it to `atheris.Setup()` along with
 
 This has to be used together with a `with`-Statement.
 
-#### `Setup(args, test_one_input)`
+#### `Setup(args, test_one_input, internal_libfuzzer=True)`
  - `args`: A list of strings: the process arguments to pass to the fuzzer, typically `sys.argv`. This argument list may be modified in-place, to remove arguments consumed by the fuzzer.
    See [the LibFuzzer docs](https://llvm.org/docs/LibFuzzer.html#options) for a list of such options.
  - `test_one_input`: your fuzzer's entry point. Must take a single `bytes` argument. This will be repeatedly invoked with a single bytes container.
+ - `internal_libfuzzer`: Indicates whether libfuzzer shall be provided by atheris or an external library (see [using_sanitizers.md](./using_sanitizers.md)).
 
 #### `Fuzz()`
 
