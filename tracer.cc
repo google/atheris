@@ -32,9 +32,9 @@
 #include "util.h"
 
 extern "C" {
-    void __sanitizer_cov_trace_const_cmp8(uint64_t arg1, uint64_t arg2);
-    void __sanitizer_cov_trace_cmp8(uint64_t arg1, uint64_t arg2);
-    void __sanitizer_weak_hook_memcmp(void* caller_pc, const void* s1, const void* s2, size_t n, int result);
+  void __sanitizer_cov_trace_const_cmp8(uint64_t arg1, uint64_t arg2);
+  void __sanitizer_cov_trace_cmp8(uint64_t arg1, uint64_t arg2);
+  void __sanitizer_weak_hook_memcmp(void* caller_pc, const void* s1, const void* s2, size_t n, int result);
 }
 
 namespace atheris {
@@ -105,17 +105,17 @@ void TraceCompareUnicode(PyObject* left, PyObject* right, void* pc) {
 NO_SANITIZE
 PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid, bool left_is_const) {
   if (PyLong_Check(left) && PyLong_Check(right)) {
-      // Integer-integer comparison. If both integers fit into 64 bits, report
-      // an integer comparison.
-      int64_t left_int;
-      int64_t right_int;
-      if (As64(&left_int, left) && As64(&right_int, right)) {
-        if (left_is_const) {
-          __sanitizer_cov_trace_const_cmp8(left_int, right_int);
-        } else {
-          __sanitizer_cov_trace_cmp8(left_int, right_int);
-        }
+    // Integer-integer comparison. If both integers fit into 64 bits, report
+    // an integer comparison.
+    int64_t left_int;
+    int64_t right_int;
+    if (As64(&left_int, left) && As64(&right_int, right)) {
+      if (left_is_const) {
+        __sanitizer_cov_trace_const_cmp8(left_int, right_int);
+      } else {
+        __sanitizer_cov_trace_cmp8(left_int, right_int);
       }
+    }
   } else if (PyBytes_Check(left) && PyBytes_Check(right)) {
     // If comparing bytes, report a memcmp. Report that we're comparing the size,
     // and then if that passes, compare the contents ourselves and report the
