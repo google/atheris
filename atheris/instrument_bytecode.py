@@ -34,7 +34,7 @@ current_pc = 0
 TARGET_MODULE = "atheris"
 REGISTER_FUNCTION = "_reserve_counters"
 COVERAGE_FUNCTION = "_trace_branch"
-COMPARE_FUNCTION = "_cmp"
+COMPARE_FUNCTION = "_trace_cmp"
 
 class Instruction:
     """
@@ -442,7 +442,7 @@ class Instrumentor:
         
     def _generate_cmp_invocation(self, op, lineno, offset):
         """
-        Builds the bytecode that calls atheris._cmp().
+        Builds the bytecode that calls atheris._trace_cmp().
         Only call this if the two objects being compared are non-constants.
         """
         to_insert = []
@@ -472,7 +472,7 @@ class Instrumentor:
         
     def _generate_const_cmp_invocation(self, op, lineno, offset, switch):
         """
-        Builds the bytecode that calls atheris._cmp().
+        Builds the bytecode that calls atheris._trace_cmp().
         Only call this if one of the objects being compared is a constant
         coming from co_consts.
         If `switch` is true the constant is the second argument and needs
@@ -619,20 +619,20 @@ class Instrumentor:
         """
         This function instruments bytecode for data-flow tracing.
         This works by replacing the instruction COMPARE_OP with
-        a call to atheris._cmp().
-        The arguments for _cmp() are as follows:
+        a call to atheris._trace_cmp().
+        The arguments for _trace_cmp() are as follows:
             - obj1 and obj2: The two values to compare
             - opid: argument to COMPARE_OP
             - pc: a counter for how many COMPARE_OPs have been replaced
             - is_const: whether obj1 is a constant in co_consts.
         To detect if any of the values being compared is a constant, all push and pop operations
         have to be analyzed. If a constant appears in a comparison it must
-        always be given as obj1 to _cmp().
+        always be given as obj1 to _trace_cmp().
         
         The bytecode that gets inserted looks like this:
           LOAD_GLOBAL    atheris
-          LOAD_ATTR      _cmp
-          ROT_THREE                   ; move atheris._cmp below the two objects
+          LOAD_ATTR      _trace_cmp
+          ROT_THREE                   ; move atheris._trace_cmp below the two objects
           LOAD_CONST     <opid>
           LOAD_CONST     <pc>
           LOAD_CONST     <is_const>

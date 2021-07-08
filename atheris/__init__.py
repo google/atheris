@@ -13,5 +13,5 @@
 # limitations under the License.
 
 from .atheris import *
-from .atheris import _trace_branch, _reserve_counters, _cmp
+from .atheris import _trace_branch, _reserve_counters, _trace_cmp
 from .import_hook import instrument
