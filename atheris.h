@@ -34,11 +34,10 @@ namespace atheris {
     
 namespace py = pybind11;
 
-void Init();
-
 std::vector<std::string> Setup(
     const std::vector<std::string>& args,
-    const std::function<void(py::bytes data)>& test_one_input);
+    const std::function<void(py::bytes data)>& test_one_input,
+    py::kwargs kwargs);
 
 void Fuzz();
 
