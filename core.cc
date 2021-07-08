@@ -31,8 +31,8 @@
 #include "pybind11/stl.h"
 
 struct PCTableEntry {
-    void* pc;
-    long  flags;
+  void* pc;
+  long  flags;
 };
 
 using UserCb = int (*)(const uint8_t* Data, size_t Size);              
