@@ -14,3 +14,4 @@
 
 from .atheris import Setup, Fuzz, FuzzedDataProvider, _trace_branch, _reserve_counters, _trace_cmp
 from .import_hook import instrument
+from .utils import path
