@@ -117,8 +117,6 @@ ext_modules = [
         "atheris.atheris",
         sorted([
             "atheris.cc",
-            "libfuzzer.cc",
-            "tracer.cc",
             "util.cc",
             "fuzzed_data_provider.cc",
         ]),
@@ -128,13 +126,23 @@ ext_modules = [
         ],
         language="c++"),
     Extension(
-        "atheris_no_libfuzzer.atheris",
+        "atheris.core_with_libfuzzer",
         sorted([
-            "atheris.cc",
-            "libfuzzer.cc",
+            "core.cc",
             "tracer.cc",
             "util.cc",
-            "fuzzed_data_provider.cc",
+        ]),
+        include_dirs=[
+            # Path to pybind11 headers
+            PybindIncludeGetter(),
+        ],
+        language="c++"),
+    Extension(
+        "atheris.core_without_libfuzzer",
+        sorted([
+            "core.cc",
+            "tracer.cc",
+            "util.cc",
         ]),
         include_dirs=[
             # Path to pybind11 headers
@@ -227,12 +235,12 @@ class BuildExt(build_ext):
     for ext in self.extensions:
       ext.define_macros = [("VERSION_INFO",
                             "'{}'".format(self.distribution.get_version())),
-                           ("ATHERIS_MODULE_NAME", "atheris")]
+                           ("ATHERIS_MODULE_NAME", ext.name.split(".")[1])]
       ext.extra_compile_args = c_opts
-      if ext.name == "atheris_no_libfuzzer.atheris":
-        ext.extra_link_args = l_opts
-      else:
+      if ext.name == "atheris.core_with_libfuzzer":
         ext.extra_link_args = l_opts + [libfuzzer]
+      else:
+        ext.extra_link_args = l_opts
     build_ext.build_extensions(self)
 
     try:
@@ -300,7 +308,7 @@ setup(
     description="A coverage-guided fuzzer for Python and Python extensions.",
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
-    packages=["atheris", "atheris_no_libfuzzer"],
+    packages=["atheris"],
     ext_modules=ext_modules,
     setup_requires=["pybind11>=2.5.0"],
     cmdclass={"build_ext": BuildExt},

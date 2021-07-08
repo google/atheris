@@ -12,6 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .atheris import *
-from .atheris import _trace_branch, _reserve_counters, _trace_cmp
+from .atheris import Setup, Fuzz, FuzzedDataProvider, _trace_branch, _reserve_counters, _trace_cmp
 from .import_hook import instrument

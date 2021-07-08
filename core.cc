@@ -21,11 +21,14 @@
 #include <exception>
 #include <iostream>
 #include <sstream>
+#include <functional>
 
-#include "atheris.h"
 #include "macros.h"
 #include "util.h"
 #include "tracer.h"
+#include "pybind11/functional.h"
+#include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
 
 struct PCTableEntry {
     void* pc;
@@ -33,7 +36,7 @@ struct PCTableEntry {
 };
 
 using UserCb = int (*)(const uint8_t* Data, size_t Size);              
-                              
+
 extern "C" {
   int LLVMFuzzerRunDriver(int* argc, char*** argv, int (*UserCb)(const uint8_t* Data, size_t Size));
   void __sanitizer_cov_8bit_counters_init(uint8_t* start, uint8_t* stop);
@@ -62,21 +65,27 @@ namespace atheris {
 
 namespace py = pybind11;
 
-namespace {
-
 std::function<void(py::bytes data)>& test_one_input_global =
     *new std::function<void(py::bytes data)>([](py::bytes data) -> void {
       std::cerr << "You must call Setup() before Fuzz()." << std::endl;
       _exit(-1);
     });
-
-std::vector<std::string>& args_global = *new std::vector<std::string>();
 std::vector<unsigned char>& counters = *new std::vector<unsigned char>();
 std::vector<struct PCTableEntry>& pctable = *new std::vector<struct PCTableEntry>();
-bool setup_called = false;
-bool fuzz_called = false;
 
-}  // namespace
+NO_SANITIZE
+void Init() {
+  if (!&LLVMFuzzerRunDriver) {
+    throw std::runtime_error(
+        "LLVMFuzzerRunDriver symbol not found. This means "
+        "you had an old version of Clang installed when "
+        "you built Atheris.");
+  }
+  
+  if (GetCoverageSymbolsLocation() != GetLibFuzzerSymbolsLocation()) {
+    std::cerr << Colorize(STDERR_FILENO, "WARNING: Coverage symbols are being provided by a library other than libFuzzer. This will result in broken Python code coverage and severely impacted native extension code coverage. Symbols are coming from this library: " + GetCoverageSymbolsLocation() + "\nYou can likely resolve this issue by linking libFuzzer into Python directly, and using `atheris_no_libfuzzer` instead of `atheris`. See using_sanitizers.md for details.");
+  }
+}
 
 NO_SANITIZE
 void _trace_branch(unsigned long long idx) {
@@ -87,27 +96,13 @@ void _trace_branch(unsigned long long idx) {
 
 NO_SANITIZE
 void _reserve_counters(unsigned long long num) {
-  if (fuzz_called) {
-    std::cerr << Colorize(STDERR_FILENO,
-                          "Tried to reserve counters after fuzzing has been started.")
-              << std::endl
-              << Colorize(STDERR_FILENO,
-                          "This is not supported. Instrument the modules before calling atheris.Fuzz().")
-              << std::endl;
-    _exit(-1);
-  }
-
-  if (num > 0) {
-    counters.resize(counters.size() + num, 0);
-    
-    int old_pctable_size = pctable.size();
-    pctable.resize(old_pctable_size + num);
-    
-    for (int i = old_pctable_size; i < pctable.size(); ++i) {
-      pctable[i].pc = reinterpret_cast<void*>(i + 1);
-      pctable[i].flags = 0;
-    }
-  }
+  std::cerr << Colorize(STDERR_FILENO,
+                        "Tried to reserve counters after fuzzing has been started.")
+            << std::endl
+            << Colorize(STDERR_FILENO,
+                        "This is not supported. Instrument the modules before calling atheris.Fuzz().")
+            << std::endl;
+  _exit(-1);
 }
 
 NO_SANITIZE
@@ -119,47 +114,6 @@ py::handle _trace_cmp(py::handle left, py::handle right, int opid, unsigned long
   } else {
     return ret;
   }
-}
-
-NO_SANITIZE
-void Init() {
-  if (!&LLVMFuzzerRunDriver) {
-    throw std::runtime_error(
-        "LLVMFuzzerRunDriver symbol not found. This means "
-        "you had an old version of Clang installed when "
-        "you built Atheris.");
-  }
-}
-
-NO_SANITIZE
-std::vector<std::string> Setup(
-    const std::vector<std::string>& args,
-    const std::function<void(py::bytes data)>& test_one_input) {
-  if (setup_called) {
-    std::cerr << Colorize(STDERR_FILENO,
-                          "Setup() must not be called more than once.")
-              << std::endl;
-    exit(1);
-  }
-  setup_called = true;
-
-  args_global = args;
-  test_one_input_global = test_one_input;
-
-  // Strip libFuzzer arguments (single dash).
-  std::vector<std::string> ret;
-  for (const std::string& arg : args) {
-    if (arg.size() > 1 && arg[0] == '-' && arg[1] != '-') {
-      continue;
-    }
-    ret.push_back(arg);
-  }
-  
-  if (GetCoverageSymbolsLocation() != GetLibFuzzerSymbolsLocation()) {
-    std::cerr << Colorize(STDERR_FILENO, "WARNING: Coverage symbols are being provided by a library other than libFuzzer. This will result in broken Python code coverage and severely impacted native extension code coverage. Symbols are coming from this library: " + GetCoverageSymbolsLocation() + "\nYou can likely resolve this issue by linking libFuzzer into Python directly, and using `atheris_no_libfuzzer` instead of `atheris`. See using_sanitizers.md for details.");
-  }
-
-  return ret;
 }
 
 NO_SANITIZE
@@ -185,31 +139,49 @@ int TestOneInput(const uint8_t* data, size_t size) {
 }
 
 NO_SANITIZE
-void Fuzz() {
-  if (!setup_called) {
-    std::cerr << Colorize(STDERR_FILENO,
-                          "Setup() must be called before Fuzz() can be called.")
-              << std::endl;
-    exit(1);
+void start_fuzzing(const std::vector<std::string>& args,
+                   const std::function<void(py::bytes data)>& test_one_input,
+                   unsigned long long num_counters
+) {
+  test_one_input_global = test_one_input;
+    
+  std::vector<char*> arg_array;
+  arg_array.reserve(args.size() + 1);
+  for (const std::string& arg : args) {
+    arg_array.push_back(const_cast<char*>(arg.c_str()));
   }
+  arg_array.push_back(nullptr);
+  char** args_ptr = &arg_array[0];
+  int args_size = args.size();
   
-  fuzz_called = true;
-
-  std::vector<char*> args;
-  args.reserve(args_global.size() + 1);
-  for (const std::string& arg : args_global) {
-    args.push_back(const_cast<char*>(arg.c_str()));
-  }
-  args.push_back(nullptr);
-  char** args_ptr = &args[0];
-  int args_size = args_global.size();
-  
-  if (!counters.empty()) {
+  if (num_counters) {
+    counters.resize(num_counters, 0);
     __sanitizer_cov_8bit_counters_init(&counters[0], &counters[0] + counters.size());
+    
+    pctable.resize(num_counters);
+    
+    for (int i = 0; i < pctable.size(); ++i) {
+      pctable[i].pc = reinterpret_cast<void*>(i + 1);
+      pctable[i].flags = 0;
+    }
+    
     __sanitizer_cov_pcs_init(reinterpret_cast<uint8_t*>(&pctable[0]), reinterpret_cast<uint8_t*>(&pctable[0] + pctable.size()));
   }
 
   exit(LLVMFuzzerRunDriver(&args_size, &args_ptr, &TestOneInput));
+}
+
+#ifndef ATHERIS_MODULE_NAME
+#error Need ATHERIS_MODULE_NAME
+#endif  // ATHERIS_MODULE_NAME
+
+PYBIND11_MODULE(ATHERIS_MODULE_NAME, m) {
+  Init();
+
+  m.def("start_fuzzing", &start_fuzzing);
+  m.def("_trace_branch", &_trace_branch);
+  m.def("_reserve_counters", &_reserve_counters);
+  m.def("_trace_cmp", &_trace_cmp, py::return_value_policy::move);
 }
 
 }  // namespace atheris

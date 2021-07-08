@@ -15,6 +15,14 @@
 
 #include "atheris.h"
 
+#include <stdio.h>
+#include <unistd.h>
+#include <dlfcn.h>
+
+#include <Python.h>
+#include <exception>
+#include <iostream>
+#include <sstream>
 #include <limits>
 
 #include "fuzzed_data_provider.h"
@@ -23,16 +31,110 @@
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
 #include "util.h"
+#include "atheris.h"
 
 namespace atheris {
+    
+namespace py = pybind11;
+
+namespace {
+
+std::function<void(py::bytes data)>& test_one_input_global =
+    *new std::function<void(py::bytes data)>([](py::bytes data) -> void {
+      std::cerr << "You must call Setup() before Fuzz()." << std::endl;
+      _exit(-1);
+    });
+
+std::vector<std::string>& args_global = *new std::vector<std::string>();
+unsigned long long num_counters = 0;
+bool internal_libfuzzer = true;
+bool setup_called = false;
+
+}  // namespace
+
+NO_SANITIZE
+void _trace_branch(unsigned long long idx) {
+  
+}
+
+NO_SANITIZE
+void _reserve_counters(unsigned long long num) {
+  num_counters += num;
+}
+
+NO_SANITIZE
+py::handle _trace_cmp(py::handle left, py::handle right, int opid, unsigned long long idx, bool left_is_const) {
+  PyObject* ret = PyObject_RichCompare(left.ptr(), right.ptr(), opid);
+  
+  if (ret == nullptr) {
+    throw py::error_already_set();
+  } else {
+    return ret;
+  }
+}
+
+NO_SANITIZE
+std::vector<std::string> Setup(
+    const std::vector<std::string>& args,
+    const std::function<void(py::bytes data)>& test_one_input,
+    py::kwargs kwargs) {
+  if (setup_called) {
+    std::cerr << Colorize(STDERR_FILENO,
+                          "Setup() must not be called more than once.")
+              << std::endl;
+    exit(1);
+  }
+  setup_called = true;
+
+  args_global = args;
+  test_one_input_global = test_one_input;
+
+  // Strip libFuzzer arguments (single dash).
+  std::vector<std::string> ret;
+  for (const std::string& arg : args) {
+    if (arg.size() > 1 && arg[0] == '-' && arg[1] != '-') {
+      continue;
+    }
+    ret.push_back(arg);
+  }
+  
+  if (kwargs.contains("internal_libfuzzer")) {
+    internal_libfuzzer = kwargs["internal_libfuzzer"].cast<bool>();
+  }
+
+  return ret;
+}
+
+NO_SANITIZE
+void Fuzz() {
+  if (!setup_called) {
+    std::cerr << Colorize(STDERR_FILENO,
+                          "Setup() must be called before Fuzz() can be called.")
+              << std::endl;
+    exit(1);
+  }
+
+  py::module_ atheris = py::module_::import("sys").attr("modules")["atheris"];
+  py::module_ core;
+  
+  if (internal_libfuzzer) {
+    core = py::module_::import("atheris.core_with_libfuzzer");
+  } else {
+    core = py::module_::import("atheris.core_without_libfuzzer");
+  }
+  
+  atheris.attr("_trace_cmp") = core.attr("_trace_cmp");
+  atheris.attr("_reserve_counters") = core.attr("_reserve_counters");
+  atheris.attr("_trace_branch") = core.attr("_trace_branch");
+  
+  core.attr("start_fuzzing")(args_global, test_one_input_global, num_counters);
+}
 
 #ifndef ATHERIS_MODULE_NAME
-#define ATHERIS_MODULE_NAME atheris
+#error Need ATHERIS_MODULE_NAME
 #endif  // ATHERIS_MODULE_NAME
 
 PYBIND11_MODULE(ATHERIS_MODULE_NAME, m) {
-  Init();
-
   m.def("Setup", &Setup);
   m.def("Fuzz", &Fuzz);
   m.def("_trace_branch", &_trace_branch);
@@ -68,8 +170,6 @@ PYBIND11_MODULE(ATHERIS_MODULE_NAME, m) {
       .def("remaining_bytes", &FuzzedDataProvider::remaining_bytes)
       .def("buffer", &FuzzedDataProvider::buffer);
   m.attr("ALL_REMAINING") = std::numeric_limits<size_t>::max();
-
-  m.def("path", &GetDynamicLocation);
 }
 
 }  // namespace atheris
