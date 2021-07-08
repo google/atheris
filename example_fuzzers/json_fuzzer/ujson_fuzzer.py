@@ -27,7 +27,12 @@ coverage.
 """
 
 import sys
-import atheris_no_libfuzzer as atheris
+import atheris
+
+# Here atheris.instrument() is not necessary
+# because ujson is just an extension.
+# Only python code is instrumented with atheris.instrument(); 
+# extensions are instrumented at compile-time.
 import ujson
 
 
@@ -48,9 +53,7 @@ def TestOneInput(input_bytes):
 
 
 def main():
-  # Since everything interesting in this fuzzer is in native code, we can
-  # disable Python coverage to improve performance and reduce coverage noise.
-  atheris.Setup(sys.argv, TestOneInput, enable_python_coverage=False)
+  atheris.Setup(sys.argv, TestOneInput, internal_libfuzzer=False)
   atheris.Fuzz()
 
 if __name__ == "__main__":

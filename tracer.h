@@ -1,5 +1,6 @@
 /*
  * Copyright 2020 Google LLC
+ * Copyright 2021 Fraunhofer FKIE
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,18 +20,9 @@
 
 #include <Python.h>
 
-#if PY_MAJOR_VERSION >= 3
-#if PY_MINOR_VERSION >= 7
-#define HAS_OPCODE_TRACE
-#endif
-#endif
-
 namespace atheris {
 
-void SetupTracer(int max_print_funcs, bool enable_opcode_tracing);
-void TraceThisThread(bool enable_opcode_tracing);
-
-void TracerStartInput();
+PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid, bool left_is_const);
 
 }  // namespace atheris
 

@@ -15,16 +15,16 @@ If your extension is too complex and this doesn't work, you may have to make spe
 
 ## Step 2: Use an external libFuzzer
 
-For technical reasons detailed below, libFuzzer must not be linked into Atheris if sanitizers are being used. First, replace this:
+For technical reasons detailed below, libFuzzer must not be linked into Atheris if sanitizers are being used. 
+Set `internal_libfuzzer=False` in the call to `atheris.Setup` like this:
 
-```
+```py
 import atheris
-```
 
-With this:
+...
 
-```
-import atheris_no_libfuzzer as atheris
+atheris.Setup(..., internal_libfuzzer=False)
+atheris.Fuzz()
 ```
 
 Now that libFuzzer is no longer being provided by Atheris, it needs to be provided elsewhere. There are two options:
@@ -34,7 +34,7 @@ Now that libFuzzer is no longer being provided by Atheris, it needs to be provid
 If you can use this option, we recommend it; it is significantly easier than option #2. (However, this option is not yet supported on Mac). When Atheris is installed, it attempts to generate custom ASan and UBSan shared libraries that have libFuzzer linked in. You can find these libraries in the directory returned by this command:
 
 ```
-python -c "import atheris; import os; print(os.path.dirname(atheris.path()))"
+python -c "import atheris; print(atheris.path())"
 ```
 
 These files will be called:
@@ -45,7 +45,7 @@ These files will be called:
 If these files are present, it means Atheris succesfully generated the files at installation time, and you can use this option. Simply `LD_PRELOAD` the right `.so` file, and you're good to go. Here's a complete example:
 
 ```
-LD_PRELOAD="$(python -c "import atheris; import os; print(os.path.dirname(atheris.path()))")/asan_with_fuzzer.so" python ./my_fuzzer.py
+LD_PRELOAD="$(python -c "import atheris; print(atheris.path())")/asan_with_fuzzer.so" python ./my_fuzzer.py
 ```
 
 ### Option 2: Linking libFuzzer into Python
@@ -82,7 +82,7 @@ needed) is written to the `site-packages` directory adjacent to where Atheris
 is installed. You can find it in the directory returned by this command:
 
 ```
-python3 -c "import atheris; import os; print(os.path.dirname(atheris.path()))"
+python3 -c "import atheris; print(atheris.path())"
 ```
 
 The `build_modified_libfuzzer.sh` script uses the libFuzzer found there by
@@ -107,19 +107,4 @@ than the weak symbols from ASan/UBSan.
 
 ## What if I'm not using a Sanitizer?
 
-While we recommend that you use a sanitizer when fuzzing native code, it's not mandatory. If you'd like to use Atheris to fuzz native code without a sanitizer, you should still build your extension with `-fsanitize=fuzzer-no-link`, and then `LD_PRELOAD` *the atheris shared library* itself.
-
-```
-LD_PRELOAD="path/to/atheris.so" python ./your_fuzzer.py
-```
-
-If you want to make a Python fuzzer that runs both with or without a sanitizer, you can use this code pattern:
-
-```
-try:
-  import atheris_no_libfuzzer as atheris
-except ImportError:
-  import atheris
-```
-
-Loading `atheris_no_libfuzzer` will fail if libFuzzer hasn't been linked into CPython and hasn't been preloaded.
+While we recommend that you use a sanitizer when fuzzing native code, it's not mandatory. If you'd like to use Atheris to fuzz native code without a sanitizer, you should still build your extension with `-fsanitize=fuzzer-no-link`, and still `LD_PRELOAD` `asan_with_fuzzer.so`.

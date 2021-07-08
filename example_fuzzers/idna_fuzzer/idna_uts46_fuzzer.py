@@ -2,6 +2,7 @@
 # coding=utf-8
 
 # Copyright 2020 Google LLC
+# Copyright 2021 Fraunhofer FKIE
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,10 +41,17 @@ domain as valid; but it relies on `libunistring`, which only supports
 Unicode 9 and therefore produces incorrect metadata about Unicode 11 characters.
 """
 import atheris
-import idna
 import sys
 import unicodedata
 
+with atheris.instrument(include=["idna"]):
+    import idna
+
+# libidn2 is just an extension.
+# Only python code is instrumented with atheris.instrument(); 
+# extensions are instrumented at compile-time
+# so a call to atheris.instrument() is not
+# necessary here.
 import libidn2
 
 
