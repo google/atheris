@@ -114,13 +114,13 @@ void Fuzz() {
     exit(1);
   }
 
-  py::module_ atheris = py::module_::import("sys").attr("modules")["atheris"];
-  py::module_ core;
+  py::module atheris = py::module::import("sys").attr("modules")["atheris"];
+  py::module core;
   
   if (internal_libfuzzer) {
-    core = py::module_::import("atheris.core_with_libfuzzer");
+    core = py::module::import("atheris.core_with_libfuzzer");
   } else {
-    core = py::module_::import("atheris.core_without_libfuzzer");
+    core = py::module::import("atheris.core_without_libfuzzer");
   }
   
   atheris.attr("_trace_cmp") = core.attr("_trace_cmp");
