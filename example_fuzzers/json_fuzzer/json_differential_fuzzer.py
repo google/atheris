@@ -37,10 +37,7 @@ misinterpreting them is not.
 
 
 # See using_sanitizers.md for what this is about.
-try:
-  import atheris_no_libfuzzer as atheris
-except ImportError:
-  import atheris
+import atheris
 
 import json
 import ujson
@@ -90,7 +87,7 @@ def TestOneInput(input_bytes):
 
 
 def main():
-  atheris.Setup(sys.argv, TestOneInput)
+  atheris.Setup(sys.argv, TestOneInput, internal_libfuzzer=False)
   atheris.Fuzz()
 
 if __name__ == "__main__":

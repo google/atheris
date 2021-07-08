@@ -27,7 +27,7 @@ coverage.
 """
 
 import sys
-import atheris_no_libfuzzer as atheris
+import atheris
 
 # Here atheris.instrument() is not necessary
 # because ujson is just an extension.
@@ -53,7 +53,7 @@ def TestOneInput(input_bytes):
 
 
 def main():
-  atheris.Setup(sys.argv, TestOneInput)
+  atheris.Setup(sys.argv, TestOneInput, internal_libfuzzer=False)
   atheris.Fuzz()
 
 if __name__ == "__main__":
