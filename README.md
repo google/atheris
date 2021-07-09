@@ -22,36 +22,15 @@ Atheris relies on libFuzzer, which is distributed with Clang. However, Apple Cla
 
 ### Installing Against New LLVM
 
-```bash
-# Building LLVM
-git clone https://github.com/llvm/llvm-project.git
-cd llvm-project
-mkdir build
-cd build
-cmake -DLLVM_ENABLE_PROJECTS='clang;compiler-rt' -G "Unix Makefiles" ../llvm
-make -j 10  # This step is very slow
-
-# Installing Atheris
-CLANG_BIN="$(pwd)/bin/clang" pip3 install atheris
-```
+<!-- MARKDOWN-AUTO-DOCS:START (CODE:src=./examples/readme/install.sh) -->
+<!-- MARKDOWN-AUTO-DOCS:END -->
 
 ## Using Atheris
 
 ### Example:
 
-```python
-import sys
-import atheris
-
-with atheris.instrument():
-  import some_library
-
-def TestOneInput(data):
-  some_library.parse(data)
-
-atheris.Setup(sys.argv, TestOneInput)
-atheris.Fuzz()
-```
+<!-- MARKDOWN-AUTO-DOCS:START (CODE:src=./examples/readme/atheris-example.py) -->
+<!-- MARKDOWN-AUTO-DOCS:END -->
 
 Atheris supports fuzzing Python code, and uses Python code coverage information for this purpose.
 When fuzzing Python, Atheris will report a failure if the Python code under test throws an uncaught exception.
@@ -62,9 +41,8 @@ In order for native fuzzing to be effective, such native extensions must be buil
 
 The mechanics of building with Clang depend on your native extension. However, if your library is built with setuptools (e.g. `pip` and setup.py), the following is often sufficient:
 
-```bash
-CC="/usr/bin/clang" CFLAGS="-fsanitize=fuzzer-no-link" CXX="/usr/bin/clang++" CXXFLAGS="-fsanitize=fuzzer-no-link" pip install .
-```
+<!-- MARKDOWN-AUTO-DOCS:START (CODE:src=./examples/readme/fuzzing-native-extensions.sh) -->
+<!-- MARKDOWN-AUTO-DOCS:END -->
 
 #### Using Sanitizers
 
