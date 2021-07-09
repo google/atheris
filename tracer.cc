@@ -80,6 +80,7 @@ Module MakeModule(int capacity, bool is_function_entry) {
   module.capacity = capacity;
 
   module.counters = new uint8_t[capacity];
+  memset(module.counters, 0, sizeof(uint8_t) * capacity);
   module.fake_instruction_buffer = new uint32_t[capacity];
   memset(module.fake_instruction_buffer, 0, sizeof(uint32_t) * capacity);
   module.pcs = new PcTableEntry[capacity];
