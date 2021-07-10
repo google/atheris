@@ -28,7 +28,7 @@ it may indicate more interesting parsing problems.
 
 import atheris
 
-with atheris.instrument():
+with atheris.instrument_imports():
   from ruamel import yaml as ruamel_yaml
   import sys
   import warnings

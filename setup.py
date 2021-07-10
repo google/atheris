@@ -310,6 +310,7 @@ setup(
     long_description_content_type="text/markdown",
     packages=["atheris"],
     package_dir={'atheris': ''},
+    py_modules=["atheris_no_libfuzzer"],
     ext_modules=ext_modules,
     setup_requires=["pybind11>=2.5.0"],
     cmdclass={"build_ext": BuildExt},

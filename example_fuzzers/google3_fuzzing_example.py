@@ -18,7 +18,7 @@
 
 import atheris
 
-with atheris.instrument():
+with atheris.instrument_imports():
   import struct
   import sys
   from google3.third_party.py.atheris.example_fuzzers import example_library

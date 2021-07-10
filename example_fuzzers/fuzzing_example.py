@@ -18,7 +18,7 @@
 
 import atheris
 
-with atheris.instrument():
+with atheris.instrument_imports():
   import struct
   import sys
   import example_library

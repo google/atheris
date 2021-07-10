@@ -42,7 +42,7 @@ CLANG_BIN="$(pwd)/bin/clang" pip3 install atheris
 ```python
 import atheris
 
-with atheris.instrument():
+with atheris.instrument_imports():
   import some_library
   import sys
 
@@ -76,33 +76,34 @@ Atheris is fully supported by [OSS-Fuzz](https://github.com/google/oss-fuzz), Go
 
 ## API
 
-The `atheris` module provides three key functions: `instrument()`, `Setup()` and `Fuzz()`.
+The `atheris` module provides three key functions: `instrument_imports()`, `Setup()` and `Fuzz()`.
 
-In your source file, import all libraries you wish to fuzz inside a `with atheris.instrument():`-block, like this:
+In your source file, import all libraries you wish to fuzz inside a `with atheris.instrument_imports():`-block, like this:
 ```py
 # library_a will not get instrumented
 import library_a
 
-with atheris.instrument():
+with atheris.instrument_imports():
     # library_b will get instrumented
     import library_b
 ```
 
-Generally, it's best to import `atheris` first and then import all other libraries inside of a `with atheris.instrument()` block.
+Generally, it's best to import `atheris` first and then import all other libraries inside of a `with atheris.instrument_imports()` block.
 
 Next, define a fuzzer entry point function and pass it to `atheris.Setup()` along with the fuzzer's arguments (typically `sys.argv`). Finally, call `atheris.Fuzz()` to start fuzzing. You must call `atheris.Setup()` before `atheris.Fuzz()`.
 
-#### `instrument(include=[], exclude=[])`
+#### `instrument_imports(include=[], exclude=[])`
 - `include`: A list of fully-qualified module names that shall be instrumented. If this is not specified every module will get instrumented.
 - `exclude`: A list of fully-qualified module names that shall NOT be instrumented.
 
 This should be used together with a `with`-Statement.
 
-#### `Setup(args, test_one_input, internal_libfuzzer=True)`
+#### `Setup(args, test_one_input, internal_libfuzzer=None)`
  - `args`: A list of strings: the process arguments to pass to the fuzzer, typically `sys.argv`. This argument list may be modified in-place, to remove arguments consumed by the fuzzer.
    See [the LibFuzzer docs](https://llvm.org/docs/LibFuzzer.html#options) for a list of such options.
  - `test_one_input`: your fuzzer's entry point. Must take a single `bytes` argument. This will be repeatedly invoked with a single bytes container.
- - `internal_libfuzzer`: Indicates whether libfuzzer will be provided by atheris or by an external library (see [using_sanitizers.md](./using_sanitizers.md)). If fuzzing pure Python, leave this as `True`.
+ - `internal_libfuzzer`: Indicates whether libfuzzer will be provided by atheris or by an external library (see [using_sanitizers.md](./using_sanitizers.md)). If unspecified, Atheris will determine this
+   automatically. If fuzzing pure Python, leave this as `True`.
 
 #### `Fuzz()`
 

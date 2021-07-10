@@ -29,9 +29,9 @@ coverage.
 import sys
 import atheris
 
-# Here atheris.instrument() is not necessary because ujson is just an extension,
-# and we don't have any Python code we want to fuzz.
-# Only python code is instrumented with atheris.instrument();
+# Here atheris.instrument_imports() is not necessary because ujson is just an
+# extension, and we don't have any Python code we want to fuzz.
+# Only python code is instrumented with atheris.instrument_imports();
 # extensions are instrumented at compile-time.
 import ujson
 
@@ -53,7 +53,7 @@ def TestOneInput(input_bytes):
 
 
 def main():
-  atheris.Setup(sys.argv, TestOneInput, internal_libfuzzer=False)
+  atheris.Setup(sys.argv, TestOneInput)
   atheris.Fuzz()
 
 if __name__ == "__main__":

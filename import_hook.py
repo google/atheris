@@ -138,7 +138,7 @@ class HookManager:
         i += 1
 
 
-def instrument(include=[], exclude=[]):
+def instrument_imports(include=[], exclude=[]):
   """
     This function temporarily installs an import hook which instruments the
     imported modules.
@@ -152,13 +152,13 @@ def instrument(include=[], exclude=[]):
   for module_name in include + exclude:
     if not isinstance(module_name, str):
       raise RuntimeError(
-          "atheris.instrument() expects names of modules of type <str>")
+          "atheris.instrument_imports() expects names of modules of type <str>")
     elif not module_name:
       raise RuntimeError(
-          f"atheris.instrument(): You supplied an empty module name")
+          f"atheris.instrument_imports(): You supplied an empty module name")
     elif module_name[0] == ".":
       raise RuntimeError(
-          "atheris.instrument(): Please specify fully qualified module names (absolute not relative)"
+          "atheris.instrument_imports(): Please specify fully qualified module names (absolute not relative)"
       )
 
   for module_name in include:

@@ -42,7 +42,7 @@ Unicode 9 and therefore produces incorrect metadata about Unicode 11 characters.
 """
 import atheris
 
-with atheris.instrument():
+with atheris.instrument_imports():
   import idna
   import sys
   import unicodedata

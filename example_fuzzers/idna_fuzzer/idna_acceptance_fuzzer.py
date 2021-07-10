@@ -42,7 +42,7 @@ including :
 
 import atheris
 
-with atheris.instrument():
+with atheris.instrument_imports():
   import idna
   import libidn2
   import sys

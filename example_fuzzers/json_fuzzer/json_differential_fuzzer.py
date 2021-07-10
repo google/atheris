@@ -38,7 +38,7 @@ misinterpreting them is not.
 
 # See using_sanitizers.md for what this is about.
 import atheris
-atheris.instrument():
+with atheris.instrument_imports():
   import json
   import ujson
   import sys
@@ -87,7 +87,7 @@ def TestOneInput(input_bytes):
 
 
 def main():
-  atheris.Setup(sys.argv, TestOneInput, internal_libfuzzer=False)
+  atheris.Setup(sys.argv, TestOneInput)
   atheris.Fuzz()
 
 if __name__ == "__main__":

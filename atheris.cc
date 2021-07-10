@@ -45,7 +45,14 @@ std::function<void(py::bytes data)>& test_one_input_global =
 
 std::vector<std::string>& args_global = *new std::vector<std::string>();
 uint64_t num_counters = 0;
-bool internal_libfuzzer = true;
+
+enum internal_libfuzzer_mode {
+  INTERNAL_LIBFUZZER_AUTO = 0,
+  INTERNAL_LIBFUZZER_ENABLE = 1,
+  INTERNAL_LIBFUZZER_DISABLE = 2
+};
+
+internal_libfuzzer_mode internal_libfuzzer = INTERNAL_LIBFUZZER_AUTO;
 bool setup_called = false;
 
 }  // namespace
@@ -101,10 +108,47 @@ std::vector<std::string> Setup(
   }
 
   if (kwargs.contains("internal_libfuzzer")) {
-    internal_libfuzzer = kwargs["internal_libfuzzer"].cast<bool>();
+    bool use_internal = kwargs["internal_libfuzzer"].cast<bool>();
+    if (use_internal) {
+      internal_libfuzzer = INTERNAL_LIBFUZZER_ENABLE;
+    } else {
+      internal_libfuzzer = INTERNAL_LIBFUZZER_DISABLE;
+    }
   }
 
   return ret;
+}
+
+// Checks if libfuzzer is already present.
+NO_SANITIZE
+bool libfuzzer_is_loaded() {
+  void* self_lib = dlopen(nullptr, RTLD_LAZY);
+  if (!self_lib) return false;
+
+  void* sym = dlsym(self_lib, "LLVMFuzzerRunDriver");
+
+  dlclose(self_lib);
+  return sym;
+}
+
+NO_SANITIZE
+py::module LoadCoreModule() {
+  if (internal_libfuzzer == INTERNAL_LIBFUZZER_AUTO) {
+    // Automatically determine whether we have libfuzzer loaded
+    if (libfuzzer_is_loaded()) {
+      internal_libfuzzer = INTERNAL_LIBFUZZER_DISABLE;  // Don't use our own
+    } else {
+      internal_libfuzzer = INTERNAL_LIBFUZZER_ENABLE;  // Use our own
+    }
+  }
+
+  if (internal_libfuzzer == INTERNAL_LIBFUZZER_ENABLE) {
+    std::cerr << "INFO: Using built-in libfuzzer" << std::endl;
+    return py::module::import("atheris.core_with_libfuzzer");
+  } else {
+    std::cerr << "INFO: Using preloaded libfuzzer" << std::endl;
+    return py::module::import("atheris.core_without_libfuzzer");
+  }
 }
 
 NO_SANITIZE
@@ -118,13 +162,7 @@ void Fuzz() {
 
   py::module atheris =
       (py::module)py::module::import("sys").attr("modules")["atheris"];
-  py::module core;
-
-  if (internal_libfuzzer) {
-    core = py::module::import("atheris.core_with_libfuzzer");
-  } else {
-    core = py::module::import("atheris.core_without_libfuzzer");
-  }
+  py::module core = LoadCoreModule();
 
   atheris.attr("_trace_cmp") = core.attr("_trace_cmp");
   atheris.attr("_trace_branch") = core.attr("_trace_branch");
@@ -139,6 +177,7 @@ PYBIND11_MODULE(atheris, m) {
   m.def("_trace_branch", &prefuzz_trace_branch);
   m.def("_trace_cmp", &prefuzz_trace_cmp, py::return_value_policy::move);
   m.def("_reserve_counters", &prefuzz_reserve_counters);
+  m.def("libfuzzer_is_loaded", &libfuzzer_is_loaded);
 
   py::class_<FuzzedDataProvider>(m, "FuzzedDataProvider")
       .def(py::init<py::bytes>())
