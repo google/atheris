@@ -14,6 +14,7 @@
 
 #include "util.h"
 
+#include <dlfcn.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -21,9 +22,9 @@
 #include <iostream>
 #include <sstream>
 
+#include "macros.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
-#include <dlfcn.h>
 
 namespace atheris {
 

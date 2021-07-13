@@ -131,6 +131,7 @@ ext_modules = [
             "core.cc",
             "tracer.cc",
             "util.cc",
+            "timeout.cc",
         ]),
         include_dirs=[
             # Path to pybind11 headers
@@ -143,6 +144,7 @@ ext_modules = [
             "core.cc",
             "tracer.cc",
             "util.cc",
+            "timeout.cc",
         ]),
         include_dirs=[
             # Path to pybind11 headers
@@ -220,7 +222,7 @@ class BuildExt(build_ext):
 
     sys.stderr.write("Your libFuzzer is up-to-date.\n")
 
-    c_opts = []
+    c_opts = ["-Wno-deprecated-declarations", "-Wno-attributes"]
     l_opts = []
 
     if sys.platform == "darwin":

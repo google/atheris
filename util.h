@@ -17,6 +17,7 @@
 #ifndef THIRD_PARTY_PY_ATHERIS_UTIL_H_
 #define THIRD_PARTY_PY_ATHERIS_UTIL_H_
 
+#include <csignal>
 #include <exception>
 #include <ostream>
 

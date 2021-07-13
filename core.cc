@@ -16,8 +16,13 @@
 #include <Python.h>
 #include <dlfcn.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
+#include <atomic>
+#include <cerrno>
+#include <chrono>
+#include <csignal>
 #include <exception>
 #include <functional>
 #include <iostream>
@@ -27,6 +32,7 @@
 #include "pybind11/functional.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
+#include "timeout.h"
 #include "tracer.h"
 #include "util.h"
 
@@ -135,7 +141,17 @@ void _reserve_counters(uint64_t num) {
 }
 
 NO_SANITIZE
+bool OnFirstTestOneInput() {
+  SetupTimeoutAlarm();
+  return true;
+}
+
+NO_SANITIZE
 int TestOneInput(const uint8_t* data, size_t size) {
+  static bool dummy = OnFirstTestOneInput();
+  (void)dummy;
+  RefreshTimeout();
+
   try {
     test_one_input_global(py::bytes(reinterpret_cast<const char*>(data), size));
     return 0;
@@ -165,11 +181,17 @@ void start_fuzzing(const std::vector<std::string>& args,
   std::vector<char*> arg_array;
   arg_array.reserve(args.size() + 1);
   for (const std::string& arg : args) {
+    // We specially care about timeouts.
+    if (arg.substr(0, 9) == "-timeout=") {
+      SetTimeout(std::stoi(arg.substr(9, std::string::npos)));
+    }
+
     arg_array.push_back(const_cast<char*>(arg.c_str()));
   }
+
   arg_array.push_back(nullptr);
   char** args_ptr = &arg_array[0];
-  int args_size = args.size();
+  int args_size = arg_array.size() - 1;
 
   if (num_counters) {
     counters.resize(num_counters, 0);
