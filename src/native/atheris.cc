@@ -171,7 +171,7 @@ void Fuzz() {
   core.attr("start_fuzzing")(args_global, test_one_input_global, num_counters);
 }
 
-PYBIND11_MODULE(atheris, m) {
+PYBIND11_MODULE(native, m) {
   m.def("Setup", &Setup);
   m.def("Fuzz", &Fuzz);
   m.def("_trace_branch", &prefuzz_trace_branch);

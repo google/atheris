@@ -114,11 +114,11 @@ def get_libfuzzer_lib():
 
 ext_modules = [
     Extension(
-        "atheris.atheris",
+        "atheris.native",
         sorted([
-            "atheris.cc",
-            "util.cc",
-            "fuzzed_data_provider.cc",
+            "src/native/atheris.cc",
+            "src/native/util.cc",
+            "src/native/fuzzed_data_provider.cc",
         ]),
         include_dirs=[
             # Path to pybind11 headers
@@ -128,10 +128,10 @@ ext_modules = [
     Extension(
         "atheris.core_with_libfuzzer",
         sorted([
-            "core.cc",
-            "tracer.cc",
-            "util.cc",
-            "timeout.cc",
+            "src/native/core.cc",
+            "src/native/tracer.cc",
+            "src/native/util.cc",
+            "src/native/timeout.cc",
         ]),
         include_dirs=[
             # Path to pybind11 headers
@@ -141,10 +141,10 @@ ext_modules = [
     Extension(
         "atheris.core_without_libfuzzer",
         sorted([
-            "core.cc",
-            "tracer.cc",
-            "util.cc",
-            "timeout.cc",
+            "src/native/core.cc",
+            "src/native/tracer.cc",
+            "src/native/util.cc",
+            "src/native/timeout.cc",
         ]),
         include_dirs=[
             # Path to pybind11 headers
@@ -311,7 +311,7 @@ setup(
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
     packages=["atheris"],
-    package_dir={'atheris': ''},
+    package_dir={"atheris": "src"},
     py_modules=["atheris_no_libfuzzer"],
     ext_modules=ext_modules,
     setup_requires=["pybind11>=2.5.0"],
