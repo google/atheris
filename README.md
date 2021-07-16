@@ -4,23 +4,37 @@ Atheris is a coverage-guided Python fuzzing engine. It supports fuzzing of Pytho
 
 ## Installation Instructions
 
-Atheris supports Linux (32- and 64-bit) and Mac OS X.
-Only python versions 3.6 - 3.9 are supported.
+Atheris supports Linux (32- and 64-bit) and Mac OS X, Python versions 3.6-3.9.
 
-### Linux
+You can install prebuilt versions of Atheris with pip:
 
-Atheris relies on libFuzzer, which is distributed with Clang. If you have a sufficiently new version of `clang` on your path, installation is as simple as:
 ```bash
-pip install atheris
+pip3 install atheris
+```
+
+These wheels come with a built-in libFuzzer, which is fine for fuzzing Python
+code. If you plan to fuzz native extensions, you may need to build from source
+to ensure the libFuzzer version in Atheris matches your Clang version.
+
+### Building from Source
+
+Atheris relies on libFuzzer, which is distributed with Clang. If you have a sufficiently new version of `clang` on your path, installation from source is as simple as:
+```bash
+# Build latest release from source
+pip3 install --no-binary atheris atheris
+# Build development code from source
+git clone https://github.com/google/atheris.git
+cd atheris
+pip3 install .
 ```
 
 If you don't have `clang` installed or it's too old, you'll need to download and build the latest version of LLVM. Follow the instructions in Installing Against New LLVM below.
 
-### Mac
+#### Mac
 
-Atheris relies on libFuzzer, which is distributed with Clang. However, Apple Clang doesn't come with libFuzzer, so you'll need to install a new version of LLVM from head. Follow the instructions in Installing Against New LLVM below.
+Apple Clang doesn't come with libFuzzer, so you'll need to install a new version of LLVM from head. Follow the instructions in Installing Against New LLVM below.
 
-### Installing Against New LLVM
+#### Installing Against New LLVM
 
 ```bash
 # Building LLVM
@@ -32,7 +46,7 @@ cmake -DLLVM_ENABLE_PROJECTS='clang;compiler-rt' -G "Unix Makefiles" ../llvm
 make -j 10  # This step is very slow
 
 # Installing Atheris
-CLANG_BIN="$(pwd)/bin/clang" pip3 install atheris
+CLANG_BIN="$(pwd)/bin/clang" pip3 install <whatever>
 ```
 
 ## Using Atheris
@@ -53,22 +67,57 @@ atheris.Setup(sys.argv, TestOneInput)
 atheris.Fuzz()
 ```
 
-Atheris supports fuzzing Python code, and uses Python code coverage information for this purpose.
 When fuzzing Python, Atheris will report a failure if the Python code under test throws an uncaught exception.
+
+### Python coverage
+
+Atheris collects Python coverage information by instrumenting bytecode.
+There are 3 options for adding this instrumentation to the bytecode:
+
+ - You can instrument the libraries you import:
+   ```python
+   with atheris.instrument_imports():
+     import foo
+     from bar import baz
+   ```
+   This will cause instrumentation to be added to `foo` and `bar`, as well as
+   any libraries they import.
+ - Or, you can instrument individual functions:
+   ```python
+   @atheris.instrument_func
+   def my_function(foo, bar):
+     print("instrumented")
+   ```
+ - Or finally, you can instrument everything:
+   ```python
+   atheris.instrument_all()
+   ```
+   Put this right before `atheris.Setup()`. This will find every Python function
+   currently loaded in the interpreter, and instrument it.
+   This might take a while.
+
+
+#### Why am I getting "No interesting inputs were found"?
+
+You might see this error:
+```
+ERROR: no interesting inputs were found. Is the code instrumented for coverage? Exiting.
+```
+
+You'll get this error if the first 2 calls to `TestOneInput` didn't produce any
+coverage events. Even if you have instrumented some Python code,
+this can happen if the instrumentation isn't reached in those first 2 calls.
+(For example, because you have a nontrivial `TestOneInput`). You can resolve
+this by adding an `atheris.instrument_func` decorator to `TestOneInput`,
+using `atheris.instrument_all()`, or moving your `TestOneInput` function into an
+instrumented module.
+
 
 ### Fuzzing Native Extensions
 
-In order for native fuzzing to be effective, such native extensions must be built with Clang, using the argument `-fsanitize=fuzzer-no-link`. They should be built with the same `clang` as was used when building Atheris.
-
-The mechanics of building with Clang depend on your native extension. However, if your library is built with setuptools (e.g. `pip` and setup.py), the following is often sufficient:
-
-```bash
-CC="/usr/bin/clang" CFLAGS="-fsanitize=fuzzer-no-link" CXX="/usr/bin/clang++" CXXFLAGS="-fsanitize=fuzzer-no-link" pip install .
-```
-
-#### Using Sanitizers
-
-When fuzzing a native extension, **we strongly recommend you use a sanitizer**, such as Address Sanitizer or Undefined Behavior Sanitizer. However, there are complexities involved in doing this; see [using_sanitizers.md](using_sanitizers.md) for details.
+In order for fuzzing native extensions to be effective, your native extensions
+must be instrumented. See [Native Extension Fuzzing](https://github.com/google/atheris/native_extension_fuzzing.md)
+for instructions.
 
 ## Integration with OSS-Fuzz
 
@@ -79,7 +128,7 @@ Atheris is fully supported by [OSS-Fuzz](https://github.com/google/oss-fuzz), Go
 The `atheris` module provides three key functions: `instrument_imports()`, `Setup()` and `Fuzz()`.
 
 In your source file, import all libraries you wish to fuzz inside a `with atheris.instrument_imports():`-block, like this:
-```py
+```python
 # library_a will not get instrumented
 import library_a
 
@@ -93,10 +142,43 @@ Generally, it's best to import `atheris` first and then import all other librari
 Next, define a fuzzer entry point function and pass it to `atheris.Setup()` along with the fuzzer's arguments (typically `sys.argv`). Finally, call `atheris.Fuzz()` to start fuzzing. You must call `atheris.Setup()` before `atheris.Fuzz()`.
 
 #### `instrument_imports(include=[], exclude=[])`
-- `include`: A list of fully-qualified module names that shall be instrumented. If this is not specified every module will get instrumented.
+- `include`: A list of fully-qualified module names that shall be instrumented.
 - `exclude`: A list of fully-qualified module names that shall NOT be instrumented.
 
-This should be used together with a `with`-Statement.
+This should be used together with a `with`-statement. All modules imported in
+said statement will be instrumented. However, because Python imports all modules
+only once, this cannot be used to instrument any previously imported module,
+including modules required by Atheris. To add coverage to those modules, use
+`instrument_all()` instead.
+
+A full list of unsupported modules can be retrieved as follows:
+
+```python
+import sys
+import atheris
+print(sys.modules.keys())
+```
+
+
+
+#### `instrument_func(func)`
+ - `func`: The function to instrument.
+
+This will instrument the specified Python function and then return `func`. This
+is typically used as a decorator, but can be used to instrument individual
+functions too. Note that the `func` is instrumented in-place, so this will
+affect all call points of the function.
+
+This cannot be called on a bound method - call it on the unbound version.
+
+#### `instrument_all()`
+
+This will scan over all objects in the interpreter and call `instrument_func` on
+every Python function. This works even on core Python interpreter functions,
+something which `instrument_imports` cannot do.
+
+This function is experimental.
+
 
 #### `Setup(args, test_one_input, internal_libfuzzer=None)`
  - `args`: A list of strings: the process arguments to pass to the fuzzer, typically `sys.argv`. This argument list may be modified in-place, to remove arguments consumed by the fuzzer.
@@ -254,6 +336,7 @@ import atheris
 from hypothesis import given, strategies as st
 
 @given(st.from_regex(r"\w+!?", fullmatch=True))
+@atheris.instrument_func
 def test(string):
   assert string != "bad"
 

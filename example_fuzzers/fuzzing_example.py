@@ -17,13 +17,16 @@
 """An example of fuzzing in Python."""
 
 import atheris
+import sys
 
+# This tells Atheris to instrument all functions in the `struct` and
+# `example_library` modules.
 with atheris.instrument_imports():
   import struct
-  import sys
   import example_library
 
 
+@atheris.instrument_func  # Instrument the TestOneInput function itself
 def TestOneInput(data):
   """The entry point for our fuzzer.
 
@@ -40,7 +43,6 @@ def TestOneInput(data):
 
   number, = struct.unpack('<I', data)
   example_library.CodeBeingFuzzed(number)
-
 
 atheris.Setup(sys.argv, TestOneInput)
 atheris.Fuzz()

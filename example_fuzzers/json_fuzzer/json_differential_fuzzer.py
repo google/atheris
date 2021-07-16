@@ -36,14 +36,14 @@ misinterpreting them is not.
 """
 
 
-# See using_sanitizers.md for what this is about.
 import atheris
+import sys
 with atheris.instrument_imports():
   import json
   import ujson
-  import sys
 
 
+@atheris.instrument_func
 def ClearAllIntegers(data):
   """Used to prevent known bug; sets all integers in data recursively to 0."""
   if type(data) == int:
@@ -57,6 +57,7 @@ def ClearAllIntegers(data):
   return data
 
 
+@atheris.instrument_func
 def TestOneInput(input_bytes):
   fdp = atheris.FuzzedDataProvider(input_bytes)
   original = fdp.ConsumeUnicode(sys.maxsize)

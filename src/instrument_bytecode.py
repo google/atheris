@@ -24,6 +24,8 @@ import importlib
 import imp
 import dis
 from collections import OrderedDict
+from .native import _reserve_counters
+from . import utils
 
 from .version_dependent import get_code_object, get_lnotab, CONDITIONAL_JUMPS, UNCONDITIONAL_JUMPS, ENDS_FUNCTION, HAVE_REL_REFERENCE, HAVE_ABS_REFERENCE, REVERSE_CMP_OP
 
@@ -431,7 +433,8 @@ class Instrumentor:
       code += instr.to_bytes()
       stacksize = max(stacksize, stacksize + instr.get_stack_effect())
 
-    return get_code_object(self._code, stacksize, code, tuple(self.consts),
+    return get_code_object(self._code, stacksize, code,
+                           tuple(self.consts + ["__ATHERIS_INSTRUMENTED__"]),
                            tuple(self._names), get_lnotab(self._code, listing))
 
   def _generate_trace_branch_invocation(self, lineno, offset):
@@ -752,6 +755,11 @@ def patch_code(code, trace_dataflow, nested=False):
   old_index = current_index
 
   inst = Instrumentor(code, current_index, current_pc)
+
+  # If this code object has already been instrumented, skip it
+  if "__ATHERIS_INSTRUMENTED__" in inst.consts:
+    return code
+
   inst.trace_control_flow()
 
   if trace_dataflow:
@@ -773,3 +781,80 @@ def patch_code(code, trace_dataflow, nested=False):
     inst.insert_registration(current_index - old_index)
 
   return inst.to_code()
+
+
+def instrument_func(func):
+  """Add Atheris instrumentation to a specific function."""
+
+  # Make the atheris module available to our instrumentation
+  sys.modules[func.__module__].atheris = sys.modules["atheris"]
+
+  old_index = current_index
+
+  func.__code__ = patch_code(func.__code__, True, True)
+  _reserve_counters(current_index - old_index)
+
+  return func
+
+
+def _is_instrumentable(obj):
+  """Returns True if this object can be instrumented."""
+  # Only callables can be instrumented
+  if not hasattr(obj, "__call__"):
+    return False
+  # Only objects with a __code__ member of type CodeType can be instrumented
+  if not hasattr(obj, "__code__"):
+    return False
+  if not isinstance(obj.__code__, types.CodeType):
+    return False
+  # Only code in a real module can be instrumented
+  if not hasattr(obj, "__module__"):
+    return False
+  if obj.__module__ not in sys.modules:
+    return False
+  # Bound methods can't be instrumented - instrument the real func instead
+  if hasattr(obj, "__self__"):
+    return False
+  # Only Python functions and methods can be instrumented, nothing native
+  if (not isinstance(obj, types.FunctionType)) and (not isinstance(
+      obj, types.MethodType)):
+    return False
+
+  return True
+
+
+def instrument_all():
+  """Add Atheris instrementation to all Python code already imported.
+
+  This function is experimental.
+
+  This function is able to instrument core library functions that can't be
+  instrumented by instrument_func or instrument_imports, as those functions are
+  used in the implementation of the instrumentation.
+  """
+  import gc
+
+  progress_renderer = None
+
+  funcs = [obj for obj in gc.get_objects() if _is_instrumentable(obj)]
+  if sys.stderr.isatty():
+    sys.stderr.write(f"INFO: Instrumenting functions: ")
+    progress_renderer = utils.ProgressRenderer(sys.stderr, len(funcs))
+  else:
+    sys.stderr.write(f"INFO: Instrumenting {len(funcs)} functions...\n")
+
+  for i in range(len(funcs)):
+    func = funcs[i]
+    try:
+      instrument_func(func)
+    except Exception as e:
+      if progress_renderer:
+        progress_renderer.drop()
+      sys.stderr.write(f"ERROR: Failed to instrument function {func}: {e}\n")
+    if progress_renderer:
+      progress_renderer.count = i + 1
+
+  if progress_renderer:
+    progress_renderer.drop()
+  else:
+    print("INFO: Instrumentation complete.")

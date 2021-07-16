@@ -41,14 +41,16 @@ domain as valid; but it relies on `libunistring`, which only supports
 Unicode 9 and therefore produces incorrect metadata about Unicode 11 characters.
 """
 import atheris
+import sys
 
 with atheris.instrument_imports():
   import idna
-  import sys
   import unicodedata
-  import libidn2
+
+import libidn2
 
 
+@atheris.instrument_func
 def TestOneInput(input_bytes):
   global total_iters
   global comparison_iters

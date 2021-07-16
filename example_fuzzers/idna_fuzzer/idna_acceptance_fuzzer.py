@@ -41,12 +41,10 @@ including :
 """
 
 import atheris
-
-with atheris.instrument_imports():
-  import idna
-  import libidn2
-  import sys
-  import unicodedata
+import sys
+import idna
+import libidn2
+import unicodedata
 
 
 def ShouldFail(domain):
@@ -204,6 +202,7 @@ def TestOneInput(input_bytes):
 
 
 def main():
+  atheris.instrument_all()
   atheris.Setup(sys.argv, TestOneInput)
   atheris.Fuzz()
 

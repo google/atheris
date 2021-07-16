@@ -15,4 +15,5 @@
 
 from .native import Setup, Fuzz, FuzzedDataProvider, _trace_branch, _reserve_counters, _trace_cmp, ALL_REMAINING
 from .import_hook import instrument_imports
+from .instrument_bytecode import patch_code, instrument_func, instrument_all
 from .utils import path

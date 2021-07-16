@@ -40,6 +40,7 @@ ryaml = ruamel_yaml.YAML(typ="safe", pure=True)
 ryaml.allow_duplicate_keys = True
 
 
+@atheris.instrument_func
 def TestOneInput(input_bytes):
   fdp = atheris.FuzzedDataProvider(input_bytes)
   data = fdp.ConsumeUnicode(sys.maxsize)

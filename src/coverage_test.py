@@ -21,6 +21,21 @@ from unittest import mock
 with atheris.instrument_imports():
   import coverage_test_helper
 
+
+@atheris.instrument_func
+def decorator_instrumented(x):
+  return 2 * x
+
+
+@atheris.instrument_func
+@atheris.instrument_func
+@atheris.instrument_func
+@atheris.instrument_func
+@atheris.instrument_func
+def multi_instrumented(x):
+  return 2 * x
+
+
 original_trace_cmp = atheris._trace_cmp
 
 
@@ -35,6 +50,15 @@ class CoverageTest(unittest.TestCase):
 
     trace_branch_mock.reset_mock()
     coverage_test_helper.simple_func(2)
+    trace_branch_mock.assert_called()
+
+  def testDecoratorBasicBlock(self, trace_branch_mock, trace_cmp_mock):
+    trace_branch_mock.assert_not_called()
+    decorator_instrumented(7)
+    trace_branch_mock.assert_called()
+
+    trace_branch_mock.reset_mock()
+    decorator_instrumented(2)
     trace_branch_mock.assert_called()
 
   def testBranch(self, trace_branch_mock, trace_cmp_mock):
@@ -93,6 +117,11 @@ class CoverageTest(unittest.TestCase):
     self.assertTraceCmpWas(trace_cmp_mock.call_args[0], 1, 3, ">", True)
     first_cmp_idx = trace_cmp_mock.call_args[0][3]
     trace_cmp_mock.reset_mock()
+
+  def testInstrumentationAppliedOnce(self, trace_branch_mock, trace_cmp_mock):
+    trace_branch_mock.assert_not_called()
+    multi_instrumented(7)
+    trace_branch_mock.assert_called_once()
 
 
 if __name__ == "__main__":
