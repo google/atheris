@@ -198,7 +198,6 @@ before passing any remaining arguments to another setup function.
 #### `FuzzedDataProvider`
 
 Often, a `bytes` object is not convenient input to your code being fuzzed. Similar to libFuzzer, we provide a FuzzedDataProvider to translate these bytes into other input forms.
-Alternatively, you can use [Hypothesis](https://hypothesis.readthedocs.io/) as described below.
 
 You can construct the FuzzedDataProvider with:
 
@@ -322,28 +321,4 @@ def ConsumeBool()
 
 Consume either `True` or `False`.
 
-
-### Use with Hypothesis
-
-The [Hypothesis library for property-based testing](https://hypothesis.readthedocs.io/)
-is also useful for writing fuzz harnesses.  As well as a great library of "strategies"
-which describe the inputs to generate, using Hypothesis makes it trivial to reproduce
-failures found by the fuzzer - including automatically finding a minimal reproducing
-input.  For example:
-
-```python
-import atheris
-from hypothesis import given, strategies as st
-
-@given(st.from_regex(r"\w+!?", fullmatch=True))
-@atheris.instrument_func
-def test(string):
-  assert string != "bad"
-
-atheris.Setup(sys.argv, test.hypothesis.fuzz_one_input)
-atheris.Fuzz()
-```
-
-[See here for more details](https://hypothesis.readthedocs.io/en/latest/details.html#use-with-external-fuzzers),
-or [here for what you can generate](https://hypothesis.readthedocs.io/en/latest/data.html).
 
