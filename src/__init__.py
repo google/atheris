@@ -17,3 +17,13 @@ from .native import Setup, Fuzz, FuzzedDataProvider, _trace_branch, _reserve_cou
 from .import_hook import instrument_imports
 from .instrument_bytecode import patch_code, instrument_func, instrument_all
 from .utils import path
+
+# PyInstaller Support
+# PyInstaller doesn't automatically support lazy imports, which happens because
+# we dynamically decide whether to import the with/without_libfuzzer versions of
+# the core module. This function tells it where to look for a hook-atheris.py
+# file.
+
+def get_hook_dirs():
+  import os
+  return [os.path.dirname(__file__)]
