@@ -29,6 +29,10 @@
 #define NO_SANITIZE_MEMORY
 #endif  // __has_attribute
 
+#ifdef __APPLE__
+#define sighandler_t sig_t
+#endif  // __APPLE__
+
 #define NO_SANITIZE NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 
 #endif  // THIRD_PARTY_PY_ATHERIS_MACROS_H_
