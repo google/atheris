@@ -443,11 +443,11 @@ class Instrumentor:
         """
     to_insert = []
     start_offset = offset
-    name_module = self._get_name(TARGET_MODULE)
+    const_atheris = self._get_const(sys.modules[TARGET_MODULE])
     name_cov = self._get_name(COVERAGE_FUNCTION)
 
     to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_GLOBAL"], name_module))
+        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_atheris))
     offset += to_insert[-1].get_size()
     to_insert.append(
         Instruction(lineno, offset, dis.opmap["LOAD_ATTR"], name_cov))
@@ -470,14 +470,14 @@ class Instrumentor:
         """
     to_insert = []
     start_offset = offset
-    name_module = self._get_name(TARGET_MODULE)
+    const_atheris = self._get_const(sys.modules[TARGET_MODULE])
     name_cmp = self._get_name(COMPARE_FUNCTION)
     const_op = self._get_const(op)
     const_pc = self._get_pc()
     const_False = self._get_const(False)
 
     to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_GLOBAL"], name_module))
+        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_atheris))
     offset += to_insert[-1].get_size()
     to_insert.append(
         Instruction(lineno, offset, dis.opmap["LOAD_ATTR"], name_cmp))
@@ -508,7 +508,7 @@ class Instrumentor:
         """
     to_insert = []
     start_offset = offset
-    name_module = self._get_name(TARGET_MODULE)
+    const_atheris = self._get_const(sys.modules[TARGET_MODULE])
     name_cmp = self._get_name(COMPARE_FUNCTION)
     const_pc = self._get_pc()
     const_True = self._get_const(True)
@@ -520,7 +520,7 @@ class Instrumentor:
       const_op = self._get_const(op)
 
     to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_GLOBAL"], name_module))
+        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_atheris))
     offset += to_insert[-1].get_size()
     to_insert.append(
         Instruction(lineno, offset, dis.opmap["LOAD_ATTR"], name_cmp))
@@ -553,7 +553,7 @@ class Instrumentor:
         the branch.
 
         The following bytecode gets inserted:
-          LOAD_GLOBAL    atheris
+          LOAD_CONST     atheris
           LOAD_ATTR      _trace_branch
           LOAD_CONST     <id>
           CALL_FUNCTION  1
@@ -592,76 +592,6 @@ class Instrumentor:
 
     self._handle_size_changes()
 
-  def insert_registration(self, num_counters):
-    """
-        This function inserts an import of atheris and a call to
-        atheris._reserve_counters() that tells atheris how many branches were
-        instrumented.
-        This function should only be called once for the root code object
-        of a module after every nested code object has been instrumented.
-
-        The bytecode that imports atheris looks like this:
-          LOAD_CONST    0         ; absolute import
-          LOAD_CONST    None      ; no fromlist
-          IMPORT_NAME   atheris
-          STORE_GLOBAL  atheris
-
-        The bytecode that calls _reserve_counters() looks like this:
-          LOAD_GLOBAL    atheris
-          LOAD_ATTR      _reserve_counters
-          LOAD_CONST     <num branches>
-          CALL_FUNCTION  1
-          POP_TOP                         ; discard return value of
-          _reserve_counters()
-        """
-    const_0 = self._get_const(0)
-    const_None = self._get_const(None)
-    name_module = self._get_name(TARGET_MODULE)
-    name_reg = self._get_name(REGISTER_FUNCTION)
-    const_num_counters = self._get_const(num_counters)
-
-    to_insert = []
-    start_offset = self._cfg[0].instructions[0].offset
-    offset = start_offset
-    lineno = self._cfg[0].instructions[0].lineno
-
-    # Insert code to import the target module
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_0))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_None))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["IMPORT_NAME"], name_module))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["STORE_GLOBAL"], name_module))
-    offset += to_insert[-1].get_size()
-
-    # Insert a call to the registration function
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_GLOBAL"], name_module))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_ATTR"], name_reg))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_CONST"],
-                    const_num_counters))
-    offset += to_insert[-1].get_size()
-    to_insert.append(Instruction(lineno, offset, dis.opmap["CALL_FUNCTION"], 1))
-    offset += to_insert[-1].get_size()
-    to_insert.append(Instruction(lineno, offset, dis.opmap["POP_TOP"]))
-    offset += to_insert[-1].get_size()
-
-    total_size = offset - start_offset
-
-    self._adjust(start_offset, total_size)
-
-    self._cfg[0].instructions = to_insert + self._cfg[0].instructions
-    self._handle_size_changes()
-
   def trace_data_flow(self):
     """
         This function instruments bytecode for data-flow tracing.
@@ -678,7 +608,7 @@ class Instrumentor:
         always be given as obj1 to _trace_cmp().
 
         The bytecode that gets inserted looks like this:
-          LOAD_GLOBAL    atheris
+          LOAD_CONST     atheris
           LOAD_ATTR      _trace_cmp
           ROT_THREE                   ; move atheris._trace_cmp below the two
           objects
@@ -778,17 +708,13 @@ def patch_code(code, trace_dataflow, nested=False):
         inst.consts[i] = patch_code(inst.consts[i], trace_dataflow, nested=True)
 
   if not nested:
-    inst.insert_registration(current_index - old_index)
+    _reserve_counters(current_index - old_index)
 
   return inst.to_code()
 
 
 def instrument_func(func):
   """Add Atheris instrumentation to a specific function."""
-
-  # Make the atheris module available to our instrumentation
-  sys.modules[func.__module__].atheris = sys.modules["atheris"]
-
   old_index = current_index
 
   func.__code__ = patch_code(func.__code__, True, True)
