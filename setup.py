@@ -306,7 +306,7 @@ setup(
     version=__version__,
     author="Bitshift",
     author_email="atheris@google.com",
-    url="https://pypi.org/project/atheris/",
+    url="https://github.com/google/atheris/",
     description="A coverage-guided fuzzer for Python and Python extensions.",
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
