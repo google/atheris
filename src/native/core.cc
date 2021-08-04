@@ -178,11 +178,16 @@ void start_fuzzing(const std::vector<std::string>& args,
                    uint64_t num_counters) {
   test_one_input_global = test_one_input;
 
+  bool registered_alarm = SetupPythonSigaction();
+
   std::vector<char*> arg_array;
   arg_array.reserve(args.size() + 1);
   for (const std::string& arg : args) {
     // We specially care about timeouts.
     if (arg.substr(0, 9) == "-timeout=") {
+      if (!registered_alarm) {
+        std::cerr << "WARNING: -timeout ignored." << std::endl;
+      }
       SetTimeout(std::stoi(arg.substr(9, std::string::npos)));
     }
 

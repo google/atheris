@@ -76,6 +76,10 @@ size_t CompositeHash(IntegralArg first, IntegralArgs... args) {
   return internal::CompositeHashImpl(0, first, args...);
 }
 
+// A sigaction that fails on error.
+void checked_sigaction(int signum, struct sigaction* act,
+                       struct sigaction* oldact);
+
 }  // namespace atheris
 
 #endif  // THIRD_PARTY_PY_ATHERIS_UTIL_H_

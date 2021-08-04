@@ -146,4 +146,15 @@ std::string GetDynamicLocation() {
   return (dl_info.dli_fname);
 }
 
+void checked_sigaction(int signum, struct sigaction* act,
+                       struct sigaction* oldact) {
+  if (sigaction(signum, act, oldact)) {
+    std::cerr << "sigaction ";
+    if (act) std::cerr << "(act) ";
+    if (oldact) std::cerr << "(oldact) ";
+    std::cerr << strerror(errno) << std::endl;
+    _exit(1);
+  }
+}
+
 }  // namespace atheris
