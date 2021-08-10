@@ -1,3 +1,4 @@
+# Copyright 2021 Google LLC
 # Copyright 2021 Fraunhofer FKIE
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,11 +21,14 @@ The instrument() function temporarily installs an import hook
 
 import sys
 from importlib.abc import MetaPathFinder
-from importlib.machinery import SourceFileLoader, SourcelessFileLoader, PathFinder
+from importlib.machinery import SourceFileLoader, SourcelessFileLoader, PathFinder, ExtensionFileLoader
 from _frozen_importlib_external import SourceFileLoader, SourcelessFileLoader
 from _frozen_importlib import BuiltinImporter, FrozenImporter
 
 from .instrument_bytecode import patch_code
+
+
+_warned_experimental = False
 
 
 class AtherisMetaPathFinder(MetaPathFinder):
@@ -43,29 +47,57 @@ class AtherisMetaPathFinder(MetaPathFinder):
 
     if (not self._include_packages or
         package_name in self._include_packages) and package_name != "atheris":
-      spec = PathFinder.find_spec(fullname, path, target)
+      # Try each importer after the Atheris importer until we find an acceptable
+      # one
+      found_atheris = False
+      for meta in sys.meta_path:
+        # Skip any loaders before (or including) the Atheris loades
+        if not found_atheris:
+          if meta is self:
+            found_atheris = True
+          continue
 
-      if spec is None or spec.loader is None:
-        return None
+        # Check each remaining loader
+        if not hasattr(meta, "find_spec"):
+          continue
 
-      if isinstance(spec.loader, SourceFileLoader):
-        spec.loader = AtherisSourceFileLoader(spec.loader.name,
-                                              spec.loader.path,
-                                              self._trace_dataflow)
-      elif isinstance(spec.loader, SourcelessFileLoader):
-        spec.loader = AtherisSourcelessFileLoader(spec.loader.name,
-                                                  spec.loader.path,
-                                                  self._trace_dataflow)
-      else:
-        return None
+        spec = meta.find_spec(fullname, path, target)
+        if spec is None or spec.loader is None:
+          continue
 
-      spec.loader_state = None
+        if isinstance(spec.loader, ExtensionFileLoader):
+          # An extension, coverage doesn't come from Python
+          return spec
 
-      print(f"INFO: Instrumenting {fullname}", file=sys.stderr)
+        print(f"INFO: Instrumenting {fullname}", file=sys.stderr)
 
-      return spec
+        # Use normal inheritance for the common cases. This may not be needed
+        # (the dynamic case should work for everything), but keep this for as
+        # long as that's experimental.
+        if isinstance(spec.loader, SourceFileLoader):
+          spec.loader = AtherisSourceFileLoader(spec.loader.name,
+                                                spec.loader.path,
+                                                self._trace_dataflow)
+        elif isinstance(spec.loader, SourcelessFileLoader):
+          spec.loader = AtherisSourcelessFileLoader(spec.loader.name,
+                                                    spec.loader.path,
+                                                    self._trace_dataflow)
+        else:
+          # The common case isn't what we have, so use 'object inheritance'.
+          global _warned_experimental
+          if not _warned_experimental:
+            print(
+                "WARNING: It looks like this module is imported by a custom "
+                "loader. Atheris has experimental support for this. However, "
+                "it is not yet well-tested. If you experience unusual errors "
+                "or poor coverage collection, try atheris.instrument_all() "
+                "instead, or file an issue on GitHub.")
+            _warned_experimental = True
 
-    else:
+          spec.loader = MakeDynamicAtherisLoader(spec.loader,
+                                                 self._trace_dataflow)
+        return spec
+
       return None
 
   def invalidate_caches(self):
@@ -100,6 +132,34 @@ class AtherisSourcelessFileLoader(SourcelessFileLoader):
       return None
     else:
       return patch_code(code, self._trace_dataflow)
+
+
+def MakeDynamicAtherisLoader(loader, trace_dataflow):
+  """Create a loader via 'object inheritance' and return it.
+
+  This technique allows us to override just the get_code function on an
+  already-existing object loader. This is experimental.
+  """
+
+  class DynAtherisLoader(loader.__class__):
+
+    def __init__(self, trace_dataflow):
+      self._trace_dataflow = trace_dataflow
+
+    def get_code(self, fullname):
+      code = super().get_code(fullname)
+
+      if code is None:
+        return None
+      return patch_code(code, self._trace_dataflow)
+
+  ret = DynAtherisLoader(trace_dataflow)
+
+  for k, v in loader.__dict__.items():
+    if k not in ret.__dict__:
+      ret.__dict__[k] = v
+
+  return ret
 
 
 class HookManager:

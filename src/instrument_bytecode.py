@@ -725,25 +725,30 @@ def instrument_func(func):
 
 def _is_instrumentable(obj):
   """Returns True if this object can be instrumented."""
-  # Only callables can be instrumented
-  if not hasattr(obj, "__call__"):
-    return False
-  # Only objects with a __code__ member of type CodeType can be instrumented
-  if not hasattr(obj, "__code__"):
-    return False
-  if not isinstance(obj.__code__, types.CodeType):
-    return False
-  # Only code in a real module can be instrumented
-  if not hasattr(obj, "__module__"):
-    return False
-  if obj.__module__ not in sys.modules:
-    return False
-  # Bound methods can't be instrumented - instrument the real func instead
-  if hasattr(obj, "__self__"):
-    return False
-  # Only Python functions and methods can be instrumented, nothing native
-  if (not isinstance(obj, types.FunctionType)) and (not isinstance(
-      obj, types.MethodType)):
+  try:
+    # Only callables can be instrumented
+    if not hasattr(obj, "__call__"):
+      return False
+    # Only objects with a __code__ member of type CodeType can be instrumented
+    if not hasattr(obj, "__code__"):
+      return False
+    if not isinstance(obj.__code__, types.CodeType):
+      return False
+    # Only code in a real module can be instrumented
+    if not hasattr(obj, "__module__"):
+      return False
+    if obj.__module__ not in sys.modules:
+      return False
+    # Bound methods can't be instrumented - instrument the real func instead
+    if hasattr(obj, "__self__"):
+      return False
+    # Only Python functions and methods can be instrumented, nothing native
+    if (not isinstance(obj, types.FunctionType)) and (not isinstance(
+        obj, types.MethodType)):
+      return False
+  except Exception:
+    # If accessing any of those fields produced an exception, the object
+    # probably can't be instrumented
     return False
 
   return True
