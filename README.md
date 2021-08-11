@@ -184,7 +184,8 @@ This function is experimental.
  - `args`: A list of strings: the process arguments to pass to the fuzzer, typically `sys.argv`. This argument list may be modified in-place, to remove arguments consumed by the fuzzer.
    See [the LibFuzzer docs](https://llvm.org/docs/LibFuzzer.html#options) for a list of such options.
  - `test_one_input`: your fuzzer's entry point. Must take a single `bytes` argument. This will be repeatedly invoked with a single bytes container.
- - `internal_libfuzzer`: Indicates whether libfuzzer will be provided by atheris or by an external library. If unspecified, Atheris will determine this
+ - `internal_libfuzzer`: Indicates whether libfuzzer will be provided by atheris or by an external
+   library (see [using_sanitizers.md](./using_sanitizers.md)). If unspecified, Atheris will determine this
    automatically. If fuzzing pure Python, leave this as `True`.
 
 #### `Fuzz()`

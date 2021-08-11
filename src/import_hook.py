@@ -83,15 +83,15 @@ class AtherisMetaPathFinder(MetaPathFinder):
                                                     spec.loader.path,
                                                     self._trace_dataflow)
         else:
-          # The common case isn't what we have, so use 'object inheritance'.
+          # The common case isn't what we have, so wrap an existing object
+          # via composition.
           global _warned_experimental
           if not _warned_experimental:
-            print(
-                "WARNING: It looks like this module is imported by a custom "
-                "loader. Atheris has experimental support for this. However, "
-                "it is not yet well-tested. If you experience unusual errors "
-                "or poor coverage collection, try atheris.instrument_all() "
-                "instead, or file an issue on GitHub.")
+            print("WARNING: It looks like this module is imported by a custom "
+                  "loader. Atheris has experimental support for this. However, "
+                  "it is not yet well-tested. If you experience unusual errors "
+                  "or poor coverage collection, try atheris.instrument_all() "
+                  "instead, or file an issue on GitHub.")
             _warned_experimental = True
 
           spec.loader = MakeDynamicAtherisLoader(spec.loader,
@@ -135,29 +135,29 @@ class AtherisSourcelessFileLoader(SourcelessFileLoader):
 
 
 def MakeDynamicAtherisLoader(loader, trace_dataflow):
-  """Create a loader via 'object inheritance' and return it.
+  """Create a loader that wraps an existing loader.
 
-  This technique allows us to override just the get_code function on an
-  already-existing object loader. This is experimental.
+  This technique allows us to effectively override just the get_code function on
+  an already-existing object loader. This is experimental.
   """
 
-  class DynAtherisLoader(loader.__class__):
+  class DynAtherisLoader:
 
-    def __init__(self, trace_dataflow):
+    def __init__(self, loader, trace_dataflow):
+      self._loader = loader
       self._trace_dataflow = trace_dataflow
 
     def get_code(self, fullname):
-      code = super().get_code(fullname)
+      code = self._loader.get_code(fullname)
 
       if code is None:
         return None
       return patch_code(code, self._trace_dataflow)
 
-  ret = DynAtherisLoader(trace_dataflow)
+    def __getattr__(self, attr):
+      return getattr(self._loader, attr)
 
-  for k, v in loader.__dict__.items():
-    if k not in ret.__dict__:
-      ret.__dict__[k] = v
+  ret = DynAtherisLoader(loader, trace_dataflow)
 
   return ret
 
