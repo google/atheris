@@ -18,7 +18,6 @@ The instrument() function temporarily installs an import hook
 (AtherisMetaPathFinder) in sys.meta_path that employs a custom loader
 (AtherisSourceFileLoader, AtherisSourcelessFileLoader).
 """
-
 import sys
 from importlib.abc import MetaPathFinder
 from importlib.machinery import SourceFileLoader, SourcelessFileLoader, PathFinder, ExtensionFileLoader
@@ -30,14 +29,35 @@ from .instrument_bytecode import patch_code
 
 _warned_experimental = False
 
+# A list of known loaders we should silence warnings about.
+SKIP_LOADERS = set([
+    # Google3 loader, implemented in native code, loads other native code
+    "ElfZipImporter"
+])
+
+
+def _skip_loader(loader):
+  """Returns whether modules loaded with this importer should be ignored."""
+  if hasattr(loader, "__qualname__"):
+    if loader.__qualname__ in SKIP_LOADERS:
+      return True
+
+  if hasattr(loader.__class__, "__qualname__"):
+    if loader.__class__.__qualname__ in SKIP_LOADERS:
+      return True
+
+  return False
+
 
 class AtherisMetaPathFinder(MetaPathFinder):
 
-  def __init__(self, include_packages, exclude_modules, trace_dataflow):
+  def __init__(self, include_packages, exclude_modules, enable_loader_override,
+               trace_dataflow):
     super().__init__()
     self._include_packages = include_packages
     self._exclude_modules = exclude_modules
     self._trace_dataflow = trace_dataflow
+    self._enable_loader_override = enable_loader_override
 
   def find_spec(self, fullname, path, target=None):
     if fullname in self._exclude_modules:
@@ -51,7 +71,7 @@ class AtherisMetaPathFinder(MetaPathFinder):
       # one
       found_atheris = False
       for meta in sys.meta_path:
-        # Skip any loaders before (or including) the Atheris loades
+        # Skip any loaders before (or including) the Atheris loader
         if not found_atheris:
           if meta is self:
             found_atheris = True
@@ -65,11 +85,14 @@ class AtherisMetaPathFinder(MetaPathFinder):
         if spec is None or spec.loader is None:
           continue
 
+        if _skip_loader(spec.loader):
+          return None
+
         if isinstance(spec.loader, ExtensionFileLoader):
           # An extension, coverage doesn't come from Python
-          return spec
+          return None
 
-        print(f"INFO: Instrumenting {fullname}", file=sys.stderr)
+        sys.stderr.write(f"INFO: Instrumenting {fullname}\n")
 
         # Use normal inheritance for the common cases. This may not be needed
         # (the dynamic case should work for everything), but keep this for as
@@ -78,25 +101,44 @@ class AtherisMetaPathFinder(MetaPathFinder):
           spec.loader = AtherisSourceFileLoader(spec.loader.name,
                                                 spec.loader.path,
                                                 self._trace_dataflow)
+          return spec
         elif isinstance(spec.loader, SourcelessFileLoader):
           spec.loader = AtherisSourcelessFileLoader(spec.loader.name,
                                                     spec.loader.path,
                                                     self._trace_dataflow)
+          return spec
         else:
           # The common case isn't what we have, so wrap an existing object
           # via composition.
+
+          if not self._enable_loader_override:
+            sys.stderr.write("WARNING: Skipping import with custom loader.\n")
+            return None
+
           global _warned_experimental
           if not _warned_experimental:
-            print("WARNING: It looks like this module is imported by a custom "
-                  "loader. Atheris has experimental support for this. However, "
-                  "it is not yet well-tested. If you experience unusual errors "
-                  "or poor coverage collection, try atheris.instrument_all() "
-                  "instead, or file an issue on GitHub.")
+            sys.stderr.write(
+                "WARNING: It looks like this module is imported by a "
+                "custom loader. Atheris has experimental support for this. "
+                "However, it may be incompatible with certain libraries. "
+                "If you experience unusual errors or poor coverage "
+                "collection, try atheris.instrument_all() instead, add "
+                "enable_loader_override=False to instrument_imports(), or "
+                "file an issue on GitHub.\n")
             _warned_experimental = True
 
-          spec.loader = MakeDynamicAtherisLoader(spec.loader,
-                                                 self._trace_dataflow)
-        return spec
+          try:
+            spec.loader = MakeDynamicAtherisLoader(spec.loader,
+                                                   self._trace_dataflow)
+            return spec
+          except Exception as e:
+            pdb.set_trace()
+            sys.stderr.write("WARNING: This module uses a custom loader that "
+                             "prevents it from being instrumented: "
+                             f"{spec.loader}\n")
+            return None
+
+          return None
 
       return None
 
@@ -135,38 +177,56 @@ class AtherisSourcelessFileLoader(SourcelessFileLoader):
 
 
 def MakeDynamicAtherisLoader(loader, trace_dataflow):
-  """Create a loader that wraps an existing loader.
+  """Create a loader via 'object inheritance' and return it.
 
-  This technique allows us to effectively override just the get_code function on
-  an already-existing object loader. This is experimental.
+  This technique allows us to override just the get_code function on an
+  already-existing object loader. This is experimental.
   """
 
-  class DynAtherisLoader:
+  if loader.__class__ is type:
+    # This is a class with classmethods. Use regular inheritance to override
+    # get_code.
+    class DynAtherisLoaderClass(loader):
 
-    def __init__(self, loader, trace_dataflow):
-      self._loader = loader
+      @classmethod
+      def get_code(self, fullname):
+        code = loader.get_code(fullname)
+
+        if code is None:
+          return None
+        return patch_code(code, self._trace_dataflow)
+
+    return DynAtherisLoaderClass
+
+  # This is an object. We create a new object that's a copy of the existing
+  # object but with a custom get_code implementation.
+  class DynAtherisLoaderObject(loader.__class__):
+
+    def __init__(self, trace_dataflow):
       self._trace_dataflow = trace_dataflow
 
     def get_code(self, fullname):
-      code = self._loader.get_code(fullname)
+      code = super().get_code(fullname)
 
       if code is None:
         return None
       return patch_code(code, self._trace_dataflow)
 
-    def __getattr__(self, attr):
-      return getattr(self._loader, attr)
-
-  ret = DynAtherisLoader(loader, trace_dataflow)
+  ret = DynAtherisLoaderObject(trace_dataflow)
+  for k, v in loader.__dict__.items():
+    if k not in ret.__dict__:
+      ret.__dict__[k] = v
 
   return ret
 
 
 class HookManager:
 
-  def __init__(self, include_packages, exclude_modules, trace_dataflow):
+  def __init__(self, include_packages, exclude_modules, enable_loader_override,
+               trace_dataflow):
     self._include_packages = include_packages
     self._exclude_modules = exclude_modules
+    self._enable_loader_override = enable_loader_override
     self._trace_dataflow = trace_dataflow
 
   def __enter__(self):
@@ -185,6 +245,7 @@ class HookManager:
     sys.meta_path.insert(
         i,
         AtherisMetaPathFinder(self._include_packages, self._exclude_modules,
+                              self._enable_loader_override,
                               self._trace_dataflow))
 
     return self
@@ -198,7 +259,7 @@ class HookManager:
         i += 1
 
 
-def instrument_imports(include=[], exclude=[]):
+def instrument_imports(include=[], exclude=[], enable_loader_override=True):
   """
     This function temporarily installs an import hook which instruments the
     imported modules.
@@ -227,4 +288,8 @@ def instrument_imports(include=[], exclude=[]):
 
     include_packages.add(module_name)
 
-  return HookManager(include_packages, set(exclude), trace_dataflow=True)
+  return HookManager(
+      include_packages,
+      set(exclude),
+      enable_loader_override,
+      trace_dataflow=True)
