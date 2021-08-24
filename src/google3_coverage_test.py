@@ -18,6 +18,9 @@ import dis
 import unittest
 from unittest import mock
 
+with atheris.instrument_imports():
+  from asn1crypto.core import Sequence
+
 
 @atheris.instrument_func
 def if_func(a):
@@ -68,6 +71,13 @@ original_trace_cmp = atheris._trace_cmp
 @mock.patch.object(atheris, "_trace_cmp")
 @mock.patch.object(atheris, "_trace_branch")
 class CoverageTest(unittest.TestCase):
+
+  def testImport(self, trace_branch_mock, trace_cmp_mock):
+    trace_cmp_mock.side_effect = original_trace_cmp
+
+    trace_branch_mock.assert_not_called()
+    Sequence.load(b"0\0")
+    trace_branch_mock.assert_called()
 
   def testBranch(self, trace_branch_mock, trace_cmp_mock):
     trace_branch_mock.assert_not_called()
