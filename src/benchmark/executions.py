@@ -54,10 +54,13 @@ def _set_nonblocking(fd):
   fcntl.fcntl(fd, fcntl.F_SETFL, nflags)
 
 
-def _benchmark_child(test_one_input, num_runs, pipe, args):
+def _benchmark_child(test_one_input, num_runs, pipe, args, inst_all):
   os.close(pipe[0])
   os.dup2(pipe[1], 1)
   os.dup2(pipe[1], 2)
+
+  if inst_all:
+    instrument_all()
 
   counter = [0]
   start = time.time()
@@ -74,7 +77,7 @@ def _benchmark_child(test_one_input, num_runs, pipe, args):
   assert False  # Does not return
 
 
-def run_benchmark(test_one_input, num_runs, timeout=10, args=[]):
+def run_benchmark(test_one_input, num_runs, timeout=10, inst_all=False, args=[]):
   """Fuzz test_one_input() in a subprocess.
 
   This forks a child, and in the child, runs atheris.Setup(test_one_input) and
@@ -90,7 +93,7 @@ def run_benchmark(test_one_input, num_runs, timeout=10, args=[]):
 
   pid = os.fork()
   if pid == 0:
-    _benchmark_child(test_one_input, num_runs, pipe, args)
+    _benchmark_child(test_one_input, num_runs, pipe, args, inst_all)
 
   os.close(pipe[1])
   _set_nonblocking(pipe[0])
@@ -791,5 +794,5 @@ def zip_fuzz(data):
 
 run_benchmark(low_cyclomatic, num_runs=40000, timeout=30)
 run_benchmark(high_cyclomatic, num_runs=2000, timeout=30)
-run_benchmark(json_fuzz, num_runs=4000, timeout=30)
+run_benchmark(json_fuzz, num_runs=4000, timeout=120, inst_all=True)
 run_benchmark(zip_fuzz, num_runs=4000, timeout=30)
