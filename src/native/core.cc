@@ -75,11 +75,14 @@ namespace py = pybind11;
 std::function<void(py::bytes data)>& test_one_input_global =
     *new std::function<void(py::bytes data)>([](py::bytes data) -> void {
       std::cerr << "You must call Setup() before Fuzz()." << std::endl;
-      _exit(-1);
+      throw std::runtime_error("You must call Setup() before Fuzz().");
     });
 std::vector<unsigned char>& counters = *new std::vector<unsigned char>();
 std::vector<struct PCTableEntry>& pctable =
     *new std::vector<struct PCTableEntry>();
+int64_t runs = -1;  // Default from libFuzzer, means infinite
+int64_t completed_runs = 0;
+int64_t fuzzer_start_time;
 
 NO_SANITIZE
 void Init() {
@@ -137,7 +140,8 @@ void _reserve_counters(uint64_t num) {
                         "This is not supported. Instrument the modules before "
                         "calling atheris.Fuzz().")
             << std::endl;
-  _exit(-1);
+  throw std::runtime_error(
+      "Tried to reserve counters after fuzzing has been started.");
 }
 
 NO_SANITIZE
@@ -154,7 +158,6 @@ int TestOneInput(const uint8_t* data, size_t size) {
 
   try {
     test_one_input_global(py::bytes(reinterpret_cast<const char*>(data), size));
-    return 0;
   } catch (py::error_already_set& ex) {
     std::string exception_type = GetExceptionType(ex);
     if (exception_type == "KeyboardInterrupt" ||
@@ -163,13 +166,29 @@ int TestOneInput(const uint8_t* data, size_t size) {
       // in which case it's impossible to catch in Python. Exit here instead.
       std::cout << Colorize(STDOUT_FILENO, "KeyboardInterrupt: stopping.")
                 << std::endl;
-      _exit(130);  // Prevent libFuzzer from thinking this is a crash.
+      GracefulExit(130);
     }
     std::cout << Colorize(STDOUT_FILENO,
                           "\n === Uncaught Python exception: ===\n");
     PrintPythonException(ex, std::cout);
-    exit(-1);
+    GracefulExit(-1, /*prevent_crash_report=*/false);
   }
+
+  --runs;
+  ++completed_runs;
+  if (!runs) {
+    // We've completed all requested runs.
+    uint64_t elapsed_time =
+        std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+            .count() -
+        fuzzer_start_time;
+    std::cerr << "Done " << completed_runs << " in " << elapsed_time
+              << " second(s)" << std::endl;
+    GracefulExit(0);
+  }
+
+  return 0;
 }
 
 NO_SANITIZE
@@ -183,12 +202,24 @@ void start_fuzzing(const std::vector<std::string>& args,
   std::vector<char*> arg_array;
   arg_array.reserve(args.size() + 1);
   for (const std::string& arg : args) {
-    // We specially care about timeouts.
+    // We care about certain arguments. Other arguments are passed through to
+    // libFuzzer.
     if (arg.substr(0, 9) == "-timeout=") {
       if (!registered_alarm) {
         std::cerr << "WARNING: -timeout ignored." << std::endl;
       }
       SetTimeout(std::stoi(arg.substr(9, std::string::npos)));
+    }
+    if (arg.substr(0, 14) == "-atheris_runs=") {
+      // We want to handle 'runs' ourselves so we can exit gracefully rather
+      // than letting libFuzzer call _exit().
+      // This is a different flag from -runs because -runs sometimes has other
+      // unrelated behavior. For example, if you set -runs when running with
+      // a fixed set of inputs, *each* input will be run that many times. The
+      // -atheris_runs= flag always performs precisely the specified number of
+      // runs.
+      runs = std::stoll(arg.substr(14, std::string::npos));
+      continue;
     }
 
     arg_array.push_back(const_cast<char*>(arg.c_str()));
@@ -215,7 +246,11 @@ void start_fuzzing(const std::vector<std::string>& args,
         reinterpret_cast<uint8_t*>(&pctable[0] + pctable.size()));
   }
 
-  exit(LLVMFuzzerRunDriver(&args_size, &args_ptr, &TestOneInput));
+  fuzzer_start_time = std::chrono::duration_cast<std::chrono::seconds>(
+                          std::chrono::system_clock::now().time_since_epoch())
+                          .count();
+
+  GracefulExit(LLVMFuzzerRunDriver(&args_size, &args_ptr, &TestOneInput));
 }
 
 #ifndef ATHERIS_MODULE_NAME

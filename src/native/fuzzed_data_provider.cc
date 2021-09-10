@@ -15,6 +15,7 @@
 #include "fuzzed_data_provider.h"
 
 #include <limits>
+#include <stdexcept>
 
 #include "util.h"
 
@@ -230,7 +231,7 @@ py::int_ FuzzedDataProvider::ConsumeIntInRange(py::int_ min, py::int_ max) {
     std::cerr << Colorize(STDERR_FILENO,
                           "ConsumeIntInRange: min must be <= max")
               << " (got min=" << min << ", max=" << max << std::endl;
-    exit(1);
+    throw std::runtime_error("ConsumeIntInRange: min must be <= max");
   }
 
   int size = py::int_(delta.attr("bit_length")());
@@ -329,7 +330,7 @@ double FuzzedDataProvider::ConsumeFloatInRange(double min, double max) {
     std::cerr << Colorize(STDERR_FILENO,
                           "ConsumeFloatInRange: min must be <= max")
               << " (got min=" << min << ", max=" << max << ")" << std::endl;
-    exit(1);
+    throw std::runtime_error("ConsumeFloatInRange: min must be <= max");
   }
 
   double range = 0.0;

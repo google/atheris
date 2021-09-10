@@ -80,6 +80,10 @@ size_t CompositeHash(IntegralArg first, IntegralArgs... args) {
 void checked_sigaction(int signum, struct sigaction* act,
                        struct sigaction* oldact);
 
+// Raise a SystemExit, the same as sys.exit(); this causes the interpreter to
+// exit via normal Python means, allowing atexit handlers to execute.
+void GracefulExit(int retcode, bool prevent_crash_report = true);
+
 }  // namespace atheris
 
 #endif  // THIRD_PARTY_PY_ATHERIS_UTIL_H_

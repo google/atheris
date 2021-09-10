@@ -113,6 +113,44 @@ using `atheris.instrument_all()`, or moving your `TestOneInput` function into an
 instrumented module.
 
 
+### Visualizing Python code coverage
+Examining which lines are executed is helpful for understanding the
+effectiveness of your fuzzer. Atheris is compatible with
+[`coverage.py`](https://coverage.readthedocs.io/): you can run your fuzzer using
+the `coverage.py` module as you would for any other Python program. Here's an
+example:
+```
+python3 -m coverage run your_fuzzer.py -atheris_runs=10000  # Times to run
+python3 -m coverage html
+(cd htmlcov && python3 -m http.server 8000)
+```
+
+Coverage reports are only generated when your fuzzer exits gracefully. This
+happens if:
+ - you specify `-atheris_runs=<number>`, and that many runs have elapsed.
+ - your fuzzer exits by Python exception.
+ - your fuzzer exits by `sys.exit()`.
+
+No coverage report will be generated if your fuzzer exits due to a
+crash in native code, or due to libFuzzer's `-runs` flag (use `-atheris_runs`).
+If your fuzzer exits via other methods, such as SIGINT (Ctrl+C), Atheris will
+attempt to generate a report but may be unable to (depending on your code).
+For consistent reports, we recommend always using
+`-atheris_runs=<number>`.
+
+If you'd like to examine coverage when running with your corpus, you can do
+that with the following command:
+```
+python3 -m coverage run your_fuzzer.py corpus_dir/* -atheris_runs=$(ls corpus_dir | wc -l)
+```
+
+This will cause Atheris to run on each file in `<corpus-dir>`, then exit.
+Importantly, if you leave off the `-atheris_runs=$(ls corpus_dir | wc -l)`, no
+coverage report will be generated.
+
+Using coverage.py will significantly slow down your fuzzer, so only use it for
+visualizing coverage; don't use it all the time.
+
 ### Fuzzing Native Extensions
 
 In order for fuzzing native extensions to be effective, your native extensions

@@ -157,4 +157,19 @@ void checked_sigaction(int signum, struct sigaction* act,
   }
 }
 
+namespace {
+int atexit_retcode;
+}
+
+void GracefulExit(int retcode, bool prevent_crash_report) {
+  if (prevent_crash_report) {
+    // Disable libfuzzer's atexit.
+    atexit_retcode = retcode;
+    atexit([]() { _exit(atexit_retcode); });
+  }
+
+  py::module sys = py::module::import("sys");
+  sys.attr("exit")(retcode);
+}
+
 }  // namespace atheris

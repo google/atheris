@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import atheris
+import atexit
 import fcntl
 import os
 import sys
@@ -32,9 +33,19 @@ def _fuzztest_child(test_one_input, pipe, args):
   os.dup2(pipe[1], 1)
   os.dup2(pipe[1], 2)
 
-  atheris.Setup([sys.argv[0]] + args, test_one_input)
-  atheris.Fuzz()
-  assert False  # Does not return
+  try:
+    atheris.Setup([sys.argv[0]] + args, test_one_input)
+    atheris.Fuzz()
+
+    # To avoid running tests multiple times due to fork(), never allow control
+    # flow to proceed past here. Report that we're exiting gracefully so that
+    # tests can verify that's what happened.
+  except SystemExit as e:
+    print("Exiting gracefully.")
+    os._exit(e.code)
+  finally:
+    print("Exiting gracefully.")
+    os._exit(0)
 
 
 def run_fuzztest(test_one_input, expected_output=None, timeout=10, args=[]):
@@ -93,9 +104,8 @@ def run_fuzztest(test_one_input, expected_output=None, timeout=10, args=[]):
 
   if expected_output:
     if expected_output not in stdout:
-      raise AssertionError(
-          f"Fuzz target did not produce the expected output {expected_output}; actually got:\n{stdout}"
-      )
+      raise AssertionError("Fuzz target did not produce the expected output "
+                           f"{expected_output}; actually got:\n{stdout}")
 
 
 def fail_immediately(data):
@@ -136,8 +146,9 @@ def string_comparison(data):
 @atheris.instrument_func
 def utf8_comparison(data):
   try:
-    if data.decode("utf-8") == "⾐∾ⶑ➠":
-      raise RuntimeError("Was random unicode")
+    decoded = data.decode("utf-8")
+    if decoded == "⾐∾ⶑ➠":
+      raise RuntimeError(f"Was random unicode '{decoded}'")
   except UnicodeDecodeError:
     pass
 
@@ -175,6 +186,16 @@ class IntegrationTests(unittest.TestCase):
         timeout_py,
         args=["-timeout=1"],
         expected_output=b"ERROR: libFuzzer: timeout after")
+
+  def testExitsGracefullyOnPyFail(self):
+    run_fuzztest(fail_immediately, expected_output=b"Exiting gracefully.")
+
+  def testExitsGracefullyOnRunsOut(self):
+    run_fuzztest(
+        many_branches, args=["-runs=2"], expected_output=b"Exiting gracefully.")
+
+  def testRunsOutCount(self):
+    run_fuzztest(many_branches, args=["-runs=3"], expected_output=b"Done 3 in ")
 
 
 if __name__ == "__main__":
