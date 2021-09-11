@@ -42,9 +42,11 @@ def _fuzztest_child(test_one_input, pipe, args):
     # tests can verify that's what happened.
   except SystemExit as e:
     print("Exiting gracefully.")
+    sys.stdout.flush()
     os._exit(e.code)
   finally:
     print("Exiting gracefully.")
+    sys.stdout.flush()
     os._exit(0)
 
 
@@ -129,6 +131,17 @@ def many_branches(data):
 
 
 @atheris.instrument_func
+def never_fail(data):
+  for d in data:
+    if d == 0:
+      pass
+    elif d == 1:
+      pass
+    elif d == 2:
+      pass
+
+
+@atheris.instrument_func
 def bytes_comparison(data):
   if data == b"foobarbazbiz":
     raise RuntimeError("Was foobarbazbiz")
@@ -192,10 +205,12 @@ class IntegrationTests(unittest.TestCase):
 
   def testExitsGracefullyOnRunsOut(self):
     run_fuzztest(
-        many_branches, args=["-runs=2"], expected_output=b"Exiting gracefully.")
+        never_fail, args=["-atheris_runs=2"],
+        expected_output=b"Exiting gracefully.")
 
   def testRunsOutCount(self):
-    run_fuzztest(many_branches, args=["-runs=3"], expected_output=b"Done 3 in ")
+    run_fuzztest(never_fail, args=["-atheris_runs=3"],
+                 expected_output=b"Done 3 in ")
 
 
 if __name__ == "__main__":
