@@ -19,6 +19,7 @@ to ensure the libFuzzer version in Atheris matches your Clang version.
 ### Building from Source
 
 Atheris relies on libFuzzer, which is distributed with Clang. If you have a sufficiently new version of `clang` on your path, installation from source is as simple as:
+
 ```bash
 # Build latest release from source
 pip3 install --no-binary atheris atheris
@@ -51,7 +52,7 @@ CLANG_BIN="$(pwd)/bin/clang" pip3 install <whatever>
 
 ## Using Atheris
 
-### Example:
+### Example
 
 ```python
 import atheris
@@ -75,6 +76,7 @@ Atheris collects Python coverage information by instrumenting bytecode.
 There are 3 options for adding this instrumentation to the bytecode:
 
  - You can instrument the libraries you import:
+
    ```python
    with atheris.instrument_imports():
      import foo
@@ -83,12 +85,14 @@ There are 3 options for adding this instrumentation to the bytecode:
    This will cause instrumentation to be added to `foo` and `bar`, as well as
    any libraries they import.
  - Or, you can instrument individual functions:
+
    ```python
    @atheris.instrument_func
    def my_function(foo, bar):
      print("instrumented")
    ```
  - Or finally, you can instrument everything:
+
    ```python
    atheris.instrument_all()
    ```
@@ -106,6 +110,7 @@ This is currently an experimental feature.
 #### Why am I getting "No interesting inputs were found"?
 
 You might see this error:
+
 ```
 ERROR: no interesting inputs were found. Is the code instrumented for coverage? Exiting.
 ```
@@ -125,7 +130,8 @@ effectiveness of your fuzzer. Atheris is compatible with
 [`coverage.py`](https://coverage.readthedocs.io/): you can run your fuzzer using
 the `coverage.py` module as you would for any other Python program. Here's an
 example:
-```
+
+```bash
 python3 -m coverage run your_fuzzer.py -atheris_runs=10000  # Times to run
 python3 -m coverage html
 (cd htmlcov && python3 -m http.server 8000)
@@ -133,6 +139,7 @@ python3 -m coverage html
 
 Coverage reports are only generated when your fuzzer exits gracefully. This
 happens if:
+
  - you specify `-atheris_runs=<number>`, and that many runs have elapsed.
  - your fuzzer exits by Python exception.
  - your fuzzer exits by `sys.exit()`.
@@ -146,6 +153,7 @@ For consistent reports, we recommend always using
 
 If you'd like to examine coverage when running with your corpus, you can do
 that with the following command:
+
 ```
 python3 -m coverage run your_fuzzer.py corpus_dir/* -atheris_runs=$(ls corpus_dir | wc -l)
 ```
@@ -172,6 +180,7 @@ Atheris is fully supported by [OSS-Fuzz](https://github.com/google/oss-fuzz), Go
 The `atheris` module provides three key functions: `instrument_imports()`, `Setup()` and `Fuzz()`.
 
 In your source file, import all libraries you wish to fuzz inside a `with atheris.instrument_imports():`-block, like this:
+
 ```python
 # library_a will not get instrumented
 import library_a
@@ -202,7 +211,6 @@ import sys
 import atheris
 print(sys.modules.keys())
 ```
-
 
 
 #### `instrument_func(func)`
@@ -365,5 +373,3 @@ def ConsumeBool()
 ```
 
 Consume either `True` or `False`.
-
-
