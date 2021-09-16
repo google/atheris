@@ -40,3 +40,7 @@ def cmp_const_less(a):
 
 def cmp_const_less_inverted(a):
   return a < 1
+
+
+def regex_match(re_obj, a):
+  re_obj.match(a)

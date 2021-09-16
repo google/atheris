@@ -22,7 +22,6 @@ import os
 import sys
 import types
 import importlib
-import imp
 import dis
 from collections import OrderedDict
 from .native import _reserve_counters

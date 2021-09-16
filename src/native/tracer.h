@@ -24,6 +24,7 @@ namespace atheris {
 
 PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid,
                          bool left_is_const);
+void TraceCompareUnicode(PyObject* left, PyObject* right, void* pc);
 
 }  // namespace atheris
 

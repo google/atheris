@@ -96,6 +96,12 @@ There are 3 options for adding this instrumentation to the bytecode:
    currently loaded in the interpreter, and instrument it.
    This might take a while.
 
+Atheris can additionally instrument regular expression checks, e.g. `re.search`.
+To enable this feature, you will need to add:
+`atheris.enabled_hooks.add("RegEx")`
+To your script before your code calls `re.compile`.
+Internally this will import the `re` module and instrument the necessary functions.
+This is currently an experimental feature.
 
 #### Why am I getting "No interesting inputs were found"?
 

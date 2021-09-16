@@ -19,6 +19,7 @@ import os
 import sys
 import time
 import unittest
+import re
 
 
 def _set_nonblocking(fd):
@@ -172,6 +173,12 @@ def timeout_py(data):
   time.sleep(100000000)
 
 
+@atheris.instrument_func
+def regex_match(data):
+  if re.search(b"(Sun|Mon)day", data) is not None:
+    raise RuntimeError("Was RegEx Match")
+
+
 class IntegrationTests(unittest.TestCase):
 
   def testFails(self):
@@ -200,6 +207,9 @@ class IntegrationTests(unittest.TestCase):
         args=["-timeout=1"],
         expected_output=b"ERROR: libFuzzer: timeout after")
 
+  def testRegExMatch(self):
+    run_fuzztest(regex_match, expected_output=b"Was RegEx Match", timeout=60 * 3)
+
   def testExitsGracefullyOnPyFail(self):
     run_fuzztest(fail_immediately, expected_output=b"Exiting gracefully.")
 
@@ -212,6 +222,7 @@ class IntegrationTests(unittest.TestCase):
     run_fuzztest(never_fail, args=["-atheris_runs=3"],
                  expected_output=b"Done 3 in ")
 
-
 if __name__ == "__main__":
+  # enable RegEx instrumentation.
+  atheris.enabled_hooks.add("RegEx")
   unittest.main()

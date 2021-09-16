@@ -107,8 +107,8 @@ void Init() {
   }
 }
 
-// These versions of _trace_branch, _trace_cmp, and _reserve_counters are called
-// after fuzzing has begun.
+// These versions of _trace_branch, _trace_cmp, _trace_cmp_unicode and
+// _reserve_counters are called after fuzzing has begun.
 
 NO_SANITIZE
 void _trace_branch(uint64_t idx) {
@@ -148,6 +148,12 @@ NO_SANITIZE
 bool OnFirstTestOneInput() {
   SetupTimeoutAlarm();
   return true;
+}
+
+NO_SANITIZE
+void _trace_cmp_unicode(py::handle left, py::handle right, py::handle object) {
+  uint64_t idx = (uint64_t)object.ptr() % counters.size();
+  TraceCompareUnicode(left.ptr(), right.ptr(), &counters[0] + idx);
 }
 
 NO_SANITIZE
@@ -264,6 +270,7 @@ PYBIND11_MODULE(ATHERIS_MODULE_NAME, m) {
   m.def("_trace_branch", &_trace_branch);
   m.def("_reserve_counters", &_reserve_counters);
   m.def("_trace_cmp", &_trace_cmp, py::return_value_policy::move);
+  m.def("_trace_cmp_unicode", &_trace_cmp_unicode);
 }
 
 }  // namespace atheris
