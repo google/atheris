@@ -62,7 +62,7 @@ py::handle _trace_cmp(py::handle left, py::handle right, int opid, uint64_t idx,
 }
 
 NO_SANITIZE
-void _trace_cmp_unicode(py::handle left, py::handle right, py::handle object) {}
+void _trace_regex_match(py::handle pattern_match, py::handle object) {}
 
 NO_SANITIZE
 void _reserve_counters(uint64_t num) {}
@@ -124,7 +124,7 @@ PYBIND11_MODULE(native, m) {
   m.def("_trace_branch", &_trace_branch);
   m.def("_trace_cmp", &_trace_cmp, py::return_value_policy::move);
   m.def("_reserve_counters", &_reserve_counters);
-  m.def("_trace_cmp_unicode", &_trace_cmp_unicode);
+  m.def("_trace_regex_match", &_trace_regex_match);
 
   py::class_<FuzzedDataProvider>(m, "FuzzedDataProvider")
       .def(py::init<py::bytes>())

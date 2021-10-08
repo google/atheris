@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .native import Setup, Fuzz, FuzzedDataProvider, _trace_branch, _reserve_counters, _trace_cmp, _trace_cmp_unicode, ALL_REMAINING
+from .native import Setup, Fuzz, FuzzedDataProvider, _trace_branch, _reserve_counters, _trace_cmp, _trace_regex_match, ALL_REMAINING
 from .import_hook import instrument_imports
 from .instrument_bytecode import patch_code, instrument_func, instrument_all
 from .utils import path

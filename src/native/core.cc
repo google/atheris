@@ -151,9 +151,9 @@ bool OnFirstTestOneInput() {
 }
 
 NO_SANITIZE
-void _trace_cmp_unicode(py::handle left, py::handle right, py::handle object) {
+void _trace_regex_match(py::handle pattern_match, py::handle object) {
   uint64_t idx = (uint64_t)object.ptr() % counters.size();
-  TraceCompareUnicode(left.ptr(), right.ptr(), &counters[0] + idx);
+  TraceRegexMatch(pattern_match.ptr(), &counters[0] + idx);
 }
 
 NO_SANITIZE
@@ -270,7 +270,7 @@ PYBIND11_MODULE(ATHERIS_MODULE_NAME, m) {
   m.def("_trace_branch", &_trace_branch);
   m.def("_reserve_counters", &_reserve_counters);
   m.def("_trace_cmp", &_trace_cmp, py::return_value_policy::move);
-  m.def("_trace_cmp_unicode", &_trace_cmp_unicode);
+  m.def("_trace_regex_match", &_trace_regex_match);
 }
 
 }  // namespace atheris

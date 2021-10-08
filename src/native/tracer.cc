@@ -93,6 +93,20 @@ void TraceCompareUnicode(PyObject* left, PyObject* right, void* pc) {
   }
 }
 
+NO_SANITIZE
+void TraceRegexMatch(PyObject* pattern_match, void* pc) {
+  PyUnicode_READY(pattern_match);
+
+  py::bytes pattern_match_utf8 = UnicodeToUtf8(pattern_match);
+  const void* pattern_bytes = PyBytes_AsString(pattern_match_utf8.ptr());
+
+  uint64_t size = PyBytes_Size(pattern_match_utf8.ptr());
+
+  // We specify -1 as the last argument to let the mutator know that these bytes
+  // need to be emitted. This basically means that the `memcmp` is different.
+  __sanitizer_weak_hook_memcmp(pc, pattern_bytes, pattern_bytes, size, -1);
+}
+
 // This function hooks COMPARE_OP, inserts calls for dataflow tracing
 // and performs an actual comparison at the end.
 // pc is a pointer belonging exclusively to the current comparison.

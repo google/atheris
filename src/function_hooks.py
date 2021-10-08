@@ -85,7 +85,6 @@ def hook_re_module():
   original_compile_func = re._compile
 
   def _hook(_pattern, _flags):
-    from atheris import _trace_cmp_unicode
     generated = ""
     if _pattern not in pattern_gen_map:
       import sre_parse
@@ -115,53 +114,6 @@ def hook_re_module():
     # Create the `re.Pattern` object. We will wrap this in a proxy later on.
     re_object = original_compile_func(_pattern, _flags)
 
-    class AtherisPatternProxy:
-      """
-        This is a simple proxy where we can hook into various regex
-        functions. This ensures that the tracing happens on each call to
-        `match`, `search`, etc.
-
-        This can be observable by users who call `compile` and then check
-        if the object is actually a `re.Pattern` object.
-
-        Unfortunately it is not possible to change the functions on the
-        `re.Pattern` object itself as the functions are not writable.
-        (One could try to bypass this but it would need unsafe usage from
-        ctypes and probably won't be version agnostic)
-      """
-
-      def __init__(self, re_obj, generated):
-        self.re_obj = re_obj
-        self.generated = generated
-
-      def search(self, string):
-        _trace_cmp_unicode(self.generated, "A" * len(self.generated),
-                           self.re_obj)
-        return self.re_obj.search(string)
-
-      def match(self, string):
-        _trace_cmp_unicode(self.generated, "A" * len(self.generated),
-                           self.re_obj)
-        return self.re_obj.match(string)
-
-      def fullmatch(self, string):
-        _trace_cmp_unicode(self.generated, "A" * len(self.generated),
-                           self.re_obj)
-        return self.re_obj.fullmatch(string)
-
-      def findall(self, string):
-        _trace_cmp_unicode(self.generated, "A" * len(self.generated),
-                           self.re_obj)
-        return self.re_obj.findall(string)
-
-      def finditer(self, string):
-        _trace_cmp_unicode(self.generated, "A" * len(self.generated),
-                           self.re_obj)
-        return self.re_obj.finditer(string)
-
-      def __getattr__(self, attr):
-        return getattr(self.re_obj, attr)
-
     # Return the wrapped `re.Pattern` object.
     return AtherisPatternProxy(re_object, generated)
 
@@ -183,3 +135,51 @@ class EnabledHooks:
 
 
 enabled_hooks = EnabledHooks()
+
+
+class AtherisPatternProxy:
+  """
+    This is a simple proxy where we can hook into various regex
+    functions. This ensures that the tracing happens on each call to
+    `match`, `search`, etc.
+
+    This can be observable by users who call `compile` and then check
+    if the object is actually a `re.Pattern` object.
+
+    Unfortunately it is not possible to change the functions on the
+    `re.Pattern` object itself as the functions are not writable.
+    (One could try to bypass this but it would need unsafe usage from
+    ctypes and probably won't be version agnostic)
+  """
+
+  def __init__(self, re_obj, generated):
+    self.re_obj = re_obj
+    self.generated = generated
+
+  def search(self, string):
+    from atheris import _trace_regex_match
+    _trace_regex_match(self.generated, self.re_obj)
+    return self.re_obj.search(string)
+
+  def match(self, string):
+    from atheris import _trace_regex_match
+    _trace_regex_match(self.generated, self.re_obj)
+    return self.re_obj.match(string)
+
+  def fullmatch(self, string):
+    from atheris import _trace_regex_match
+    _trace_regex_match(self.generated, self.re_obj)
+    return self.re_obj.fullmatch(string)
+
+  def findall(self, string):
+    from atheris import _trace_regex_match
+    _trace_regex_match(self.generated, self.re_obj)
+    return self.re_obj.findall(string)
+
+  def finditer(self, string):
+    from atheris import _trace_regex_match
+    _trace_regex_match(self.generated, self.re_obj)
+    return self.re_obj.finditer(string)
+
+  def __getattr__(self, attr):
+    return getattr(self.re_obj, attr)

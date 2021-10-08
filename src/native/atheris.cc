@@ -84,7 +84,7 @@ NO_SANITIZE
 void prefuzz_reserve_counters(uint64_t num) { num_counters += num; }
 
 NO_SANITIZE
-void prefuzz_trace_cmp_unicode(py::handle left, py::handle right, py::handle object) {}
+void prefuzz_trace_regex_match(py::handle pattern_match, py::handle object) {}
 
 NO_SANITIZE
 std::vector<std::string> Setup(
@@ -169,7 +169,7 @@ void Fuzz() {
   py::module core = LoadCoreModule();
 
   atheris.attr("_trace_cmp") = core.attr("_trace_cmp");
-  atheris.attr("_trace_cmp_unicode") = core.attr("_trace_cmp_unicode");
+  atheris.attr("_trace_regex_match") = core.attr("_trace_regex_match");
   atheris.attr("_trace_branch") = core.attr("_trace_branch");
   atheris.attr("_reserve_counters") = core.attr("_reserve_counters");
 
@@ -182,7 +182,7 @@ PYBIND11_MODULE(native, m) {
   m.def("_trace_branch", &prefuzz_trace_branch);
   m.def("_trace_cmp", &prefuzz_trace_cmp, py::return_value_policy::move);
   m.def("_reserve_counters", &prefuzz_reserve_counters);
-  m.def("_trace_cmp_unicode", &prefuzz_trace_cmp_unicode);
+  m.def("_trace_regex_match", &prefuzz_trace_regex_match);
   m.def("libfuzzer_is_loaded", &libfuzzer_is_loaded);
 
   py::class_<FuzzedDataProvider>(m, "FuzzedDataProvider")

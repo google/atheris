@@ -29,12 +29,14 @@ def _set_nonblocking(fd):
   fcntl.fcntl(fd, fcntl.F_SETFL, nflags)
 
 
-def _fuzztest_child(test_one_input, pipe, args):
+def _fuzztest_child(test_one_input, pipe, args, enabled_hooks):
   os.close(pipe[0])
   os.dup2(pipe[1], 1)
   os.dup2(pipe[1], 2)
 
   try:
+    for hook in enabled_hooks:
+        atheris.enabled_hooks.add(hook)
     atheris.Setup([sys.argv[0]] + args, test_one_input)
     atheris.Fuzz()
 
@@ -51,7 +53,7 @@ def _fuzztest_child(test_one_input, pipe, args):
     os._exit(0)
 
 
-def run_fuzztest(test_one_input, expected_output=None, timeout=10, args=[]):
+def run_fuzztest(test_one_input, expected_output=None, timeout=10, args=[], enabled_hooks=[]):
   """Fuzz test_one_input() in a subprocess.
 
   This forks a child, and in the child, runs atheris.Setup(test_one_input) and
@@ -69,7 +71,7 @@ def run_fuzztest(test_one_input, expected_output=None, timeout=10, args=[]):
 
   pid = os.fork()
   if pid == 0:
-    _fuzztest_child(test_one_input, pipe, args)
+    _fuzztest_child(test_one_input, pipe, args, enabled_hooks)
 
   os.close(pipe[1])
   _set_nonblocking(pipe[0])
@@ -208,7 +210,10 @@ class IntegrationTests(unittest.TestCase):
         expected_output=b"ERROR: libFuzzer: timeout after")
 
   def testRegExMatch(self):
-    run_fuzztest(regex_match, expected_output=b"Was RegEx Match", timeout=60 * 3)
+    run_fuzztest(
+        regex_match,
+        expected_output=b"Was RegEx Match",
+        enabled_hooks=["RegEx"])
 
   def testExitsGracefullyOnPyFail(self):
     run_fuzztest(fail_immediately, expected_output=b"Exiting gracefully.")
@@ -223,6 +228,4 @@ class IntegrationTests(unittest.TestCase):
                  expected_output=b"Done 3 in ")
 
 if __name__ == "__main__":
-  # enable RegEx instrumentation.
-  atheris.enabled_hooks.add("RegEx")
   unittest.main()
