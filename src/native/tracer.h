@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef THIRD_PARTY_PY_ATHERIS_TRACER_H_
-#define THIRD_PARTY_PY_ATHERIS_TRACER_H_
+#ifndef ATHERIS_TRACER_H_
+#define ATHERIS_TRACER_H_
 
 #include <Python.h>
 
@@ -28,4 +28,4 @@ void TraceRegexMatch(PyObject* pattern_match, void* pc);
 
 }  // namespace atheris
 
-#endif  // THIRD_PARTY_PY_ATHERIS_TRACER_H_
+#endif  // ATHERIS_TRACER_H_

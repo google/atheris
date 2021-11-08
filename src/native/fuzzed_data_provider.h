@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef THIRD_PARTY_PY_ATHERIS_FUZZED_DATA_PROVIDER_H_
-#define THIRD_PARTY_PY_ATHERIS_FUZZED_DATA_PROVIDER_H_
+#ifndef ATHERIS_FUZZED_DATA_PROVIDER_H_
+#define ATHERIS_FUZZED_DATA_PROVIDER_H_
 
 #include <Python.h>
 #include <unicodeobject.h>
@@ -144,4 +144,4 @@ class FuzzedDataProvider {
 
 }  // namespace atheris
 
-#endif  // THIRD_PARTY_PY_ATHERIS_FUZZED_DATA_PROVIDER_H_
+#endif  // ATHERIS_FUZZED_DATA_PROVIDER_H_

@@ -19,8 +19,8 @@
 // header, and exactly one of them must be linked. See atheris.cc for
 // documentation on the behavior of these functions.
 
-#ifndef THIRD_PARTY_PY_ATHERIS_ATHERIS_H_
-#define THIRD_PARTY_PY_ATHERIS_ATHERIS_H_
+#ifndef ATHERIS_ATHERIS_H_
+#define ATHERIS_ATHERIS_H_
 
 #include <functional>
 #include <string>
@@ -48,4 +48,4 @@ void _trace_branch(uint64_t idx);
 
 }  // namespace atheris
 
-#endif  // THIRD_PARTY_PY_ATHERIS_LIBFUZZER_H_
+#endif  // ATHERIS_ATHERIS_H_
