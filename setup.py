@@ -151,6 +151,17 @@ ext_modules = [
             PybindIncludeGetter(),
         ],
         language="c++"),
+    Extension(
+        "atheris.custom_mutator",
+        sorted([
+            "src/native/custom_mutator.cc",
+            "src/native/custom_mutator_module.cc",
+        ]),
+        include_dirs=[
+            # Path to pybind11 headers
+            PybindIncludeGetter(),
+        ],
+        language="c++"),
 ]
 
 

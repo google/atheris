@@ -171,6 +171,96 @@ In order for fuzzing native extensions to be effective, your native extensions
 must be instrumented. See [Native Extension Fuzzing](https://github.com/google/atheris/blob/master/native_extension_fuzzing.md)
 for instructions.
 
+### Structure-aware Fuzzing
+
+Atheris is based on a coverage-guided mutation-based fuzzer (LibFuzzer). This
+has the advantage of not requiring any grammar definition for generating inputs,
+making its setup easier. The disadvantage is that it will be harder for the
+fuzzer to generate inputs for code that parses complex data types. Often the
+inputs will be rejected early, resulting in low coverage.
+
+Atheris supports custom mutators
+[(as offered by LibFuzzer)](https://github.com/google/fuzzing/blob/master/docs/structure-aware-fuzzing.md)
+to produce grammar-aware inputs.
+
+Example (Atheris-equivalent of the
+[example in the LibFuzzer docs](https://github.com/google/fuzzing/blob/master/docs/structure-aware-fuzzing.md#example-compression)):
+
+```python
+@atheris.instrument_func
+def TestOneInput(data):
+  try:
+    decompressed = zlib.decompress(data)
+  except zlib.error:
+    return
+
+  if len(decompressed) < 2:
+    return
+
+  try:
+    if decompressed.decode() == 'FU':
+      raise RuntimeError('Boom')
+  except UnicodeDecodeError:
+    pass
+```
+
+To reach the `RuntimeError` crash, the fuzzer needs to be able to produce inputs
+that are valid compressed data and satisfy the checks after decompression.
+It is very unlikely that Atheris will be able to produce such inputs: mutations
+on the input data will most probably result in invalid data that will fail at
+decompression-time.
+
+To overcome this issue, you can define a custom mutator function (equivalent to
+`LLVMFuzzerCustomMutator`).
+This example produces valid compressed data. To enable Atheris to make use of
+it, pass the custom mutator function to the invocation of `atheris.Setup`.
+
+```python
+def CustomMutator(data, max_size, seed):
+  try:
+    decompressed = zlib.decompress(data)
+  except zlib.error:
+    decompressed = b'Hi'
+  else:
+    decompressed = atheris.Mutate(decompressed, len(decompressed))
+  return zlib.compress(decompressed)
+
+atheris.Setup(sys.argv, TestOneInput, custom_mutator=CustomMutator)
+atheris.Fuzz()
+```
+
+As seen in the example, the custom mutator may request Atheris to mutate data
+using `atheris.Mutate()` (this is equivalent to `LLVMFuzzerMutate`).
+
+You can experiment with [custom_mutator_example.py](example_fuzzers/custom_mutator_example.py)
+and see that without the mutator Atheris would not be able to find the crash,
+while with the mutator this is achieved in a matter of seconds.
+
+```shell
+$ python3 example_fuzzers/custom_mutator_example.py --no_mutator
+[...]
+#2      INITED cov: 2 ft: 2 corp: 1/1b exec/s: 0 rss: 37Mb
+#524288 pulse  cov: 2 ft: 2 corp: 1/1b lim: 4096 exec/s: 262144 rss: 37Mb
+#1048576        pulse  cov: 2 ft: 2 corp: 1/1b lim: 4096 exec/s: 349525 rss: 37Mb
+#2097152        pulse  cov: 2 ft: 2 corp: 1/1b lim: 4096 exec/s: 299593 rss: 37Mb
+#4194304        pulse  cov: 2 ft: 2 corp: 1/1b lim: 4096 exec/s: 279620 rss: 37Mb
+[...]
+
+$ python3 example_fuzzers/custom_mutator_example.py
+[...]
+INFO: found LLVMFuzzerCustomMutator (0x7f9c989fb0d0). Disabling -len_control by default.
+[...]
+#2      INITED cov: 2 ft: 2 corp: 1/1b exec/s: 0 rss: 37Mb
+#3      NEW    cov: 4 ft: 4 corp: 2/11b lim: 4096 exec/s: 0 rss: 37Mb L: 10/10 MS: 1 Custom-
+#12     NEW    cov: 5 ft: 5 corp: 3/21b lim: 4096 exec/s: 0 rss: 37Mb L: 10/10 MS: 7 Custom-CrossOver-Custom-CrossOver-Custom-ChangeBit-Custom-
+ === Uncaught Python exception: ===
+RuntimeError: Boom
+Traceback (most recent call last):
+  File "example_fuzzers/custom_mutator_example.py", line 62, in TestOneInput
+    raise RuntimeError('Boom')
+[...]
+```
+
 ## Integration with OSS-Fuzz
 
 Atheris is fully supported by [OSS-Fuzz](https://github.com/google/oss-fuzz), Google's continuous fuzzing service for open source projects. For integrating with OSS-Fuzz, please see [https://google.github.io/oss-fuzz/getting-started/new-project-guide/python-lang](https://google.github.io/oss-fuzz/getting-started/new-project-guide/python-lang).

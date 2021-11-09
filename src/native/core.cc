@@ -46,6 +46,7 @@ using UserCb = int (*)(const uint8_t* Data, size_t Size);
 extern "C" {
 int LLVMFuzzerRunDriver(int* argc, char*** argv,
                         int (*UserCb)(const uint8_t* Data, size_t Size));
+size_t LLVMFuzzerMutate(uint8_t* Data, size_t Size, size_t MaxSize);
 void __sanitizer_cov_8bit_counters_init(uint8_t* start, uint8_t* stop);
 void __sanitizer_cov_pcs_init(uint8_t* pcs_beg, uint8_t* pcs_end);
 }
@@ -259,6 +260,15 @@ void start_fuzzing(const std::vector<std::string>& args,
   GracefulExit(LLVMFuzzerRunDriver(&args_size, &args_ptr, &TestOneInput));
 }
 
+NO_SANITIZE
+py::bytes Mutate(py::bytes data, size_t max_size) {
+  std::string d = data.cast<std::string>();
+  LLVMFuzzerMutate(
+      const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(d.data())),
+      d.size(), max_size);
+  return d;
+}
+
 #ifndef ATHERIS_MODULE_NAME
 #define ATHERIS_MODULE_NAME core_with_libfuzzer
 #endif  // ATHERIS_MODULE_NAME
@@ -271,6 +281,8 @@ PYBIND11_MODULE(ATHERIS_MODULE_NAME, m) {
   m.def("_reserve_counters", &_reserve_counters);
   m.def("_trace_cmp", &_trace_cmp, py::return_value_policy::move);
   m.def("_trace_regex_match", &_trace_regex_match);
+
+  m.def("Mutate", &Mutate);
 }
 
 }  // namespace atheris

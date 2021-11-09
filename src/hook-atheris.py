@@ -13,7 +13,8 @@
 # limitations under the License.
 
 hiddenimports = [
-  "atheris.core_with_libfuzzer",
-  "atheris.core_without_libfuzzer",
-  "atheris.native"
+    "atheris.core_with_libfuzzer",
+    "atheris.core_without_libfuzzer",
+    "atheris.custom_mutator",
+    "atheris.native",
 ]
