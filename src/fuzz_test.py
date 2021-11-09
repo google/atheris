@@ -187,16 +187,19 @@ class IntegrationTests(unittest.TestCase):
     run_fuzztest(fail_immediately, expected_output=b"Failed immediately")
 
   def testManyBranches(self):
-    run_fuzztest(many_branches, expected_output=b"Many branches", timeout=30)
+    run_fuzztest(many_branches, expected_output=b"Many branches", timeout=90)
 
   def testBytesComparison(self):
-    run_fuzztest(bytes_comparison, expected_output=b"Was foobarbazbiz")
+    run_fuzztest(bytes_comparison, expected_output=b"Was foobarbazbiz",
+                 timeout=30)
 
   def testStringComparison(self):
-    run_fuzztest(string_comparison, expected_output=b"Was foobarbazbiz")
+    run_fuzztest(string_comparison, expected_output=b"Was foobarbazbiz",
+                 timeout=30)
 
   def testUtf8Comparison(self):
-    run_fuzztest(utf8_comparison, expected_output=b"Was random unicode")
+    run_fuzztest(utf8_comparison, expected_output=b"Was random unicode",
+                 timeout=60)
 
   def testTimeoutPy(self):
     """This test verifies that timeout messages are recorded from -timeout."""
