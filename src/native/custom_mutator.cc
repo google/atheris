@@ -40,8 +40,7 @@ std::function<py::bytes(py::bytes data, size_t max_size, unsigned int seed)>&
         unsigned int seed)>([](py::bytes data, size_t max_size,
                                unsigned int seed) -> py::bytes {
       std::cerr
-          << "You must set a custom mutator via Setup(custom_mutator=[...]) or "
-             "remove //third_party/py/atheris:custom_mutator from your deps."
+          << "You must set a custom mutator via Setup(custom_mutator=[...])."
           << std::endl;
       _exit(-1);
     });
