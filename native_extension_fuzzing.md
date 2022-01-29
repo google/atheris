@@ -8,7 +8,7 @@ While this doesn't work for every extension and build system, if you are using
 setuptools, you can typically compile a sanitized extension like this:
 
 ```
-CC="/usr/bin/clang" CFLAGS="-fsanitize=address,fuzzer-no-link" CXX="/usr/bin/clang++" CXXFLAGS="-fsanitize=address,fuzzer-no-link" pip3 install .
+CC="/usr/bin/clang" CFLAGS="-fsanitize=address,fuzzer-no-link" CXX="/usr/bin/clang++" CXXFLAGS="-fsanitize=address,fuzzer-no-link" LDSHARED="/usr/bin/clang -shared" pip3 install .
 ```
 
 Here, `address` means Address Sanitizer. You can also use `undefined` for the
