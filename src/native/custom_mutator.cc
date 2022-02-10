@@ -39,10 +39,8 @@ std::function<py::bytes(py::bytes data, size_t max_size, unsigned int seed)>&
         py::bytes data, size_t max_size,
         unsigned int seed)>([](py::bytes data, size_t max_size,
                                unsigned int seed) -> py::bytes {
-      std::cerr
-          << "You must set a custom mutator via Setup(custom_mutator=[...])."
-          << std::endl;
-      _exit(-1);
+          // This function should never be called.
+          abort();
     });
 }  // namespace
 

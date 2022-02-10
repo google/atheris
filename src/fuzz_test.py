@@ -18,6 +18,7 @@ import sys
 import time
 import unittest
 import zlib
+import functools
 
 import atheris
 
@@ -110,6 +111,31 @@ def compressed_data(data):
     pass
 
 
+@atheris.instrument_func
+def reserve_counter_after_fuzz_start(data):
+  del data
+  atheris._reserve_counter()
+
+
+@functools.lru_cache(maxsize=None)
+def instrument_once(func):
+  """Instruments func, and verifies that this is the first time."""
+  assert("__ATHERIS_INSTRUMENTED__" not in func.__code__.co_consts)
+  atheris.instrument_func(func)
+  assert("__ATHERIS_INSTRUMENTED__" in func.__code__.co_consts)
+
+
+def foo(data):
+  if data == b"foobar":
+    raise RuntimeError("Code instrumented at runtime.")
+
+
+def runtime_instrument_code(data):
+  instrument_once(foo)
+  foo(data)
+
+
+
 class IntegrationTests(unittest.TestCase):
 
   def testFails(self):
@@ -174,15 +200,34 @@ class IntegrationTests(unittest.TestCase):
     # This test only makes sense for Google3, as the LLVMFuzzerCustomMutator
     # in this test is not linked while a mutator is set. That cannot happen in
     # the OSS version.
+    try:
+      import google3
+    except ImportError:
+      return  # Skip test if this is an OSS execution.
 
     def fake_custom_mutator(data, max_size, seed):
+      del max_size, seed
       return data
 
     fuzz_test_lib.run_fuzztest(
         compressed_data,
-        custom_mutator=fake_custom_mutator,
+        setup_kwargs={"custom_mutator": fake_custom_mutator},
         expected_output=b"Add //third_party/py/atheris:custom_mutator")
+
   # copybara:strip_end
+
+  def testReserveCounterAfterFuzzStart(self):
+    fuzz_test_lib.run_fuzztest(
+        reserve_counter_after_fuzz_start,
+        args=["-atheris_runs=2"],
+        expected_output=b"Exiting gracefully.")
+
+  def testInstrumentCodeWhileFuzzing(self):
+    fuzz_test_lib.run_fuzztest(
+        runtime_instrument_code,
+        timeout=90,
+        expected_output=b"Code instrumented at runtime.")
+
 
 if __name__ == "__main__":
   unittest.main()

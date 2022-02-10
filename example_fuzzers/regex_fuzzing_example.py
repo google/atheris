@@ -25,6 +25,7 @@ with atheris.instrument_imports():
   import re
   import sys
 
+
 @atheris.instrument_func  # Instrument the TestOneInput function itself
 def TestOneInput(data):
   """The entry point for our fuzzer.
@@ -45,6 +46,7 @@ def TestOneInput(data):
 
   if reg.search(data):
     raise RuntimeError("Solved RegEx")
+
 
 atheris.Setup(sys.argv, TestOneInput)
 atheris.Fuzz()

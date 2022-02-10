@@ -15,8 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """IDNA encoding/decoding differential fuzzer for Python idna vs libidn2.
 
 This is a differential fuzzer that compares the Python `idna` package with the C
@@ -133,28 +131,28 @@ def CompareEncodedWithLibidn2(original, encoded):
       return
 
     codepoints = [hex(ord(x))[2:] for x in original]
-    sys.stderr.write((
-        "IDNA produced a valid output, whereas libidn2 returned an error.\n"
-        "Input: %s\nInput codepoints: %s\nIDNA encoding: %s\n"
-        "libidn2 decoding of IDNA encoding:%s\n")
-        % (original, codepoints, encoded, libidn2.decode(encoded)))
+    sys.stderr.write(
+        ("IDNA produced a valid output, whereas libidn2 returned an error.\n"
+         "Input: %s\nInput codepoints: %s\nIDNA encoding: %s\n"
+         "libidn2 decoding of IDNA encoding:%s\n") %
+        (original, codepoints, encoded, libidn2.decode(encoded)))
     raise
 
   if encoded != libidn2_encoded:
-    raise RuntimeError((
-        "IDNA encoding disagrees with libidn2 encoding.\nInput: %s\n"
-        "IDNA encoding: %s\nlibidn2 encoding: %s")
-        % (original, encoded, libidn2_encoded))
+    raise RuntimeError(
+        ("IDNA encoding disagrees with libidn2 encoding.\nInput: %s\n"
+         "IDNA encoding: %s\nlibidn2 encoding: %s") %
+        (original, encoded, libidn2_encoded))
 
 
 def CompareDecodedWithLibidn2(original, encoded, decoded):
   """Decodes `encoded` with libidn2, and compares it to `decoded` from idna."""
   libidn2_decoded = libidn2.decode(encoded)
   if libidn2_decoded != decoded:
-    raise RuntimeError((
-        "IDNA decoding disagrees with libidn2 decoding.\nOriginal Input: %s\n"
-        "Encoding: %s\nIDNA Decoding: %s\nlibidn2 Decoding: %s\n")
-        % (original, encoded, decoded, libidn2_decoded))
+    raise RuntimeError(
+        ("IDNA decoding disagrees with libidn2 decoding.\nOriginal Input: %s\n"
+         "Encoding: %s\nIDNA Decoding: %s\nlibidn2 Decoding: %s\n") %
+        (original, encoded, decoded, libidn2_decoded))
 
 
 def TestOneInput(input_bytes):
@@ -170,8 +168,7 @@ def TestOneInput(input_bytes):
     if should_fail:
       raise RuntimeError(
           ("Input '%s' is invalid, should have failed; "
-           "however, actually encoded to '%s'")
-          % (original, encoded))
+           "however, actually encoded to '%s'") % (original, encoded))
   # These errors are very complex would essentially require the idna package to
   # be reimplemented in order to correctly implement, so we assume they are
   # valid.
@@ -205,6 +202,7 @@ def main():
   atheris.instrument_all()
   atheris.Setup(sys.argv, TestOneInput)
   atheris.Fuzz()
+
 
 if __name__ == "__main__":
   main()

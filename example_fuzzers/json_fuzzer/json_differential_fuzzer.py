@@ -35,7 +35,6 @@ values that are too big or too small is techincally fine; however,
 misinterpreting them is not.
 """
 
-
 import atheris
 import sys
 with atheris.instrument_imports():
@@ -71,8 +70,6 @@ def TestOneInput(input_bytes):
     # that are uninteresting, such as "00". So, that is not done.
     return
 
-
-
   # Uncomment these lines to ignore the errors described in the docstring of
   # this file.
   json_data = ClearAllIntegers(json_data)
@@ -90,6 +87,7 @@ def TestOneInput(input_bytes):
 def main():
   atheris.Setup(sys.argv, TestOneInput)
   atheris.Fuzz()
+
 
 if __name__ == "__main__":
   main()

@@ -12,12 +12,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Atheris is a coverage-guided Python fuzzing engine."""
 
-from .native import Setup, Fuzz, FuzzedDataProvider, _trace_branch, _reserve_counters, _trace_cmp, _trace_regex_match, ALL_REMAINING
+from typing import List
+from .function_hooks import enabled_hooks
+from .function_hooks import gen_match
 from .import_hook import instrument_imports
-from .instrument_bytecode import patch_code, instrument_func, instrument_all
+from .instrument_bytecode import instrument_all
+from .instrument_bytecode import instrument_func
+from .instrument_bytecode import patch_code
 from .utils import path
-from .function_hooks import enabled_hooks, gen_match
+# MyPy cannot find native code.
+from .native import _reserve_counter  # type: ignore[import]
+from .native import _trace_branch  # type: ignore[import]
+from .native import _trace_cmp  # type: ignore[import]
+from .native import _trace_regex_match  # type: ignore[import]
+from .native import ALL_REMAINING  # type: ignore[import]
+from .native import Fuzz  # type: ignore[import]
+from .native import FuzzedDataProvider  # type: ignore[import]
+from .native import Mutate  # type: ignore[import]
+from .native import Setup  # type: ignore[import]
 
 # PyInstaller Support
 # PyInstaller doesn't automatically support lazy imports, which happens because
@@ -25,6 +39,7 @@ from .function_hooks import enabled_hooks, gen_match
 # the core module. This function tells it where to look for a hook-atheris.py
 # file.
 
-def get_hook_dirs():
-  import os
+
+def get_hook_dirs() -> List[str]:
+  import os  # pylint: disable=g-import-not-at-top
   return [os.path.dirname(__file__)]

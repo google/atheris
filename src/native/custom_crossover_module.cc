@@ -1,6 +1,5 @@
 /*
- * Copyright 2020 Google LLC
- * Copyright 2021 Fraunhofer FKIE
+ * Copyright 2021 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,22 +14,22 @@
  * limitations under the License.
  */
 
-#ifndef ATHERIS_TRACER_H_
-#define ATHERIS_TRACER_H_
-
 #include <Python.h>
 
+#include <functional>
+#include <stdexcept>
+#include <string>
+
+#include "custom_crossover.h"
+#include "macros.h"
+#include "pybind11/functional.h"
 #include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
 
 namespace atheris {
 
-PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid,
-                         bool left_is_const);
-
-// Passes `generated_match` (str) to the backend fuzzer in a way that it will be
-// emitted by the fuzzer. `re_obj` is the compiled regex object.
-void TraceRegexMatch(pybind11::handle generated_match, pybind11::handle re_obj);
+PYBIND11_MODULE(custom_crossover, m) {
+  m.def("_set_custom_crossover", &_set_custom_crossover);
+}
 
 }  // namespace atheris
-
-#endif  // ATHERIS_TRACER_H_

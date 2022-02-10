@@ -15,30 +15,74 @@
 
 import re
 import sre_parse
-from google3.testing.pybase import parameterized, googletest
+import unittest
 from atheris import gen_match
 
-TESTS = [
-    (r"abc"),
-    (r"abc|def"),
-    (r"(abc|\d+)"),
-    (r"(?:abc){3,}"),
-    (r"(?:abc){,3}"),
-    (r"(?=abc)"),
-    (r"(?<!abc)"),
-    (r"[^abc]abc"),
-    (r"[abc]abc"),
-]
+
+class RegexMatchGeneration(unittest.TestCase):
+
+  def test_plain(self):
+    match = gen_match(sre_parse.parse("abc"))
+    self.assertEqual(match, "abc")
+
+  def test_alternate1(self):
+    match = gen_match(sre_parse.parse("abc|def"))
+    self.assertIn(match, ["abc", "def"])
+
+  def test_alternate2(self):
+    pattern = r"(abc|\d+)"
+    match = gen_match(sre_parse.parse(pattern))
+    self.assertRegex(match, pattern)
+
+  def test_oneof(self):
+    match = gen_match(sre_parse.parse("[abc]abc"))
+    self.assertIn(match, ["aabc", "babc", "cabc"])
+
+  def test_notoneof(self):
+    match = gen_match(sre_parse.parse("[^abc]def"))
+    if len(match) != 4:
+      raise AssertionError(f"Unexpected generated match {match}")
+    if not match.endswith("def"):
+      raise AssertionError(f"Unexpected generated match {match}")
+    if match[0] in "abc":
+      raise AssertionError(f"Unexpected generated match {match}")
+
+  def test_noncapturing(self):
+    pattern = r"(?:abc){3,}"
+    match = gen_match(sre_parse.parse(pattern))
+    self.assertRegex(match, pattern)
+    print(match)
+
+  def test_noncapturing2(self):
+    pattern = r"(?:abc){,3}"
+    match = gen_match(sre_parse.parse(pattern))
+    self.assertRegex(match, pattern)
+    print(match)
+
+  def test_lookahead(self):
+    pattern = r"y(?=abc)"
+    match = gen_match(sre_parse.parse(pattern))
+    self.assertRegex(match, pattern)
+
+  def test_unicode(self):
+    match = gen_match(sre_parse.parse("•"))
+    self.assertEqual(match, "•")
+
+  # Unsupported yet:
+  # def test_plainbytes(self):
+  #   match = gen_match(sre_parse.parse(b"abc"))
+  #   self.assertEqual(match, b"abc")
+  # def test_negative_lookbehind(self):
+  #   pattern = r"t(?<!abc)u"
+  #   match = gen_match(sre_parse.parse(pattern))
+  #   self.assertRegex(match, pattern)
+  # def test_digits(self):
+  #   pattern = r"\d"
+  #   match = gen_match(sre_parse.parse(pattern))
+  #   self.assertRegex(match, pattern)
 
 
-class RegexTests(parameterized.TestCase):
-
-  @parameterized.parameters(TESTS)
-  def testRegExMatchGeneration(self, test_input):
-    match = gen_match(sre_parse.parse(test_input))
-    if re.match(test_input, match) is None:
-      raise AssertionError(f"Could not generate RegEx Match for {test_input}")
 
 
 if __name__ == "__main__":
-  googletest.main()
+  unittest.main()

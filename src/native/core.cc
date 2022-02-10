@@ -28,6 +28,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "counters.h"
 #include "macros.h"
 #include "pybind11/functional.h"
 #include "pybind11/pybind11.h"
@@ -35,11 +36,6 @@
 #include "timeout.h"
 #include "tracer.h"
 #include "util.h"
-
-struct PCTableEntry {
-  void* pc;
-  long flags;
-};
 
 using UserCb = int (*)(const uint8_t* Data, size_t Size);
 
@@ -78,9 +74,6 @@ std::function<void(py::bytes data)>& test_one_input_global =
       std::cerr << "You must call Setup() before Fuzz()." << std::endl;
       throw std::runtime_error("You must call Setup() before Fuzz().");
     });
-std::vector<unsigned char>& counters = *new std::vector<unsigned char>();
-std::vector<struct PCTableEntry>& pctable =
-    *new std::vector<struct PCTableEntry>();
 int64_t runs = -1;  // Default from libFuzzer, means infinite
 int64_t completed_runs = 0;
 int64_t fuzzer_start_time;
@@ -108,21 +101,18 @@ void Init() {
   }
 }
 
-// These versions of _trace_branch, _trace_cmp, _trace_cmp_unicode and
-// _reserve_counters are called after fuzzing has begun.
+// These versions of _trace_branch and _trace_cmp are called after fuzzing has
+// begun.
 
 NO_SANITIZE
-void _trace_branch(uint64_t idx) {
-  if (idx < counters.size()) {
-    counters[idx]++;
-  }
-}
+void _trace_branch(uint64_t idx) { IncrementCounter(idx); }
 
 NO_SANITIZE
 py::handle _trace_cmp(py::handle left, py::handle right, int opid, uint64_t idx,
                       bool left_is_const) {
-  PyObject* ret = TraceCompareOp(&counters[0] + idx, left.ptr(), right.ptr(),
-                                 opid, left_is_const);
+  // Give `idx` as a fake pc.
+  PyObject* ret = TraceCompareOp(reinterpret_cast<void*>(idx), left.ptr(),
+                                 right.ptr(), opid, left_is_const);
 
   if (ret == nullptr) {
     throw py::error_already_set();
@@ -131,19 +121,6 @@ py::handle _trace_cmp(py::handle left, py::handle right, int opid, uint64_t idx,
   }
 }
 
-NO_SANITIZE
-void _reserve_counters(uint64_t num) {
-  std::cerr << Colorize(
-                   STDERR_FILENO,
-                   "Tried to reserve counters after fuzzing has been started.")
-            << std::endl
-            << Colorize(STDERR_FILENO,
-                        "This is not supported. Instrument the modules before "
-                        "calling atheris.Fuzz().")
-            << std::endl;
-  throw std::runtime_error(
-      "Tried to reserve counters after fuzzing has been started.");
-}
 
 NO_SANITIZE
 bool OnFirstTestOneInput() {
@@ -152,16 +129,18 @@ bool OnFirstTestOneInput() {
 }
 
 NO_SANITIZE
-void _trace_regex_match(py::handle pattern_match, py::handle object) {
-  uint64_t idx = (uint64_t)object.ptr() % counters.size();
-  TraceRegexMatch(pattern_match.ptr(), &counters[0] + idx);
-}
-
-NO_SANITIZE
 int TestOneInput(const uint8_t* data, size_t size) {
   static bool dummy = OnFirstTestOneInput();
   (void)dummy;
   RefreshTimeout();
+  const auto alloc = AllocateCountersAndPcs();
+  if (alloc.counters_start && alloc.counters_end) {
+    __sanitizer_cov_8bit_counters_init(alloc.counters_start,
+                                       alloc.counters_end);
+  }
+  if (alloc.pctable_start && alloc.pctable_end) {
+    __sanitizer_cov_pcs_init(alloc.pctable_start, alloc.pctable_end);
+  }
 
   try {
     test_one_input_global(py::bytes(reinterpret_cast<const char*>(data), size));
@@ -200,8 +179,7 @@ int TestOneInput(const uint8_t* data, size_t size) {
 
 NO_SANITIZE
 void start_fuzzing(const std::vector<std::string>& args,
-                   const std::function<void(py::bytes data)>& test_one_input,
-                   uint64_t num_counters) {
+                   const std::function<void(py::bytes data)>& test_one_input) {
   test_one_input_global = test_one_input;
 
   bool registered_alarm = SetupPythonSigaction();
@@ -228,6 +206,11 @@ void start_fuzzing(const std::vector<std::string>& args,
       runs = std::stoll(arg.substr(14, std::string::npos));
       continue;
     }
+    if (arg.substr(0, 14) == "-max_counters=") {
+      int max = std::stoll(arg.substr(14, std::string::npos));
+      SetMaxCounters(max);
+      continue;
+    }
 
     arg_array.push_back(const_cast<char*>(arg.c_str()));
   }
@@ -235,23 +218,6 @@ void start_fuzzing(const std::vector<std::string>& args,
   arg_array.push_back(nullptr);
   char** args_ptr = &arg_array[0];
   int args_size = arg_array.size() - 1;
-
-  if (num_counters) {
-    counters.resize(num_counters, 0);
-    __sanitizer_cov_8bit_counters_init(&counters[0],
-                                       &counters[0] + counters.size());
-
-    pctable.resize(num_counters);
-
-    for (int i = 0; i < pctable.size(); ++i) {
-      pctable[i].pc = reinterpret_cast<void*>(i + 1);
-      pctable[i].flags = 0;
-    }
-
-    __sanitizer_cov_pcs_init(
-        reinterpret_cast<uint8_t*>(&pctable[0]),
-        reinterpret_cast<uint8_t*>(&pctable[0] + pctable.size()));
-  }
 
   fuzzer_start_time = std::chrono::duration_cast<std::chrono::seconds>(
                           std::chrono::system_clock::now().time_since_epoch())
@@ -262,11 +228,13 @@ void start_fuzzing(const std::vector<std::string>& args,
 
 NO_SANITIZE
 py::bytes Mutate(py::bytes data, size_t max_size) {
-  std::string d = data.cast<std::string>();
-  LLVMFuzzerMutate(
+  std::string d = data;
+  size_t old_size = d.size();
+  d.resize(max_size);
+  size_t new_size = LLVMFuzzerMutate(
       const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(d.data())),
-      d.size(), max_size);
-  return d;
+      old_size, max_size);
+  return py::bytes(d.data(), new_size);
 }
 
 #ifndef ATHERIS_MODULE_NAME
@@ -278,9 +246,10 @@ PYBIND11_MODULE(ATHERIS_MODULE_NAME, m) {
 
   m.def("start_fuzzing", &start_fuzzing);
   m.def("_trace_branch", &_trace_branch);
-  m.def("_reserve_counters", &_reserve_counters);
+  m.def("_reserve_counter", ReserveCounter);
+  m.def("_reserve_counters", ReserveCounters);
   m.def("_trace_cmp", &_trace_cmp, py::return_value_policy::move);
-  m.def("_trace_regex_match", &_trace_regex_match);
+  m.def("_trace_regex_match", &TraceRegexMatch);
 
   m.def("Mutate", &Mutate);
 }

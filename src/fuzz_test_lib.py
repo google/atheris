@@ -27,17 +27,24 @@ def _set_nonblocking(fd):
   fcntl.fcntl(fd, fcntl.F_SETFL, nflags)
 
 
-def _fuzztest_child(test_one_input, custom_mutator, pipe, args, enabled_hooks):
+def _fuzztest_child(test_one_input, custom_setup, setup_kwargs, pipe, args,
+                    enabled_hooks):
+  """Fuzzing target to run as a separate process."""
   os.close(pipe[0])
   os.dup2(pipe[1], 1)
   os.dup2(pipe[1], 2)
+
+  if not setup_kwargs:
+    setup_kwargs = {}
 
   try:
     if enabled_hooks:
       for hook in enabled_hooks:
         atheris.enabled_hooks.add(hook)
-    atheris.Setup([sys.argv[0]] + (args if args else []), test_one_input,
-                  custom_mutator=custom_mutator)
+    custom_setup(
+        [sys.argv[0]] + (args if args else []),
+        test_one_input,
+        **setup_kwargs)
     atheris.Fuzz()
 
     # To avoid running tests multiple times due to fork(), never allow control
@@ -54,7 +61,8 @@ def _fuzztest_child(test_one_input, custom_mutator, pipe, args, enabled_hooks):
 
 
 def run_fuzztest(test_one_input,
-                 custom_mutator=None,
+                 custom_setup=None,
+                 setup_kwargs=None,
                  expected_output=None,
                  timeout=10,
                  args=None,
@@ -66,8 +74,8 @@ def run_fuzztest(test_one_input,
 
   Args:
     test_one_input: a callable that takes a bytes.
-    custom_mutator: a callable that takes a bytes, max_length of the mutated
-      data, and the fuzzing seed.
+    custom_setup: a custom setup function, if None atheris.Setup is used.
+    setup_kwargs: arguments to pass to the setup function.
     expected_output: bytes. If specified, the output of the fuzzer must contain
       this data.
     timeout: float. Time until the fuzzing is aborted and an assertion failure
@@ -82,7 +90,8 @@ def run_fuzztest(test_one_input,
 
   pid = os.fork()
   if pid == 0:
-    _fuzztest_child(test_one_input, custom_mutator, pipe, args, enabled_hooks)
+    _fuzztest_child(test_one_input, custom_setup or atheris.Setup,
+                    setup_kwargs, pipe, args, enabled_hooks)
 
   os.close(pipe[1])
   _set_nonblocking(pipe[0])

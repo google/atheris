@@ -261,6 +261,19 @@ Traceback (most recent call last):
 [...]
 ```
 
+Custom crossover functions (equivalent to `LLVMFuzzerCustomCrossOver`) are also
+supported. You can pass the custom crossover function to the invocation of
+`atheris.Setup`. See its usage in [custom_crossover_fuzz_test.py](src/custom_crossover_fuzz_test.py).
+
+#### Structure-aware Fuzzing with Protocol Buffers
+
+[libprotobuf-mutator](https://github.com/google/libprotobuf-mutator) has
+bindings to use it together with Atheris to perform structure-aware fuzzing
+using protocol buffers.
+
+See the documentation for
+[atheris_libprotobuf_mutator](contrib/libprotobuf_mutator/README.md).
+
 ## Integration with OSS-Fuzz
 
 Atheris is fully supported by [OSS-Fuzz](https://github.com/google/oss-fuzz), Google's continuous fuzzing service for open source projects. For integrating with OSS-Fuzz, please see [https://google.github.io/oss-fuzz/getting-started/new-project-guide/python-lang](https://google.github.io/oss-fuzz/getting-started/new-project-guide/python-lang).

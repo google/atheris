@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Setuptools for Atheris."""
 
 import os
@@ -26,7 +25,7 @@ from setuptools import Extension
 from setuptools import setup
 from setuptools.command.build_ext import build_ext
 
-__version__ = os.getenv("ATHERIS_VERSION", "2.0.7")
+__version__ = os.getenv("ATHERIS_VERSION", "2.0.8")
 
 if len(sys.argv) > 1 and sys.argv[1] == "print_version":
   print(__version__)
@@ -129,6 +128,7 @@ ext_modules = [
         "atheris.core_with_libfuzzer",
         sorted([
             "src/native/core.cc",
+            "src/native/counters.cc",
             "src/native/tracer.cc",
             "src/native/util.cc",
             "src/native/timeout.cc",
@@ -142,9 +142,21 @@ ext_modules = [
         "atheris.core_without_libfuzzer",
         sorted([
             "src/native/core.cc",
+            "src/native/counters.cc",
             "src/native/tracer.cc",
             "src/native/util.cc",
             "src/native/timeout.cc",
+        ]),
+        include_dirs=[
+            # Path to pybind11 headers
+            PybindIncludeGetter(),
+        ],
+        language="c++"),
+    Extension(
+        "atheris.custom_crossover",
+        sorted([
+            "src/native/custom_crossover.cc",
+            "src/native/custom_crossover_module.cc",
         ]),
         include_dirs=[
             # Path to pybind11 headers
@@ -193,10 +205,11 @@ def cpp_flag(compiler):
     flags = ["-std=c++" + os.getenv("FORCE_VERSION")]
   else:
     flags = [
-      #"-std=c++17",  C++17 disabled unless explicitly requested, to work
-      # around https://github.com/pybind/pybind11/issues/1818
-      "-std=c++14",
-      "-std=c++11"]
+        #"-std=c++17",  C++17 disabled unless explicitly requested, to work
+        # around https://github.com/pybind/pybind11/issues/1818
+        "-std=c++14",
+        "-std=c++11"
+    ]
 
   for flag in flags:
     if has_flag(compiler, flag):

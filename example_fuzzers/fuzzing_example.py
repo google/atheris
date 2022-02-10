@@ -44,5 +44,6 @@ def TestOneInput(data):
   number, = struct.unpack('<I', data)
   example_library.CodeBeingFuzzed(number)
 
+
 atheris.Setup(sys.argv, TestOneInput)
 atheris.Fuzz()

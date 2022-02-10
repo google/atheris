@@ -15,6 +15,6 @@ namespace py = pybind11;
 void _set_custom_mutator(
     const std::function<py::bytes(py::bytes data, size_t max_size,
                                   unsigned int seed)>& custom_mutator_func);
-}
+}  // namespace atheris
 
 #endif  // ATHERIS_CUSTOM_MUTATOR_H_

@@ -64,8 +64,11 @@ py::handle _trace_cmp(py::handle left, py::handle right, int opid, uint64_t idx,
 NO_SANITIZE
 void _trace_regex_match(py::handle pattern_match, py::handle object) {}
 
+
+int global_counter = 0;
+
 NO_SANITIZE
-void _reserve_counters(uint64_t num) {}
+int _reserve_counter() { return global_counter++; }
 
 std::vector<std::string> Setup(
     const std::vector<std::string>& args,
@@ -118,12 +121,26 @@ void Fuzz() {
   exit(UnittestFuzz(args_size, args_ptr, &TestOneInput));
 }
 
+NO_SANITIZE
+py::bytes Mutate(py::bytes data, size_t max_size) {
+  std::cerr
+      << Colorize(
+             STDERR_FILENO,
+             "Mutate() cannot be used without libFuzzer. Without libFuzzer "
+             "custom mutators are ignored, so registering them is still "
+             "acceptable as long as Mutate() is only called within your custom "
+             "mutator.")
+      << std::endl;
+  exit(1);
+}
+
 PYBIND11_MODULE(native, m) {
   m.def("Setup", &Setup);
   m.def("Fuzz", &Fuzz);
+  m.def("Mutate", &Mutate);
   m.def("_trace_branch", &_trace_branch);
   m.def("_trace_cmp", &_trace_cmp, py::return_value_policy::move);
-  m.def("_reserve_counters", &_reserve_counters);
+  m.def("_reserve_counter", &_reserve_counter);
   m.def("_trace_regex_match", &_trace_regex_match);
 
   py::class_<FuzzedDataProvider>(m, "FuzzedDataProvider")

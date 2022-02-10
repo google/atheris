@@ -55,7 +55,7 @@ class CustomMutatorTests(unittest.TestCase):
   def testCompressedData(self):
     fuzz_test_lib.run_fuzztest(
         compressed_data,
-        custom_mutator=compressed_mutator,
+        setup_kwargs={"custom_mutator": compressed_mutator},
         expected_output=b"Boom")
 
   # copybara:strip_begin(internal)
@@ -64,12 +64,18 @@ class CustomMutatorTests(unittest.TestCase):
     # function is linked but the custom mutator is not set. This cannot happen
     # in the OSS version as the visibility of LLVMFuzzerCustomMutator is managed
     # at runtime using dlopenflags.
+    try:
+      import google3
+    except ImportError:
+      return
+
     fuzz_test_lib.run_fuzztest(
         compressed_data,
-        custom_mutator=None,
+        setup_kwargs={"custom_mutator": None},
         expected_output=b"You must set a custom mutator")
 
   # copybara:strip_end
+
 
 if __name__ == "__main__":
   unittest.main()
