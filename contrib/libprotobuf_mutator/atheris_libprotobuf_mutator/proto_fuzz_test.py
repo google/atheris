@@ -1,9 +1,9 @@
 import unittest
 
 import atheris
-from atheris.contrib.libprotobuf_mutator import atheris_libprotobuf_mutator
-from atheris.src import fuzz_test_lib
-from google3.google.protobuf import wrappers_pb2
+import atheris_libprotobuf_mutator
+from atheris import fuzz_test_lib
+from google.protobuf import wrappers_pb2
 
 
 @atheris.instrument_func

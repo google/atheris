@@ -19,7 +19,6 @@ import zlib
 
 import atheris
 
-sys.path.append(os.path.dirname(__file__))  # copybara:strip(internal)
 import fuzz_test_lib
 
 

@@ -19,7 +19,6 @@ import zlib
 
 import atheris
 
-sys.path.append(os.path.dirname(__file__))  # copybara:strip(internal)
 import fuzz_test_lib
 
 
@@ -59,26 +58,6 @@ class CustomCrossoverTests(unittest.TestCase):
             "custom_crossover": noop_crossover
         },
         expected_output=b"Hello from crossover")
-
-  # copybara:strip_begin(internal)
-  def testWithoutCrossover(self):
-    # This test only makes sense for Google3 when the LLVMFuzzerCustomCrossOver
-    # function is linked but the custom crossover is not set. This cannot happen
-    # in the OSS version as the visibility of LLVMFuzzerCustomCrossOver is
-    # managed at runtime using dlopenflags.
-    try:
-      import google3
-    except ImportError:
-      return
-
-    fuzz_test_lib.run_fuzztest(
-        bytes_comparison,
-        setup_kwargs={
-            "custom_crossover": None
-        },
-        expected_output=b"You must set a custom crossover")
-
-  # copybara:strip_end
 
 
 if __name__ == "__main__":

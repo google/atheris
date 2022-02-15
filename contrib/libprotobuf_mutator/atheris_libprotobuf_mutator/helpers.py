@@ -17,19 +17,13 @@ from typing import Any, Callable, List, Text
 
 import atheris
 
-# copybara:strip_begin
-# Use google3 imports internally.
-from atheris.contrib.libprotobuf_mutator import _mutator
-from google3.net.proto2.python.public import message
-# copybara:strip_end_and_replace_begin
-#from . import _mutator
-#from google.protobuf import message
-# copybara:replace_end
+from . import _mutator
+from google.protobuf import message
 
 
 def Setup(argv: List[Text],
-          test_one_proto_input: Callable[[message.Message], Any],
-          proto: Callable[..., message.Message],
+          test_one_proto_input: Callable[[Any], Any],
+          proto: Callable[..., Any],
           use_binary=False,
           **kwargs):
   """Wrapper for atheris.Setup() for fuzzing functions that take protos as input.
@@ -44,6 +38,8 @@ def Setup(argv: List[Text],
     proto: the type of protobuf object taken by test_one_proto_input().
     use_binary: whether to use binary or text protos.
     **kwargs: additional arguments to pass to atheris.Setup().
+  Returns:
+    argv with any arguments consumed by Atheris removed.
   """
 
   def _CustomMutator(data: bytes, max_size: int, seed: int):
@@ -73,7 +69,7 @@ def Setup(argv: List[Text],
     if msg:
       test_one_proto_input(msg)
 
-  atheris.Setup(
+  return atheris.Setup(
       argv,
       TestOneProtoInputImpl,
       custom_mutator=_CustomMutator,

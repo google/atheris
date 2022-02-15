@@ -22,7 +22,6 @@ import functools
 
 import atheris
 
-sys.path.append(os.path.dirname(__file__))  # copybara:strip(internal)
 import fuzz_test_lib
 
 
@@ -194,27 +193,6 @@ class IntegrationTests(unittest.TestCase):
       fuzz_test_lib.run_fuzztest(compressed_data)
     except TimeoutError:  # Expected to timeout without a custom mutator.
       pass
-
-  # copybara:strip_begin(internal)
-  def testCustomMutatorWithoutBuildDep(self):
-    # This test only makes sense for Google3, as the LLVMFuzzerCustomMutator
-    # in this test is not linked while a mutator is set. That cannot happen in
-    # the OSS version.
-    try:
-      import google3
-    except ImportError:
-      return  # Skip test if this is an OSS execution.
-
-    def fake_custom_mutator(data, max_size, seed):
-      del max_size, seed
-      return data
-
-    fuzz_test_lib.run_fuzztest(
-        compressed_data,
-        setup_kwargs={"custom_mutator": fake_custom_mutator},
-        expected_output=b"Add //third_party/py/atheris:custom_mutator")
-
-  # copybara:strip_end
 
   def testReserveCounterAfterFuzzStart(self):
     fuzz_test_lib.run_fuzztest(

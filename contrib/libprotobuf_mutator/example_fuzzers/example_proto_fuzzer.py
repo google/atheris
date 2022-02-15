@@ -16,14 +16,8 @@
 import atheris
 import sys
 
-# copybara:strip_begin
-# Use google3 imports internally.
-from google3.google.protobuf import wrappers_pb2
-from atheris.contrib.libprotobuf_mutator import atheris_libprotobuf_mutator
-# copybara:strip_end_and_replace_begin
-#import atheris_libprotobuf_mutator
-#from google.protobuf import wrappers_pb2
-# copybara:replace_end
+import atheris_libprotobuf_mutator
+from google.protobuf import wrappers_pb2
 
 
 @atheris.instrument_func

@@ -19,7 +19,6 @@ import zlib
 
 import atheris
 
-sys.path.append(os.path.dirname(__file__))  # copybara:strip(internal)
 import fuzz_test_lib
 
 
@@ -57,24 +56,6 @@ class CustomMutatorTests(unittest.TestCase):
         compressed_data,
         setup_kwargs={"custom_mutator": compressed_mutator},
         expected_output=b"Boom")
-
-  # copybara:strip_begin(internal)
-  def testWithoutMutator(self):
-    # This test only makes sense for Google3 when the LLVMFuzzerCustomMutator
-    # function is linked but the custom mutator is not set. This cannot happen
-    # in the OSS version as the visibility of LLVMFuzzerCustomMutator is managed
-    # at runtime using dlopenflags.
-    try:
-      import google3
-    except ImportError:
-      return
-
-    fuzz_test_lib.run_fuzztest(
-        compressed_data,
-        setup_kwargs={"custom_mutator": None},
-        expected_output=b"You must set a custom mutator")
-
-  # copybara:strip_end
 
 
 if __name__ == "__main__":
