@@ -56,10 +56,10 @@ class BuildExtCommand(setuptools.command.build_ext.build_ext):
 
 setup(
     name="atheris_libprotobuf_mutator",
-    version="0.1.0",
-    author="fuzzing@google.com",
-    author_email="fuzzing@google.com",
-    url="https://github.com/google/libprotobuf-mutator/",
+    version="0.1.2",
+    author="atheris@google.com",
+    author_email="atheris@google.com",
+    url="https://github.com/google/atheris/",
     description="libprotobuf-mutator bindings for Python using Atheris.",
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
