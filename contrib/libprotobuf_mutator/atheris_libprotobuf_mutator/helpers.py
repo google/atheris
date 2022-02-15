@@ -18,7 +18,6 @@ from typing import Any, Callable, List, Text
 import atheris
 
 from . import _mutator
-from google.protobuf import message
 
 
 def Setup(argv: List[Text],
