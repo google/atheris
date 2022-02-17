@@ -33,6 +33,10 @@
 #define sighandler_t sig_t
 #endif  // __APPLE__
 
+#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+
 #define NO_SANITIZE NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 
 #endif  // ATHERIS_MACROS_H_
