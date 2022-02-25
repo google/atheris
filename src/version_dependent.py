@@ -12,9 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module manages the different aspects of bytecode instrumentation that depend on specific python versions:
+"""This module manages the version specific aspects of bytecode instrumentation.
 
+Accross Python versions there are variations in:
     - Instructions
+    - Instruction arguments
     - Shape of a code object
     - Construction of the lnotab
 
@@ -23,6 +25,7 @@ Currently supported python versions are:
     - 3.7
     - 3.8
     - 3.9
+    - 3.10
 """
 
 import sys
@@ -30,9 +33,11 @@ import types
 
 PYTHON_VERSION = sys.version_info[:2]
 
-if PYTHON_VERSION < (3, 6) or PYTHON_VERSION > (3, 9):
+if PYTHON_VERSION < (3, 6) or PYTHON_VERSION > (3, 10):
   raise RuntimeError(
-      f"You are fuzzing on an unsupported python version: {PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.9 are supported by atheris 2.0. Use atheris 1.0 for older python versions."
+      "You are fuzzing on an unsupported python version: " +
+      f"{PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.10 are " +
+      "supported by atheris 2.0. Use atheris 1.0 for older python versions."
   )
 
 ### Instruction categories ###
@@ -125,16 +130,35 @@ else:
                           code_obj.co_freevars, code_obj.co_cellvars)
 
 
+### Python 3.10 uses instruction (2 byte) offsets rather than byte offsets ###
+
+if PYTHON_VERSION >= (3, 10):
+
+  def jump_arg_bytes(arg: int) -> int:
+    return arg * 2
+
+  def add_bytes_to_jump_arg(arg: int, size: int) -> int:
+    return arg + size // 2
+else:
+
+  def jump_arg_bytes(arg: int) -> int:
+    return arg
+
+  def add_bytes_to_jump_arg(arg: int, size: int) -> int:
+    return arg + size
+
+
 ### Lnotab handling ###
 
-if (3, 6) <= PYTHON_VERSION <= (3, 9):
+if (3, 6) <= PYTHON_VERSION <= (3, 10):
 
   def get_lnotab(code, listing):
+    """Returns line number table."""
     lnotab = []
     current_lineno = listing[0].lineno
     i = 0
 
-    assert (listing[0].lineno >= code.co_firstlineno)
+    assert listing[0].lineno >= code.co_firstlineno
 
     if listing[0].lineno > code.co_firstlineno:
       delta_lineno = listing[0].lineno - code.co_firstlineno
@@ -155,7 +179,7 @@ if (3, 6) <= PYTHON_VERSION <= (3, 9):
       if i >= len(listing):
         break
 
-      assert (delta_bc > 0)
+      assert delta_bc > 0
 
       delta_lineno = listing[i].lineno - current_lineno
 

@@ -22,15 +22,18 @@ import dis
 import gc
 import sys
 import types
-from typing import List, Callable, Any, TypeVar, Tuple, Union, Iterator, Optional
+from typing import Any, Callable, Iterator, List, Optional, Tuple, TypeVar, Union
+
 from . import utils
 from .native import _reserve_counter  # type: ignore[import]
+from .version_dependent import add_bytes_to_jump_arg
 from .version_dependent import CONDITIONAL_JUMPS
 from .version_dependent import ENDS_FUNCTION
 from .version_dependent import get_code_object
 from .version_dependent import get_lnotab
 from .version_dependent import HAVE_ABS_REFERENCE
 from .version_dependent import HAVE_REL_REFERENCE
+from .version_dependent import jump_arg_bytes
 from .version_dependent import REVERSE_CMP_OP
 from .version_dependent import UNCONDITIONAL_JUMPS
 
@@ -40,6 +43,7 @@ _COMPARE_FUNCTION = "_trace_cmp"
 
 # TODO(b/207008147): Use NewType to differentiate the many int and str types.
 
+
 class Instruction:
   """A single bytecode instruction after every EXTENDED_ARG has been resolved.
 
@@ -47,6 +51,22 @@ class Instruction:
 
   Sometimes the Python-Interpreter pads instructions with 'EXTENDED_ARG 0'
   so instructions must have a minimum size.
+
+  Attributes:
+    lineno:
+      Line number in the original source code.
+    offset:
+      Offset of an instruction in bytes.
+    opcode:
+      Integer identifier of the bytecode operation.
+    mnemonic:
+      Human readable name of the opcode.
+    arg:
+      Optional (default 0) argument to the instruction. This may index into
+      CodeType.co_consts or it may be the address for jump instructions.
+    reference:
+      For jump instructions, the absolute address in bytes of the target. For
+      other instructions, None.
   """
 
   @classmethod
@@ -68,15 +88,20 @@ class Instruction:
 
     if self.mnemonic in HAVE_REL_REFERENCE:
       self._is_relative: Optional[bool] = True
-      self.reference: Optional[int] = self.offset + self.get_size() + self.arg
+      self.reference: Optional[int] = self.offset + self.get_size(
+      ) + jump_arg_bytes(self.arg)
     elif self.mnemonic in HAVE_ABS_REFERENCE:
       self._is_relative = False
-      self.reference = self.arg
+      self.reference = jump_arg_bytes(self.arg)
     else:
       self._is_relative = None
       self.reference = None
 
     self.check_state()
+
+  def __repr__(self) -> str:
+    return (f"{self.mnemonic}(arg={self.arg} offset={self.offset} " +
+            f"reference={self.reference} getsize={self.get_size()})")
 
   def has_argument(self) -> bool:
     return self.opcode >= dis.HAVE_ARGUMENT
@@ -140,7 +165,7 @@ class Instruction:
     Args:
       changed_offset: The offset where instructions are inserted.
       size: The number of bytes of instructions inserted.
-      keep_ref: if True, adjsust our reference.
+      keep_ref: if True, adjust our reference.
     """
     old_offset = self.offset
     old_reference = self.reference
@@ -164,21 +189,23 @@ class Instruction:
 
       if self._is_relative:
         if old_offset < changed_offset <= old_reference:
-          self.arg += size
+          self.arg = add_bytes_to_jump_arg(self.arg, size)
       else:
         if changed_offset <= old_reference:
-          self.arg += size
+          self.arg = add_bytes_to_jump_arg(self.arg, size)
 
   def check_state(self) -> None:
+    """Asserts that internal state is consistent."""
     assert self.mnemonic != "EXTENDED_ARG"
     assert 0 <= self.arg <= 0x7fffffff
     assert 0 <= self.opcode < 256
 
     if self.reference is not None:
       if self._is_relative:
-        assert self.offset + self.get_size() + self.arg == self.reference
+        assert self.offset + self.get_size() + jump_arg_bytes(
+            self.arg) == self.reference
       else:
-        assert self.arg == self.reference
+        assert jump_arg_bytes(self.arg) == self.reference
 
   def is_jump(self) -> bool:
     return self.mnemonic in CONDITIONAL_JUMPS or self.mnemonic in UNCONDITIONAL_JUMPS
@@ -205,8 +232,7 @@ class BasicBlock:
       self.edges = []
     elif last_instr.mnemonic in CONDITIONAL_JUMPS:
       self.edges = list(
-          set([last_instr.reference,
-               last_instr.offset + last_instr.get_size()]))
+          {last_instr.reference, last_instr.offset + last_instr.get_size()})
     else:
       if last_instr.reference is not None:
         self.edges = [last_instr.reference]
@@ -217,7 +243,8 @@ class BasicBlock:
     return iter(self.instructions)
 
   def __repr__(self) -> str:
-    return f"BasicBlock(id={self.id}, edges={self.edges})"
+    return (f"BasicBlock(id={self.id}, edges={self.edges}, " +
+            f"instructions={self.instructions})")
 
 
 _SizeAndInstructions = Tuple[int, List[Instruction]]
@@ -331,7 +358,8 @@ class Instrumentor:
       seen_ids.add(basic_block.id)
 
       for edge in basic_block.edges:
-        assert edge in self._cfg
+        assert edge in self._cfg, (
+            f"{basic_block} has an edge, {edge}, not in CFG {self._cfg}.")
 
     listing = self._get_linear_instruction_listing()
     i = 0
@@ -702,8 +730,8 @@ def patch_code(code: types.CodeType,
   Args:
     code: The byte code to instrument.
     trace_dataflow: Whether to trace dataflow or not.
-    nested: If False, reserve counters, and patch modules. Recursive
-      calls to this function are considered nested.
+    nested: If False, reserve counters, and patch modules. Recursive calls to
+      this function are considered nested.
   """
   inst = Instrumentor(code)
 
@@ -725,8 +753,7 @@ def patch_code(code: types.CodeType,
           (not nested and inst.consts[i].co_name == "<module>") or
           inst.consts[i].co_name[0] != "<" or
           inst.consts[i].co_name[-1] != ">"):
-        inst.consts[i] = patch_code(
-            inst.consts[i], trace_dataflow, nested=True)
+        inst.consts[i] = patch_code(inst.consts[i], trace_dataflow, nested=True)
 
   return inst.to_code()
 
