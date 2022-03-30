@@ -94,11 +94,9 @@ void TraceCompareUnicode(PyObject* left, PyObject* right, void* pc) {
 }
 
 NO_SANITIZE
-void TraceRegexMatch(py::handle generated_match, py::handle re_obj) {
-  PyUnicode_READY(generated_match.ptr());
-  py::bytes utf8 = UnicodeToUtf8(generated_match.ptr());
-  const char* generated = PyBytes_AsString(utf8.ptr());
-  const uint64_t size = PyBytes_Size(utf8.ptr());
+void TraceRegexMatch(const std::string generated_match, py::handle re_obj) {
+  const char* generated = generated_match.data();
+  const uint64_t size = generated_match.size();
   // Libfuzzer doesn't _really_ care about the program counter location so we'll
   // give one based on the regex pattern hash.
   const ssize_t fake_pc = py::hash(re_obj.ptr());

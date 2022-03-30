@@ -62,7 +62,7 @@ py::handle _trace_cmp(py::handle left, py::handle right, int opid, uint64_t idx,
 }
 
 NO_SANITIZE
-void _trace_regex_match(py::handle pattern_match, py::handle object) {}
+void _trace_regex_match(std::string pattern_match, py::handle object) {}
 
 
 int global_counter = 0;

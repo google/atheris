@@ -16,7 +16,7 @@
 import re
 import sre_parse
 import sys
-from typing import Set, Any, Pattern, List, Match, Optional, Iterator
+from typing import Set, Any, Pattern, List, Match, Optional, Iterator, Union, TypeVar, Callable, AnyStr
 
 # mypy does not like the implicit rexport of the constants available in
 # sre_parse, and also does not support ignoring for blocks of code. Rather
@@ -33,23 +33,45 @@ _NEGATE = sre_parse.NEGATE  # type: ignore[attr-defined]
 _SUBPATTERN = sre_parse.SUBPATTERN  # type: ignore[attr-defined]
 
 
-def gen_match(ops: Any) -> str:
+def to_correct_type(to_convert: Union[str, bytes],
+                    return_type: Callable[[], AnyStr]) -> AnyStr:
+  if return_type != str and return_type != bytes:
+    raise TypeError("Expected `return_type` to be str or bytes, got {}" %
+                    return_type)
+  if (isinstance(to_convert, bytes) and
+      return_type == bytes) or (isinstance(to_convert, str) and
+                                return_type == str):
+    return to_convert
+  elif isinstance(to_convert, bytes):
+    return str(to_convert)
+  else:
+    return bytes(to_convert, "utf-8")
+
+
+def gen_match_recursive(ops: Any,
+                        return_type: Callable[[], AnyStr] = str) -> AnyStr:
   """Returns a matching string given a regex expression."""
   # TODO(cffsmith): This generator is *not* feature complete.
 
   available_characters = set([chr(x) for x in range(0x20, 0x7e)] + ["\t", "\n"])
 
-  literals = ""
+  literals = return_type()
 
   for tup in ops:
     if tup[0] == _LITERAL:
-      if tup[1] > 128:
-        sys.stderr.write("Encountered non-ASCII char\n")
-      literals += chr(tup[1])  # pytype: disable=wrong-arg-types
+      val = tup[1]
+      if return_type == str:
+        literals += chr(val)
+      elif return_type == bytes:
+        # Endianess does not matter because there's just a single byte.
+        literals += val.to_bytes(1, 'big')
+      else:
+        raise TypeError(
+            f"Expected return_type to be `str` or `bytes`, got {return_type}")
 
     elif tup[0] == _BRANCH:
       # just generate the first branch
-      literals += gen_match(tup[1][1][0])
+      literals += gen_match_recursive(tup[1][1][0], return_type)
 
     elif tup[0] == _NEGATE:
       sys.stderr.write("WARNING: We did not expect a NEGATE op here; is " +
@@ -61,7 +83,7 @@ def gen_match(ops: Any) -> str:
       negated = tup[1][0][0] == _NEGATE
       # Take the first one that is actually in the class
       if not negated:
-        literals += gen_match([tup[1][0]])
+        literals += gen_match_recursive([tup[1][0]], return_type)
       else:
         char_set = set()
         # grab all literals from this class
@@ -76,18 +98,18 @@ def gen_match(ops: Any) -> str:
           sys.stderr.write("WARNING: This character set does not seem to " +
                            "allow any characters, cannot instrument RegEx!\n")
         else:
-          literals += list(allowed)[0]
+          literals += to_correct_type(list(allowed)[0], return_type)
 
     elif tup[0] == _SUBPATTERN:
-      literals += gen_match(tup[1][3])
+      literals += gen_match_recursive(tup[1][3], return_type)
 
     elif tup[0] == _MAX_REPEAT:
       # The minimum amount of repetitions we need to fulfill the pattern
       minimum = tup[1][0]
-      literals += gen_match(tup[1][2]) * minimum
+      literals += gen_match_recursive(tup[1][2], return_type) * minimum
 
     elif tup[0] == _ASSERT or tup[0] == _ASSERT_NOT:
-      literals += gen_match(tup[1][1])
+      literals += gen_match_recursive(tup[1][1], return_type)
 
     elif tup[0] == _CATEGORY:
       sys.stderr.write("WARNING: Currently not handling RegEx categories, " +
@@ -100,34 +122,26 @@ def gen_match(ops: Any) -> str:
   return literals
 
 
+def gen_match(pattern: AnyStr) -> AnyStr:
+  pat = sre_parse.parse(pattern)
+  return gen_match_recursive(pat, type(pattern))
+
+
 def hook_re_module() -> None:
   """Adds Atheris instrumentation hooks to the `re` module."""
   pattern_gen_map = {}
 
   original_compile_func = re._compile  # type: ignore[attr-defined]
 
-  def _compile_hook(pattern: str, flags: int) -> "AtherisPatternProxy":
+  def _compile_hook(pattern: AnyStr, flags: int) -> "AtherisPatternProxy":
     """Overrides re._compile."""
 
-    generated = ""
+    generated: AnyStr
     if pattern not in pattern_gen_map:
-      pat = sre_parse.parse(pattern)
-      generated = gen_match(pat)
-      # Check that the pattern actually matches
-      check_pattern = pattern
+      generated = gen_match(pattern)
+
       try:
-        # Convert our pattern to a string if necessary
-        check_pattern = pattern.decode("utf-8")  # type: ignore
-      except AttributeError:
-        # Already a string
-        pass
-      except Exception as e:  # pylint: disable=broad-except
-        # Not sure what went wrong.
-        sys.stderr.write(f"Could not convert the pattern {pattern} to a " +
-                         f"utf-8 string: {e}\n")
-      try:
-        if original_compile_func(check_pattern,
-                                 flags).search(generated) is None:
+        if original_compile_func(pattern, flags).search(generated) is None:
           sys.stderr.write(f"ERROR: generated match '{generated}' did not " +
                            "match the RegEx pattern '{_pattern}'!\n")
       except Exception as e:  # pylint: disable=broad-except

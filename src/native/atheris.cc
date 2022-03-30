@@ -89,7 +89,7 @@ py::handle prefuzz_trace_cmp(py::handle left, py::handle right, int opid,
 }
 
 NO_SANITIZE
-void prefuzz_trace_regex_match(py::handle pattern_match, py::handle object) {}
+void prefuzz_trace_regex_match(std::string pattern_match, py::handle object) {}
 
 NO_SANITIZE
 std::vector<std::string> Setup(

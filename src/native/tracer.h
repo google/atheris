@@ -29,7 +29,7 @@ PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid,
 
 // Passes `generated_match` (str) to the backend fuzzer in a way that it will be
 // emitted by the fuzzer. `re_obj` is the compiled regex object.
-void TraceRegexMatch(pybind11::handle generated_match, pybind11::handle re_obj);
+void TraceRegexMatch(std::string generated_match, pybind11::handle re_obj);
 
 }  // namespace atheris
 
