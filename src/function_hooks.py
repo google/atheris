@@ -13,6 +13,7 @@
 # limitations under the License.
 """Provides Atheris instrumentation hooks for particular functions like regex."""
 
+import random
 import re
 import sre_parse
 import sys
@@ -26,6 +27,12 @@ _ASSERT = sre_parse.ASSERT  # type: ignore[attr-defined]
 _ASSERT_NOT = sre_parse.ASSERT_NOT  # type: ignore[attr-defined]
 _BRANCH = sre_parse.BRANCH  # type: ignore[attr-defined]
 _CATEGORY = sre_parse.CATEGORY  # type: ignore[attr-defined]
+_CATEGORY_DIGIT = sre_parse.CATEGORY_DIGIT  # type: ignore[attr-defined]
+_CATEGORY_NOT_DIGIT = sre_parse.CATEGORY_NOT_DIGIT  # type: ignore[attr-defined]
+_CATEGORY_SPACE = sre_parse.CATEGORY_SPACE  # type: ignore[attr-defined]
+_CATEGORY_NOT_SPACE = sre_parse.CATEGORY_NOT_SPACE  # type: ignore[attr-defined]
+_CATEGORY_WORD = sre_parse.CATEGORY_WORD  # type: ignore[attr-defined]
+_CATEGORY_NOT_WORD = sre_parse.CATEGORY_NOT_WORD  # type: ignore[attr-defined]
 _IN = sre_parse.IN  # type: ignore[attr-defined]
 _LITERAL = sre_parse.LITERAL  # type: ignore[attr-defined]
 _MAX_REPEAT = sre_parse.MAX_REPEAT  # type: ignore[attr-defined]
@@ -116,8 +123,28 @@ def gen_match_recursive(ops: Any,
       literals += gen_match_recursive(tup[1][1], return_type)
 
     elif tup[0] == _CATEGORY:
-      sys.stderr.write("WARNING: Currently not handling RegEx categories, " +
-                       "cannot instrument RegEx!\n")
+      # For how each of these is encoded, see
+      # https://github.com/python/cpython/blob/main/Lib/sre_parse.py#L42
+      category = tup[1]
+      # start with a string, we'll do the type conversion later.
+      ch = ""
+      if category == _CATEGORY_DIGIT:
+        ch = "0"
+      if category == _CATEGORY_NOT_DIGIT:
+        ch = "a"
+      elif category == _CATEGORY_SPACE:
+        ch = " "
+      elif category == _CATEGORY_NOT_SPACE:
+        ch = "a"
+      elif category == _CATEGORY_WORD:
+        ch = "a"
+      elif category == _CATEGORY_NOT_WORD:
+        ch = " "
+      else:
+        sys.stderr.write("WARNING: Unsupported RegEx category, " +
+                         "cannot instrument RegEx!\n")
+
+      literals += to_correct_type(ch, return_type)
 
     else:
       sys.stderr.write(f"WARNING: Encountered non-handled RegEx op: {tup[0]}" +

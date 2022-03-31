@@ -101,13 +101,39 @@ class RegexMatchGeneration(unittest.TestCase):
     match = gen_match("•".encode("utf-8"))
     self.assertEqual(match, b"\xe2\x80\xa2")
 
+  def test_digits(self):
+    pattern = r"\d"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
+  def test_not_digits(self):
+    pattern = r"\D"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
+  def test_word(self):
+    pattern = r"\w"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
+  def test_not_word(self):
+    pattern = r"\W"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
+  def test_space(self):
+    pattern = r"\s"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
+  def test_not_space(self):
+    pattern = r"\S"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
   # Unsupported yet:
   # def test_negative_lookbehind(self):
   #   pattern = r"t(?<!abc)u"
-  #   match = gen_match(pattern)
-  #   self.assertRegex(match, pattern)
-  # def test_digits(self):
-  #   pattern = r"\d"
   #   match = gen_match(pattern)
   #   self.assertRegex(match, pattern)
 
