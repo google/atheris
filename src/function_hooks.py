@@ -29,6 +29,7 @@ _CATEGORY = sre_parse.CATEGORY  # type: ignore[attr-defined]
 _IN = sre_parse.IN  # type: ignore[attr-defined]
 _LITERAL = sre_parse.LITERAL  # type: ignore[attr-defined]
 _MAX_REPEAT = sre_parse.MAX_REPEAT  # type: ignore[attr-defined]
+_MIN_REPEAT = sre_parse.MIN_REPEAT  # type: ignore[attr-defined]
 _NEGATE = sre_parse.NEGATE  # type: ignore[attr-defined]
 _SUBPATTERN = sre_parse.SUBPATTERN  # type: ignore[attr-defined]
 
@@ -103,8 +104,11 @@ def gen_match_recursive(ops: Any,
     elif tup[0] == _SUBPATTERN:
       literals += gen_match_recursive(tup[1][3], return_type)
 
-    elif tup[0] == _MAX_REPEAT:
-      # The minimum amount of repetitions we need to fulfill the pattern
+    elif tup[0] == _MAX_REPEAT or tup[0] == _MIN_REPEAT:
+      # The minimum amount of repetitions we need to fulfill the pattern.
+      # This refers to the distinction between `*` and `+`, not between greedy
+      # (the default) matching vs non-greedy repeat matching with `.*?`, which
+      # is represented by _MAX_REPEAT vs _MIN_REPEAT.
       minimum = tup[1][0]
       literals += gen_match_recursive(tup[1][2], return_type) * minimum
 

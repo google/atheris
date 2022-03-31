@@ -38,6 +38,26 @@ class RegexMatchGeneration(unittest.TestCase):
     match = gen_match("[abc]abc")
     self.assertIn(match, ["aabc", "babc", "cabc"])
 
+  def test_repeat_star(self):
+    pattern = "abc*d"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
+  def test_non_greedy_repeat_star(self):
+    pattern = "abc*?d"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
+  def test_repeat_plus(self):
+    pattern = "abc+d"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
+  def test_non_greedy_repeat_plus(self):
+    pattern = "abc+?d"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
   def test_notoneof(self):
     match = gen_match("[^abc]def")
     if len(match) != 4:
