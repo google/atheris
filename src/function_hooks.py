@@ -57,7 +57,8 @@ def to_correct_type(to_convert: Union[str, bytes],
 
 
 def gen_match_recursive(ops: Any,
-                        return_type: Callable[[], AnyStr] = str) -> AnyStr:
+                        return_type: Callable[[], AnyStr] = str,
+                        respect_lookarounds: bool = False) -> AnyStr:
   """Returns a matching string given a regex expression."""
   # TODO(cffsmith): This generator is *not* feature complete.
 
@@ -119,8 +120,25 @@ def gen_match_recursive(ops: Any,
       minimum = tup[1][0]
       literals += gen_match_recursive(tup[1][2], return_type) * minimum
 
-    elif tup[0] == _ASSERT or tup[0] == _ASSERT_NOT:
-      literals += gen_match_recursive(tup[1][1], return_type)
+    elif tup[0] == _ASSERT_NOT:
+      sys.stderr.write(
+          "WARNING: found negative lookahead or negative lookbehind, "
+          "which are currently unsupported due to NP Completeness.")
+    elif tup[0] == _ASSERT:
+      if not respect_lookarounds:
+        sys.stderr.write(
+            "WARNING: Found lookahead or lookbehind in the middle of a regex, "
+            "ignoring due to NP Completeness."
+        )
+        continue
+
+      is_lookahead = tup[1][0] > 0
+      is_beginning = ops.data.index(tup) == 0
+      is_end = ops.data.index(tup) == len(ops) - 1
+      if is_lookahead and is_end:
+        literals += gen_match_recursive(tup[1][1], return_type)
+      elif not is_lookahead and is_beginning:
+        literals = gen_match_recursive(tup[1][1], return_type) + literals
 
     elif tup[0] == _CATEGORY:
       # For how each of these is encoded, see
@@ -155,7 +173,7 @@ def gen_match_recursive(ops: Any,
 
 def gen_match(pattern: AnyStr) -> AnyStr:
   pat = sre_parse.parse(pattern)
-  return gen_match_recursive(pat, type(pattern))
+  return gen_match_recursive(pat, type(pattern), respect_lookarounds=True)
 
 
 def hook_re_module() -> None:

@@ -71,18 +71,43 @@ class RegexMatchGeneration(unittest.TestCase):
     pattern = r"(?:abc){3,}"
     match = gen_match(pattern)
     self.assertRegex(match, pattern)
-    print(match)
 
   def test_noncapturing2(self):
     pattern = r"(?:abc){,3}"
     match = gen_match(pattern)
     self.assertRegex(match, pattern)
-    print(match)
 
-  def test_lookahead(self):
-    pattern = r"y(?=abc)"
+  def test_lookahead_at_end(self):
+    pattern = r"a(?=bc)"
     match = gen_match(pattern)
     self.assertRegex(match, pattern)
+    self.assertEqual(match, "abc")
+
+  def test_lookbehind_at_beginning(self):
+    pattern = r"(?<=a)bc"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+    self.assertEqual(match, "abc")
+
+  def test_ignores_lookahead_in_middle(self):
+    pattern = r"xy(?=a)z"
+    match = gen_match(pattern)
+    self.assertEqual(match, "xyz")
+
+  def test_ignores_lookbehind_in_middle(self):
+    pattern = r"xy(?<=a)z"
+    match = gen_match(pattern)
+    self.assertEqual(match, "xyz")
+
+  def test_ignores_negative_lookahead_in_middle(self):
+    pattern = r"xy(?!z)z"
+    match = gen_match(pattern)
+    self.assertEqual(match, "xyz")
+
+  def test_ignores_negative_lookbehind_in_middle(self):
+    pattern = r"xy(?<!z)z"
+    match = gen_match(pattern)
+    self.assertEqual(match, "xyz")
 
   def test_unicode(self):
     match = gen_match("•")
@@ -130,12 +155,6 @@ class RegexMatchGeneration(unittest.TestCase):
     pattern = r"\S"
     match = gen_match(pattern)
     self.assertRegex(match, pattern)
-
-  # Unsupported yet:
-  # def test_negative_lookbehind(self):
-  #   pattern = r"t(?<!abc)u"
-  #   match = gen_match(pattern)
-  #   self.assertRegex(match, pattern)
 
 
 if __name__ == "__main__":
