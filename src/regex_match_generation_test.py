@@ -156,6 +156,11 @@ class RegexMatchGeneration(unittest.TestCase):
     match = gen_match(pattern)
     self.assertRegex(match, pattern)
 
+  def test_wildcard(self):
+    pattern = r"a.bc"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
 
 if __name__ == "__main__":
   unittest.main()

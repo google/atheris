@@ -23,6 +23,7 @@ from typing import Set, Any, Pattern, List, Match, Optional, Iterator, Union, Ty
 # sre_parse, and also does not support ignoring for blocks of code. Rather
 # than having a whole-file ignore, or interrupting every line of every statement
 # below with an ignore, we will make aliases and ignore here.
+_ANY = sre_parse.ANY  # type: ignore[attr-defined]
 _ASSERT = sre_parse.ASSERT  # type: ignore[attr-defined]
 _ASSERT_NOT = sre_parse.ASSERT_NOT  # type: ignore[attr-defined]
 _BRANCH = sre_parse.BRANCH  # type: ignore[attr-defined]
@@ -73,10 +74,13 @@ def gen_match_recursive(ops: Any,
         literals += chr(val)
       elif return_type == bytes:
         # Endianess does not matter because there's just a single byte.
-        literals += val.to_bytes(1, 'big')
+        literals += val.to_bytes(1, "big")
       else:
         raise TypeError(
             f"Expected return_type to be `str` or `bytes`, got {return_type}")
+
+    elif tup[0] == _ANY:
+      literals += "a"
 
     elif tup[0] == _BRANCH:
       # just generate the first branch
