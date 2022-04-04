@@ -161,6 +161,26 @@ class RegexMatchGeneration(unittest.TestCase):
     match = gen_match(pattern)
     self.assertRegex(match, pattern)
 
+  def test_range_with_fixed_chars(self):
+    pattern = r"[a-z1]bc"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
+  def test_range(self):
+    pattern = r"[a-z]bc"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
+  def test_negative_range(self):
+    pattern = r"[^a-z]bc"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
+  def test_negative_range_with_fixed_chars(self):
+    pattern = r"[^a-z\\]bc"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
 
 if __name__ == "__main__":
   unittest.main()

@@ -39,6 +39,7 @@ _LITERAL = sre_parse.LITERAL  # type: ignore[attr-defined]
 _MAX_REPEAT = sre_parse.MAX_REPEAT  # type: ignore[attr-defined]
 _MIN_REPEAT = sre_parse.MIN_REPEAT  # type: ignore[attr-defined]
 _NEGATE = sre_parse.NEGATE  # type: ignore[attr-defined]
+_RANGE = sre_parse.RANGE  # type: ignore[attr-defined]
 _SUBPATTERN = sre_parse.SUBPATTERN  # type: ignore[attr-defined]
 
 
@@ -91,6 +92,9 @@ def gen_match_recursive(ops: Any,
                        "there an invalid RegEx somewhere?\n")
       pass
 
+    elif tup[0] == _RANGE:
+      literals += to_correct_type(chr(tup[1][1]), return_type)
+
     elif tup[0] == _IN:
       # Check if this class is negated.
       negated = tup[1][0][0] == _NEGATE
@@ -101,11 +105,14 @@ def gen_match_recursive(ops: Any,
         char_set = set()
         # grab all literals from this class
         for t in tup[1][1:]:
-          if t[0] != _LITERAL:
+          if t[0] == _LITERAL:
+            char_set.add(chr(t[1]))
+          elif t[0] == _RANGE:
+            char_set |= set(chr(c) for c in range(t[1][0], t[1][1] + 1))
+          else:
             sys.stderr.write("WARNING: Encountered non literal in character " +
                              "class, cannot instrument RegEx!\n")
             continue
-          char_set.add(chr(t[1]))
         allowed = available_characters - char_set
         if not allowed:
           sys.stderr.write("WARNING: This character set does not seem to " +
