@@ -13,7 +13,6 @@
 # limitations under the License.
 """Provides Atheris instrumentation hooks for particular functions like regex."""
 
-import random
 import re
 import sre_parse
 import sys
