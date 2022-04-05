@@ -16,7 +16,7 @@
 import re
 import sre_parse
 import sys
-from typing import Set, Any, Pattern, List, Match, Optional, Iterator, Union, TypeVar, Callable, AnyStr
+from typing import Set, Any, Pattern, List, Match, Optional, Iterator, Union, Callable, AnyStr
 
 # mypy does not like the implicit rexport of the constants available in
 # sre_parse, and also does not support ignoring for blocks of code. Rather
