@@ -16,7 +16,7 @@
 
 from typing import List
 from .function_hooks import enabled_hooks
-from .function_hooks import gen_match_recursive
+from .function_hooks import gen_match
 from .import_hook import instrument_imports
 from .instrument_bytecode import instrument_all
 from .instrument_bytecode import instrument_func
