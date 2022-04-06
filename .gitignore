@@ -4,3 +4,13 @@ atheris.egg-info
 /.eggs
 /build
 /tmp
+bin/
+lib/
+lib64
+pyvenv.cfg
+share/
+src/__pycache__/
+src/build/
+*.spec
+timeout-*
+crash-*
