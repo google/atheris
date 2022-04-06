@@ -35,7 +35,13 @@ fi
 git_status="$(git status --porcelain --ignored)"
 if [[ ! -z "$git_status" ]]; then
   >&2 echo "Git working directory not clean - please ensure it's pristine before deploying (including any gitignored files)."
+  >&2 echo "to reproduce, run 'git status --porcelain --ignored'. Current status is:"
+  >&2 echo "$git_status"
   exit 1
+fi
+
+if [[ -z "$ATHERIS_VERSION" ]]; then
+  export ATHERIS_VERSION=$(python3 ./setup.py print_version)
 fi
 
 (
@@ -53,7 +59,7 @@ fi
 if [ "$pypi" == "pypi" ]; then
   (
     set -e -x
-    git tag -a "$(python3 ./setup.py print_version)" -m "Atheris version $(python3 ./setup.py print_version)"
+    git tag -a "${ATHERIS_VERSION?}" -m "Atheris version ${ATHERIS_VERSION?}"
   )
-  echo "Tag $(python3 ./setup.py print_version) created. Please push tag to git."
+  echo "Tag ${ATHERIS_VERSION?} created. Please push tag to git."
 fi
