@@ -188,6 +188,12 @@ class IntegrationTests(unittest.TestCase):
     fuzz_test_lib.run_fuzztest(
         never_fail, args=["-atheris_runs=3"], expected_output=b"Done 3 in ")
 
+  def testCompressedDataWithoutCustomMutator(self):
+    try:
+      fuzz_test_lib.run_fuzztest(compressed_data)
+    except TimeoutError:  # Expected to timeout without a custom mutator.
+      pass
+
   def testReserveCounterAfterFuzzStart(self):
     fuzz_test_lib.run_fuzztest(
         reserve_counter_after_fuzz_start,
