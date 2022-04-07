@@ -14,6 +14,7 @@
 
 import fcntl
 import os
+import signal
 import sys
 import time
 
@@ -116,6 +117,7 @@ def run_fuzztest(test_one_input,
     if wpid == (0, 0):
       # Process not done yet
       if time.time() > start_time + timeout:
+        os.kill(pid, signal.SIGTERM)
         raise TimeoutError("Fuzz target failed to exit within expected time.")
       time.sleep(0.1)
       continue
