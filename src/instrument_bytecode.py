@@ -176,7 +176,7 @@ class Instruction:
           self.reference += size  # type: ignore[operator]
         elif old_reference > old_offset:
           self.reference += size  # type: ignore[operator]
-          self.arg += size
+          self.arg = add_bytes_to_jump_arg(self.arg, size)
 
       return
 
