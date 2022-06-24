@@ -159,7 +159,7 @@ python3 -m coverage run your_fuzzer.py corpus_dir/* -atheris_runs=$(( 1 + $(ls c
 ```
 
 This will cause Atheris to run on each file in `<corpus-dir>`, then exit.
-Note: atheris use empty data first time even the file absences in corpus_dir.
+Note: atheris use empty data set as the first input even if there is no empty file in `<corpus_dir>`.
 Importantly, if you leave off the `-atheris_runs=$(ls corpus_dir | wc -l)`, no
 coverage report will be generated.
 
