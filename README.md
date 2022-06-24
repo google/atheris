@@ -155,10 +155,11 @@ If you'd like to examine coverage when running with your corpus, you can do
 that with the following command:
 
 ```
-python3 -m coverage run your_fuzzer.py corpus_dir/* -atheris_runs=$(ls corpus_dir | wc -l)
+python3 -m coverage run your_fuzzer.py corpus_dir/* -atheris_runs=$(( 1 + $(ls corpus_dir | wc -l) ))
 ```
 
 This will cause Atheris to run on each file in `<corpus-dir>`, then exit.
+Note: atheris use empty data first time even the file absences in corpus_dir.
 Importantly, if you leave off the `-atheris_runs=$(ls corpus_dir | wc -l)`, no
 coverage report will be generated.
 
