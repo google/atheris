@@ -195,7 +195,7 @@ def hook_re_module() -> None:
   def _compile_hook(pattern: AnyStr, flags: int) -> "AtherisPatternProxy":
     """Overrides re._compile."""
 
-    generated: AnyStr
+    generated: AnyStr  # pytype: disable=invalid-annotation  # enable-bare-annotations
     if pattern not in pattern_gen_map:
       generated = gen_match(pattern)
 
