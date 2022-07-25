@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script requires that 'python37', 'python38', 'python39', and 'python310'
+# This script requires that 'python36', 'python37', 'python38', and 'python39'
 # be present on the path, and that $CLANG_BIN be set to the location of a
 # built-from-source Clang.
 
@@ -31,7 +31,7 @@ export CC="${CLANG_BIN}"
 export CXX="${CLANG_BIN}++"
 
 
+python36 setup.py bdist_wheel -d ./dist
 python37 setup.py bdist_wheel -d ./dist
 python38 setup.py bdist_wheel -d ./dist
 python39 setup.py bdist_wheel -d ./dist
-python310 setup.py bdist_wheel -d ./dist
