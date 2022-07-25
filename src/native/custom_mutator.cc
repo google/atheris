@@ -21,6 +21,7 @@
 #include <stdint.h>
 
 #include <functional>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 
