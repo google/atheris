@@ -24,7 +24,7 @@ if [[ "$uname" == "Darwin" ]]; then
 elif [[ "$uname" == "Linux" ]]; then
   machine="$(uname -m)"
   if [[ "$machine" == "x86_64" ]]; then
-    libpath="lib/linux/libclang_rt.fuzzer_no_main-x86_64.a"
+    libpath="lib/x86_64-unknown-linux-gnu/libclang_rt.fuzzer_no_main.a"
   elif [[ "$machine" == "i386" ]]; then
     libpath="lib/linux/libclang_rt.fuzzer_no_main-i386.a"
   elif [[ "$machine" == "i686" ]]; then

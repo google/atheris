@@ -276,22 +276,22 @@ class BuildExt(build_ext):
       sys.stderr.write("\n")
 
     # Deploy versions of ASan and UBSan that have been merged with libFuzzer
-    asan_name = orig_libfuzzer.replace(".fuzzer_no_main-", ".asan-")
+    asan_name = orig_libfuzzer.replace(".fuzzer_no_main", ".asan")
     merged_asan_name = "asan_with_fuzzer.so"
     self.merge_deploy_libfuzzer_sanitizer(
         libfuzzer, asan_name, merged_asan_name,
         "asan_preinit.cc.o asan_preinit.cpp.o")
 
-    ubsan_name = orig_libfuzzer.replace(".fuzzer_no_main-",
-                                        ".ubsan_standalone-")
+    ubsan_name = orig_libfuzzer.replace(".fuzzer_no_main",
+                                        ".ubsan_standalone")
     merged_ubsan_name = "ubsan_with_fuzzer.so"
     self.merge_deploy_libfuzzer_sanitizer(
         libfuzzer, ubsan_name, merged_ubsan_name,
         "ubsan_init_standalone_preinit.cc.o ubsan_init_standalone_preinit.cpp.o"
     )
 
-    ubsanxx_name = orig_libfuzzer.replace(".fuzzer_no_main-",
-                                          ".ubsan_standalone_cxx-")
+    ubsanxx_name = orig_libfuzzer.replace(".fuzzer_no_main",
+                                          ".ubsan_standalone_cxx")
     merged_ubsanxx_name = "ubsan_cxx_with_fuzzer.so"
     self.merge_deploy_libfuzzer_sanitizer(
         libfuzzer, ubsanxx_name, merged_ubsanxx_name,
