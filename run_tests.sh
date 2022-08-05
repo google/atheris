@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Make sure we propegate exit codes, for kokoro.
+set -e
+
 if [[ "$(python3 -m venv 2>&1)" =~ "No module named venv" ]]; then
   echo "Virtualenv not installed. This script requires virtual env, please install it."
   exit 1;
