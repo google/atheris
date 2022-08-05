@@ -64,6 +64,11 @@ USER_SPECIFIED_PYPI="$1"
     deployment/build_wheels.sh
   fi
 
+  TEST_OUTPUT="$(./run_tests.sh 2>&1)"
+  if [ "$(echo "${TEST_OUTPUT?}" | tail -n1)" != "OK" ]; then
+    echo "tests failed :(. exiting"
+    exit 1
+  fi
   # Validate args - dev or prod
   if [ -z "${USER_SPECIFIED_PYPI}" ]; then
     # Take hash after building so that we can verify nothing has changed later on.
