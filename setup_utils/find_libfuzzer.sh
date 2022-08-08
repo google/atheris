@@ -24,11 +24,11 @@ if [[ "$uname" == "Darwin" ]]; then
 elif [[ "$uname" == "Linux" ]]; then
   machine="$(uname -m)"
   if [[ "$machine" == "x86_64" ]]; then
-    libpath="lib/x86_64-unknown-linux-gnu/libclang_rt.fuzzer_no_main.a"
+    libpath="lib/linux/libclang_rt.fuzzer_no_main-x86_64.a"
   elif [[ "$machine" == "i386" ]]; then
-    libpath="lib/i386-unknown-linux-gnu/libclang_rt.fuzzer_no_main.a"
+    libpath="lib/linux/libclang_rt.fuzzer_no_main-i386.a"
   elif [[ "$machine" == "i686" ]]; then
-    libpath="lib/i686-unknown-linux-gnu/libclang_rt.fuzzer_no_main.a"
+    libpath="lib/linux/libclang_rt.fuzzer_no_main-i386.a"
   else
     >&2 echo "Failed to identify platform machine (got $machine); set \$LIBFUZZER_LIB to point directly to your libfuzzer .a file."
   fi
