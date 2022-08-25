@@ -32,12 +32,11 @@ if len(sys.argv) > 1 and sys.argv[1] == "print_version":
   quit()
 
 clang_install_instructions = """download and build the latest version of Clang:
-    git clone https://github.com/llvm/llvm-project.git
+    git clone --depth=1 https://github.com/llvm/llvm-project.git
     cd llvm-project
-    mkdir build
-    cd build
-    cmake -DLLVM_ENABLE_PROJECTS='clang;compiler-rt' -G "Unix Makefiles" ../llvm
-    make -j 100  # This step is very slow
+    cmake -DLLVM_ENABLE_PROJECTS='clang;compiler-rt' -G "Unix Makefiles" -S llvm -B build
+    NPROC=$(sysctl -n hw.logicalcpu 2>/dev/null || nproc)
+    cmake --build build --parallel $NPROC # This step is very slow.
 Then, set $CLANG_BIN="$(pwd)/bin/clang" and run pip again.
 You should use this same Clang for building any Python extensions you plan to fuzz.
 """
