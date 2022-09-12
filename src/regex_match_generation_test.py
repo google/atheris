@@ -13,8 +13,6 @@
 # limitations under the License.
 """Tests for RegEx match generation."""
 
-import re
-import sre_parse
 import unittest
 from atheris import gen_match
 
