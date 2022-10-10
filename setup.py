@@ -281,8 +281,7 @@ class BuildExt(build_ext):
         libfuzzer, asan_name, merged_asan_name,
         "asan_preinit.cc.o asan_preinit.cpp.o")
 
-    ubsan_name = orig_libfuzzer.replace(".fuzzer_no_main",
-                                        ".ubsan_standalone")
+    ubsan_name = orig_libfuzzer.replace(".fuzzer_no_main", ".ubsan_standalone")
     merged_ubsan_name = "ubsan_with_fuzzer.so"
     self.merge_deploy_libfuzzer_sanitizer(
         libfuzzer, ubsan_name, merged_ubsan_name,

@@ -310,9 +310,9 @@ class Instrumentor:
       elif arg is not None:
         assert offset is not None
         combined_arg = 0
-        # https://bugs.python.org/issue45757 can cause instruction.arg to be None
+        # https://bugs.python.org/issue45757 can cause .arg to be None
         if instruction.arg is not None:
-          combined_arg = (arg << 8) | instruction.arg # type: ignore[operator]
+          combined_arg = (arg << 8) | instruction.arg  # type: ignore[operator]
         instr_list.append(
             Instruction(
                 lineno,
