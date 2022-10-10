@@ -27,7 +27,8 @@ RUN set -e -x -v; \
 
 RUN set -e -x -v; \
 	cd /root/llvm-project; \
-	cmake -S llvm -B build -G "Unix Makefiles" -DLLVM_ENABLE_PROJECTS="clang;compiler-rt";
+	git checkout 0982db188b661d6744b06244fda64d43dd80206e; \
+	cmake -S llvm -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_PROJECTS="clang;compiler-rt";
 RUN set -e -x -v; \
 	cd /root/llvm-project/build; \
 	make compiler-rt;
