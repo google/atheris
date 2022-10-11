@@ -38,6 +38,9 @@ cd "${DIR}/../"
   set -e -x
   rm -rf dist/
   rm -rf atheris.egg-info/
+  rm -rf .eggs/
+  rm -rf build/
+  rm -rf tmp/
 )
 
 # Verify that we're pushing a valid git state
