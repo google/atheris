@@ -25,7 +25,7 @@ function download_from_test_pypi() {
   OLD_DIR="$(pwd)"
   python3 -m pip download --index-url 'https://test.pypi.org/simple/' --no-binary=:all: atheris -d "${TMP_DIR?}" 1>/dev/null
   cd "${TMP_DIR}"
-  tar vxf $(ls *.tar*)
+  tar vxf $(ls *.tar*) >/dev/null
   UNPACKED_DIR="$(ls *.tar* | sed s/\\.tar.*//)"
   echo "${PWD?}/${UNPACKED_DIR?}"
   cd "${OLD_DIR}"
