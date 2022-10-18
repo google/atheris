@@ -218,6 +218,107 @@ def cpp_flag(compiler):
   raise RuntimeError("Unsupported compiler -- at least C++11 support "
                      "is needed!")
 
+# This is the warning configuration used in Google - the same configuration is
+# used here to ensure that Atheris builds as similarly as possible same inside
+# and outside.
+# The commented-out lines are not supported by gcc.
+warning_copts = [
+  "-Wall",
+  "-Werror",
+  "-Wformat-security",
+  "-fdiagnostics-show-option",
+  "-fmessage-length=0",
+  #"-fbracket-depth=768",
+  "-fno-strict-aliasing",
+  "-fmerge-all-constants",
+  #"-flax-vector-conversions=all",
+  "-funsigned-char",
+  #"-ffile-reproducible",
+  "-Wno-unused-command-line-argument",
+  #"-fcolor-diagnostics",
+  "-Wno-address-of-packed-member",
+  "-Wno-align-mismatch",
+  "-Wno-bitwise-instead-of-logical",
+  "-Wno-comment",
+  "-Wno-defaulted-function-deleted",
+  "-Wno-deprecated-non-prototype",
+  "-Wno-enum-compare-switch",
+  "-Wno-enum-constexpr-conversion",
+  "-Wno-expansion-to-defined",
+  "-Wno-ignored-attributes",
+  "-Wno-ignored-qualifiers",
+  #"-Wno-implicit-int",
+  "-Wno-inconsistent-missing-override",
+  #"-Wno-int-conversion",
+  "-Wno-misleading-indentation",
+  "-Wno-potentially-evaluated-expression",
+  "-Wno-psabi",
+  "-Wno-range-loop-analysis",
+  "-Wno-return-std-move",
+  #"-Wno-strict-prototypes",
+  "-Wno-string-concatenation",
+  "-Wno-tautological-type-limit-compare",
+  "-Wno-tautological-undefined-compare",
+  "-Wno-tautological-unsigned-zero-compare",
+  "-Wno-tautological-unsigned-enum-zero-compare",
+  "-Wno-undefined-func-template",
+  "-Wno-unused-but-set-variable",
+  "-Wno-unused-lambda-capture",
+  "-Wno-unused-local-typedef",
+  "-Wno-compound-token-split",
+  "-Wno-unqualified-std-cast-call",
+  "-Wno-bitfield-constant-conversion",
+  "-Wno-ambiguous-member-template",
+  "-Wno-char-subscripts",
+  "-Wno-error=deprecated-declarations",
+  "-Wno-extern-c-compat",
+  "-Wno-gnu-alignof-expression",
+  "-Wno-gnu-variable-sized-type-not-at-end",
+  "-Wno-implicit-int-float-conversion",
+  "-Wno-invalid-source-encoding",
+  "-Wno-mismatched-tags",
+  #"-Wno-pointer-sign",
+  "-Wno-private-header",
+  "-Wno-sign-compare",
+  "-Wno-signed-unsigned-wchar",
+  "-Wno-strict-overflow",
+  "-Wno-trigraphs",
+  "-Wno-unknown-pragmas",
+  "-Wno-unused-const-variable",
+  "-Wno-unused-function",
+  "-Wno-unused-private-field",
+  "-Wno-user-defined-warnings",
+  #"-Wthread-safety-beta",
+  #"-Wctad-maybe-unsupported",
+  #"-Wfloat-overflow-conversion",
+  #"-Wfloat-zero-conversion",
+  #"-Wfor-loop-analysis",
+  #"-Wgnu-redeclared-enum",
+  #"-Winfinite-recursion",
+  #"-Wliteral-conversion",
+  #"-Wself-assign",
+  #"-Wstring-conversion",
+  #"-Wtautological-overlap-compare",
+  #"-Wunused-comparison",
+  "-Wvla",
+  "-Wno-reserved-user-defined-literal",
+  "-Wno-return-type-c-linkage",
+  "-Wno-self-assign-overloaded",
+  "-Woverloaded-virtual",
+  "-Wnon-virtual-dtor",
+  "-Wno-deprecated",
+  "-Wno-invalid-offsetof",
+  #"-fshow-overloads=best",
+  #"-Wdeprecated-increment-bool",
+  "-Wimplicit-fallthrough",
+  "-Wno-final-dtor-non-final-class",
+  #"-Wc++20-extensions",
+  "-Wno-c++20-designator",
+  "-Wno-register",
+  #"-Wthread-safety-analysis",
+  "-Wno-builtin-macro-redefined",
+]
+
 
 class BuildExt(build_ext):
   """A custom build extension for adding compiler-specific options."""
@@ -246,7 +347,9 @@ class BuildExt(build_ext):
 
     sys.stderr.write("Your libFuzzer is up-to-date.\n")
 
-    c_opts = ["-Wno-deprecated-declarations", "-Wno-attributes"]
+    c_opts = list(warning_copts)
+
+    c_opts += ["-Wno-attributes", "-Wno-address", "-Wno-deprecated-declarations"]
     l_opts = []
 
     if sys.platform == "darwin":
