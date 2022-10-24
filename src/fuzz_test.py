@@ -57,6 +57,11 @@ def never_fail(data):
 
 
 @atheris.instrument_func
+def raise_with_surrogates(data):
+  raise RuntimeError("abc \ud927 def")
+
+
+@atheris.instrument_func
 def bytes_comparison(data):
   if data == b"foobarbazbiz":
     raise RuntimeError("Was foobarbazbiz")
@@ -183,6 +188,12 @@ class IntegrationTests(unittest.TestCase):
         never_fail,
         args=["-atheris_runs=2"],
         expected_output=b"Exiting gracefully.")
+
+  def testExceptionWithSurrogates(self):
+    fuzz_test_lib.run_fuzztest(
+        raise_with_surrogates,
+        args=["-atheris_runs=1"],
+        expected_output=b"abc \\ud927 def")
 
   def testRunsOutCount(self):
     fuzz_test_lib.run_fuzztest(

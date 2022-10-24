@@ -40,10 +40,47 @@ std::string Colorize(int fileno, const std::string& message) {
   }
 }
 
+std::string GetExceptionType(const pybind11::error_already_set& ex) {
+  return ex.type().attr("__name__").str();
+}
+
+std::string GetExceptionMessage(const py::error_already_set& ex) {
+  // Loosely based on pybind11::error_already_set::format_value_and_trace().
+  std::string result;
+  std::string message_error_string;
+  if (ex.value()) {
+    auto value_str =
+        py::reinterpret_steal<py::object>(PyObject_Str(ex.value().ptr()));
+    if (!value_str) {
+      message_error_string = py::detail::error_string();
+      result = "<MESSAGE UNAVAILABLE DUE TO ANOTHER EXCEPTION>";
+    } else {
+      py::bytes bytes =
+          value_str.attr("encode").call("utf-8", "backslashreplace");
+      result = bytes;
+    }
+  } else {
+    result = "<MESSAGE UNAVAILABLE>";
+  }
+  if (result.empty()) {
+    result = "<EMPTY MESSAGE>";
+  }
+
+  if (!message_error_string.empty()) {
+    result += '\n';
+    result += "\nMESSAGE UNAVAILABLE DUE TO EXCEPTION: " + message_error_string;
+  }
+
+  return result;
+}
+
 void PrintPythonException(const py::error_already_set& ex, std::ostream& os) {
   // Strip out some extra, redundant information pybind11 includes
-  std::string what = ex.what();
-  what = what.substr(0, what.find("\n\nAt:\n"));
+  std::string what = GetExceptionMessage(ex);
+  
+  if (ex.type()) {
+    what = GetExceptionType(ex) + ": " + what;
+  }
 
   os << what << std::endl;
 
@@ -55,15 +92,8 @@ void PrintPythonException(const py::error_already_set& ex, std::ostream& os) {
   for (const std::string& str : printable_stack) {
     os << str;
   }
-  os << std::endl;
-}
 
-std::string GetExceptionType(const pybind11::error_already_set& ex) {
-  return ex.type().attr("__name__").str();
-}
-
-std::string GetExceptionMessage(const pybind11::error_already_set& ex) {
-  return ex.value().str();
+  os << what << std::endl << std::endl;
 }
 
 bool StartsWith(const char* text, const char* prefix) {
