@@ -25,7 +25,7 @@ from setuptools import Extension
 from setuptools import setup
 from setuptools.command.build_ext import build_ext
 
-__version__ = os.getenv("ATHERIS_VERSION", "2.1.0")
+__version__ = os.getenv("ATHERIS_VERSION", "2.1.1")
 
 
 if len(sys.argv) > 1 and sys.argv[1] == "print_version":
@@ -347,7 +347,10 @@ class BuildExt(build_ext):
 
     sys.stderr.write("Your libFuzzer is up-to-date.\n")
 
-    c_opts = list(warning_copts)
+    # Temporarily removed the warning_copts because too many only apply to new
+    # compiler versions.
+    # TODO(ipudney): Detect compiler support for the flags and re-add them.
+    c_opts = []
 
     c_opts += ["-Wno-attributes", "-Wno-address", "-Wno-deprecated-declarations"]
     l_opts = []
