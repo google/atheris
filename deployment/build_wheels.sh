@@ -18,3 +18,8 @@ cd "$DIR"
 
 sudo docker build -t atheris-builder ./
 sudo docker run -it --env ATHERIS_VERSION="$ATHERIS_VERSION" --mount type=bind,source=$PWD/../,target=/atheris atheris-builder
+
+# chown the resulting dirs so that they can be read by the deployment script.
+for d in .eggs atheris.egg-info build dist tmp; do                               
+    sudo chown -R $USER ../$d                                                    
+done
