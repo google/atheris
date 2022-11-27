@@ -14,6 +14,8 @@ CC="/usr/bin/clang" CFLAGS="-fsanitize=address,fuzzer-no-link" CXX="/usr/bin/cla
 Here, `address` means Address Sanitizer. You can also use `undefined` for the
 Undefined Behavior Sanitizer.
 
+If you use want to confirm that the built library is compiled/linker properly, you can do it by checking if it contains asan and sancov related symbols via a command like `nm <path to .so file> | grep asan` (or `grep sancov`).
+
 ## Step 2: Use an external libFuzzer
 
 At runtime, you may get an error about missing symbols. These are libFuzzer
