@@ -31,7 +31,7 @@ export CC="${CLANG_BIN}"
 export CXX="${CLANG_BIN}++"
 
 
-python36 setup.py bdist_wheel -d ./dist
-python37 setup.py bdist_wheel -d ./dist
-python38 setup.py bdist_wheel -d ./dist
-python39 setup.py bdist_wheel -d ./dist
+python3.7 setup.py bdist_wheel -d ./dist
+python3.8 setup.py bdist_wheel -d ./dist
+python3.9 setup.py bdist_wheel -d ./dist
+python3.10 setup.py bdist_wheel -d ./dist
