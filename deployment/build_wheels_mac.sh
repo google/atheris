@@ -27,8 +27,8 @@ if [[ -z "${CLANG_BIN}" ]]; then
   exit 1
 fi
 
-export CC="${CLANG_BIN}"
-export CXX="${CLANG_BIN}++"
+#export CC="${CLANG_BIN}"
+#export CXX="${CLANG_BIN}++"
 
 
 python3.7 setup.py bdist_wheel -d ./dist
