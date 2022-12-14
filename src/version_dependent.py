@@ -150,8 +150,46 @@ else:
 
 ### Lnotab handling ###
 
-if (3, 6) <= PYTHON_VERSION <= (3, 10):
+# In Python 3.10 lnotab was deprecated, context:
+# 3.10 specific notes: https://github.com/python/cpython/blob/28b75c80dcc1e17ed3ac1c69362bf8dc164b760a/Objects/lnotab_notes.txt
+# GitHub PR: https://github.com/python/cpython/commit/877df851c3ecdb55306840e247596e7b7805a60a
+# Inspiration for this code: https://github.com/python/cpython/blob/28b75c80dcc1e17ed3ac1c69362bf8dc164b760a/Python/compile.c#L5563
+# It changes again in 3.11.
+if (3, 10) <= PYTHON_VERSION <= (3, 11):
 
+  def get_lnotab(code, listing):
+    """Returns line number table."""
+    lnotab = []
+    prev_lineno = listing[0].lineno
+
+    for instr in listing:
+      bdelta = instr.get_size()
+      if bdelta == 0:
+        continue
+      ldelta = 0
+      if instr.lineno < 0:
+        ldelta = -128
+      else:
+        ldelta = instr.lineno - prev_lineno
+        while ldelta > 127:
+          lnotab.extend([0, 127])
+          ldelta -= 127
+        while ldelta < -127:
+          lnotab.extend([0, -127 % 256])
+          ldelta += 127
+      assert -128 <= ldelta < 128
+      ldelta %= 256
+      while bdelta > 254:
+        lnotab.extend([254, ldelta])
+        ldelta = -128 if instr.lineno < 0 else 0
+        bdelta -= 254
+      lnotab.extend([bdelta, ldelta])
+      prev_lineno = instr.lineno
+
+    return bytes(lnotab)
+
+
+if (3, 6) <= PYTHON_VERSION <= (3, 9):
   def get_lnotab(code, listing):
     """Returns line number table."""
     lnotab = []
