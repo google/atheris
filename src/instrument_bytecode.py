@@ -708,7 +708,7 @@ class Instrumentor:
     previous_instructions = []
     for i in range(len(self._cfg[0].instructions)):
       bb_instr = self._cfg[0].instructions[i]
-      if bb_instr.mnemonic != "RESUME":
+      if bb_instr.mnemonic not in ("RESUME", "GEN_START"):
         first_real_instr = bb_instr
         first_real_instr_slot = i
         break
