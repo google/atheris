@@ -27,8 +27,15 @@ if [[ -z "${CLANG_BIN}" ]]; then
   exit 1
 fi
 
-#export CC="${CLANG_BIN}"
-#export CXX="${CLANG_BIN}++"
+# TODO(aidenhall): Fix this when possible.
+# With all of this commented out, uses the default Clang.
+# Building LLVM properly on Mac is turning out to be extrmeely painful, due to
+# some recent changes. Should be better when https://reviews.llvm.org/D133273
+# is merged. Until then, use the inbuilt Clang (but still link against the
+# home-built libFuzzer)
+#
+# export CC="${CLANG_BIN}"
+# export CXX="${CLANG_BIN}++"
 
 
 python3.7 setup.py bdist_wheel -d ./dist
