@@ -4,7 +4,7 @@ Atheris is a coverage-guided Python fuzzing engine. It supports fuzzing of Pytho
 
 ## Installation Instructions
 
-Atheris supports Linux (32- and 64-bit) and Mac OS X, Python versions 3.6-3.10.
+Atheris supports Linux (32- and 64-bit) and Mac OS X, Python versions 3.6-3.10. Instructions on how to install Atheris on ARM can found [here](https://github.com/google/atheris/blob/master/installing_atheris_on_arm.md).
 
 You can install prebuilt versions of Atheris with pip:
 

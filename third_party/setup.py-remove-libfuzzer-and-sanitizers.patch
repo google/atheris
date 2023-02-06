@@ -1,0 +1,53 @@
+--- a/setup.py
++++ b/setup.py
+@@ -127,21 +127,6 @@
+         language="c++",
+     ),
+     Extension(
+-        "atheris.core_with_libfuzzer",
+-        sorted([
+-            "src/native/core.cc",
+-            "src/native/counters.cc",
+-            "src/native/tracer.cc",
+-            "src/native/util.cc",
+-            "src/native/timeout.cc",
+-        ]),
+-        include_dirs=[
+-            # Path to pybind11 headers
+-            PybindIncludeGetter(),
+-        ],
+-        language="c++",
+-    ),
+-    Extension(
+         "atheris.core_without_libfuzzer",
+         sorted([
+             "src/native/core.cc",
+@@ -391,28 +376,6 @@
+     except Exception as e:
+       sys.stderr.write(str(e))
+       sys.stderr.write("\n")
+-
+-    # Deploy versions of ASan and UBSan that have been merged with libFuzzer
+-    asan_name = orig_libfuzzer.replace(".fuzzer_no_main", ".asan")
+-    merged_asan_name = "asan_with_fuzzer.so"
+-    self.merge_deploy_libfuzzer_sanitizer(
+-        libfuzzer, asan_name, merged_asan_name,
+-        "asan_preinit.cc.o asan_preinit.cpp.o")
+-
+-    ubsan_name = orig_libfuzzer.replace(".fuzzer_no_main", ".ubsan_standalone")
+-    merged_ubsan_name = "ubsan_with_fuzzer.so"
+-    self.merge_deploy_libfuzzer_sanitizer(
+-        libfuzzer, ubsan_name, merged_ubsan_name,
+-        "ubsan_init_standalone_preinit.cc.o ubsan_init_standalone_preinit.cpp.o"
+-    )
+-
+-    ubsanxx_name = orig_libfuzzer.replace(".fuzzer_no_main",
+-                                          ".ubsan_standalone_cxx")
+-    merged_ubsanxx_name = "ubsan_cxx_with_fuzzer.so"
+-    self.merge_deploy_libfuzzer_sanitizer(
+-        libfuzzer, ubsanxx_name, merged_ubsanxx_name,
+-        "ubsan_init_standalone_preinit.cc.o ubsan_init_standalone_preinit.cpp.o"
+-    )
+
+   def deploy_file(self, name, target_filename):
+     atheris = self.get_ext_fullpath("atheris")
