@@ -49,7 +49,7 @@ This option doesn't rely on these custom shared libraries; instead, it involves 
 for Python 3.8.6 in the `third_party` directory.
 
 ```
-cd third_party
+cd libfuzzer_mod
 ./build_modified_libfuzzer.sh
 ```
 
