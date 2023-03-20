@@ -94,17 +94,16 @@ void TraceCompareUnicode(PyObject* left, PyObject* right, void* pc) {
 }
 
 NO_SANITIZE
-void TraceRegexMatch(PyObject* pattern_match, void* pc) {
-  PyUnicode_READY(pattern_match);
-
-  py::bytes pattern_match_utf8 = UnicodeToUtf8(pattern_match);
-  const void* pattern_bytes = PyBytes_AsString(pattern_match_utf8.ptr());
-
-  uint64_t size = PyBytes_Size(pattern_match_utf8.ptr());
+void TraceRegexMatch(const std::string generated_match, py::handle re_obj) {
+  const char* generated = generated_match.data();
+  const uint64_t size = generated_match.size();
+  // Libfuzzer doesn't _really_ care about the program counter location so we'll
+  // give one based on the regex pattern hash.
+  const ssize_t fake_pc = py::hash(re_obj.ptr());
 
   // We specify -1 as the last argument to let the mutator know that these bytes
   // need to be emitted. This basically means that the `memcmp` is different.
-  __sanitizer_weak_hook_memcmp(pc, pattern_bytes, pattern_bytes, size, -1);
+  __sanitizer_weak_hook_memcmp((char*)fake_pc, generated, generated, size, -1);
 }
 
 // This function hooks COMPARE_OP, inserts calls for dataflow tracing

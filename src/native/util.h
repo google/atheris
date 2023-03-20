@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef THIRD_PARTY_PY_ATHERIS_UTIL_H_
-#define THIRD_PARTY_PY_ATHERIS_UTIL_H_
+#ifndef ATHERIS_UTIL_H_
+#define ATHERIS_UTIL_H_
 
 #include <csignal>
 #include <exception>
@@ -86,4 +86,4 @@ void GracefulExit(int retcode, bool prevent_crash_report = true);
 
 }  // namespace atheris
 
-#endif  // THIRD_PARTY_PY_ATHERIS_UTIL_H_
+#endif  // ATHERIS_UTIL_H_

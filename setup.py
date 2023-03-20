@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Setuptools for Atheris."""
 
 import os
@@ -26,19 +25,19 @@ from setuptools import Extension
 from setuptools import setup
 from setuptools.command.build_ext import build_ext
 
-__version__ = os.getenv("ATHERIS_VERSION", "2.0.7")
+__version__ = os.getenv("ATHERIS_VERSION", "2.2.2")
+
 
 if len(sys.argv) > 1 and sys.argv[1] == "print_version":
   print(__version__)
   quit()
 
 clang_install_instructions = """download and build the latest version of Clang:
-    git clone https://github.com/llvm/llvm-project.git
+    git clone --depth=1 https://github.com/llvm/llvm-project.git
     cd llvm-project
-    mkdir build
-    cd build
-    cmake -DLLVM_ENABLE_PROJECTS='clang;compiler-rt' -G "Unix Makefiles" ../llvm
-    make -j 100  # This step is very slow
+    cmake -DLLVM_ENABLE_PROJECTS='clang;compiler-rt' -G "Unix Makefiles" -S llvm -B build
+    NPROC=$(sysctl -n hw.logicalcpu 2>/dev/null || nproc)
+    cmake --build build --parallel $NPROC # This step is very slow.
 Then, set $CLANG_BIN="$(pwd)/bin/clang" and run pip again.
 You should use this same Clang for building any Python extensions you plan to fuzz.
 """
@@ -119,16 +118,19 @@ ext_modules = [
             "src/native/atheris.cc",
             "src/native/util.cc",
             "src/native/fuzzed_data_provider.cc",
+            "src/native/codetable_gen.cc",
         ]),
         include_dirs=[
             # Path to pybind11 headers
             PybindIncludeGetter(),
         ],
-        language="c++"),
+        language="c++",
+    ),
     Extension(
         "atheris.core_with_libfuzzer",
         sorted([
             "src/native/core.cc",
+            "src/native/counters.cc",
             "src/native/tracer.cc",
             "src/native/util.cc",
             "src/native/timeout.cc",
@@ -137,11 +139,13 @@ ext_modules = [
             # Path to pybind11 headers
             PybindIncludeGetter(),
         ],
-        language="c++"),
+        language="c++",
+    ),
     Extension(
         "atheris.core_without_libfuzzer",
         sorted([
             "src/native/core.cc",
+            "src/native/counters.cc",
             "src/native/tracer.cc",
             "src/native/util.cc",
             "src/native/timeout.cc",
@@ -150,7 +154,32 @@ ext_modules = [
             # Path to pybind11 headers
             PybindIncludeGetter(),
         ],
-        language="c++"),
+        language="c++",
+    ),
+    Extension(
+        "atheris.custom_crossover",
+        sorted([
+            "src/native/custom_crossover.cc",
+            "src/native/custom_crossover_module.cc",
+        ]),
+        include_dirs=[
+            # Path to pybind11 headers
+            PybindIncludeGetter(),
+        ],
+        language="c++",
+    ),
+    Extension(
+        "atheris.custom_mutator",
+        sorted([
+            "src/native/custom_mutator.cc",
+            "src/native/custom_mutator_module.cc",
+        ]),
+        include_dirs=[
+            # Path to pybind11 headers
+            PybindIncludeGetter(),
+        ],
+        language="c++",
+    ),
 ]
 
 
@@ -182,10 +211,11 @@ def cpp_flag(compiler):
     flags = ["-std=c++" + os.getenv("FORCE_VERSION")]
   else:
     flags = [
-      #"-std=c++17",  C++17 disabled unless explicitly requested, to work
-      # around https://github.com/pybind/pybind11/issues/1818
-      "-std=c++14",
-      "-std=c++11"]
+        #"-std=c++17",  C++17 disabled unless explicitly requested, to work
+        # around https://github.com/pybind/pybind11/issues/1818
+        "-std=c++14",
+        "-std=c++11"
+    ]
 
   for flag in flags:
     if has_flag(compiler, flag):
@@ -193,6 +223,107 @@ def cpp_flag(compiler):
 
   raise RuntimeError("Unsupported compiler -- at least C++11 support "
                      "is needed!")
+
+# This is the warning configuration used in Google - the same configuration is
+# used here to ensure that Atheris builds as similarly as possible same inside
+# and outside.
+# The commented-out lines are not supported by gcc.
+warning_copts = [
+  "-Wall",
+  "-Werror",
+  "-Wformat-security",
+  "-fdiagnostics-show-option",
+  "-fmessage-length=0",
+  #"-fbracket-depth=768",
+  "-fno-strict-aliasing",
+  "-fmerge-all-constants",
+  #"-flax-vector-conversions=all",
+  "-funsigned-char",
+  #"-ffile-reproducible",
+  "-Wno-unused-command-line-argument",
+  #"-fcolor-diagnostics",
+  "-Wno-address-of-packed-member",
+  "-Wno-align-mismatch",
+  "-Wno-bitwise-instead-of-logical",
+  "-Wno-comment",
+  "-Wno-defaulted-function-deleted",
+  "-Wno-deprecated-non-prototype",
+  "-Wno-enum-compare-switch",
+  "-Wno-enum-constexpr-conversion",
+  "-Wno-expansion-to-defined",
+  "-Wno-ignored-attributes",
+  "-Wno-ignored-qualifiers",
+  #"-Wno-implicit-int",
+  "-Wno-inconsistent-missing-override",
+  #"-Wno-int-conversion",
+  "-Wno-misleading-indentation",
+  "-Wno-potentially-evaluated-expression",
+  "-Wno-psabi",
+  "-Wno-range-loop-analysis",
+  "-Wno-return-std-move",
+  #"-Wno-strict-prototypes",
+  "-Wno-string-concatenation",
+  "-Wno-tautological-type-limit-compare",
+  "-Wno-tautological-undefined-compare",
+  "-Wno-tautological-unsigned-zero-compare",
+  "-Wno-tautological-unsigned-enum-zero-compare",
+  "-Wno-undefined-func-template",
+  "-Wno-unused-but-set-variable",
+  "-Wno-unused-lambda-capture",
+  "-Wno-unused-local-typedef",
+  "-Wno-compound-token-split",
+  "-Wno-unqualified-std-cast-call",
+  "-Wno-bitfield-constant-conversion",
+  "-Wno-ambiguous-member-template",
+  "-Wno-char-subscripts",
+  "-Wno-error=deprecated-declarations",
+  "-Wno-extern-c-compat",
+  "-Wno-gnu-alignof-expression",
+  "-Wno-gnu-variable-sized-type-not-at-end",
+  "-Wno-implicit-int-float-conversion",
+  "-Wno-invalid-source-encoding",
+  "-Wno-mismatched-tags",
+  #"-Wno-pointer-sign",
+  "-Wno-private-header",
+  "-Wno-sign-compare",
+  "-Wno-signed-unsigned-wchar",
+  "-Wno-strict-overflow",
+  "-Wno-trigraphs",
+  "-Wno-unknown-pragmas",
+  "-Wno-unused-const-variable",
+  "-Wno-unused-function",
+  "-Wno-unused-private-field",
+  "-Wno-user-defined-warnings",
+  #"-Wthread-safety-beta",
+  #"-Wctad-maybe-unsupported",
+  #"-Wfloat-overflow-conversion",
+  #"-Wfloat-zero-conversion",
+  #"-Wfor-loop-analysis",
+  #"-Wgnu-redeclared-enum",
+  #"-Winfinite-recursion",
+  #"-Wliteral-conversion",
+  #"-Wself-assign",
+  #"-Wstring-conversion",
+  #"-Wtautological-overlap-compare",
+  #"-Wunused-comparison",
+  "-Wvla",
+  "-Wno-reserved-user-defined-literal",
+  "-Wno-return-type-c-linkage",
+  "-Wno-self-assign-overloaded",
+  "-Woverloaded-virtual",
+  "-Wnon-virtual-dtor",
+  "-Wno-deprecated",
+  "-Wno-invalid-offsetof",
+  #"-fshow-overloads=best",
+  #"-Wdeprecated-increment-bool",
+  "-Wimplicit-fallthrough",
+  "-Wno-final-dtor-non-final-class",
+  #"-Wc++20-extensions",
+  "-Wno-c++20-designator",
+  "-Wno-register",
+  #"-Wthread-safety-analysis",
+  "-Wno-builtin-macro-redefined",
+]
 
 
 class BuildExt(build_ext):
@@ -222,7 +353,17 @@ class BuildExt(build_ext):
 
     sys.stderr.write("Your libFuzzer is up-to-date.\n")
 
-    c_opts = ["-Wno-deprecated-declarations", "-Wno-attributes"]
+    # Temporarily removed the warning_copts because too many only apply to new
+    # compiler versions.
+    # TODO(ipudney): Detect compiler support for the flags and re-add them.
+    c_opts = []
+
+    c_opts += [
+        "-DPYBIND11_DETAILED_ERROR_MESSAGES=1",
+        "-Wno-attributes",
+        "-Wno-address",
+        "-Wno-deprecated-declarations",
+    ]
     l_opts = []
 
     if sys.platform == "darwin":
@@ -252,22 +393,21 @@ class BuildExt(build_ext):
       sys.stderr.write("\n")
 
     # Deploy versions of ASan and UBSan that have been merged with libFuzzer
-    asan_name = orig_libfuzzer.replace(".fuzzer_no_main-", ".asan-")
+    asan_name = orig_libfuzzer.replace(".fuzzer_no_main", ".asan")
     merged_asan_name = "asan_with_fuzzer.so"
     self.merge_deploy_libfuzzer_sanitizer(
         libfuzzer, asan_name, merged_asan_name,
         "asan_preinit.cc.o asan_preinit.cpp.o")
 
-    ubsan_name = orig_libfuzzer.replace(".fuzzer_no_main-",
-                                        ".ubsan_standalone-")
+    ubsan_name = orig_libfuzzer.replace(".fuzzer_no_main", ".ubsan_standalone")
     merged_ubsan_name = "ubsan_with_fuzzer.so"
     self.merge_deploy_libfuzzer_sanitizer(
         libfuzzer, ubsan_name, merged_ubsan_name,
         "ubsan_init_standalone_preinit.cc.o ubsan_init_standalone_preinit.cpp.o"
     )
 
-    ubsanxx_name = orig_libfuzzer.replace(".fuzzer_no_main-",
-                                          ".ubsan_standalone_cxx-")
+    ubsanxx_name = orig_libfuzzer.replace(".fuzzer_no_main",
+                                          ".ubsan_standalone_cxx")
     merged_ubsanxx_name = "ubsan_cxx_with_fuzzer.so"
     self.merge_deploy_libfuzzer_sanitizer(
         libfuzzer, ubsanxx_name, merged_ubsanxx_name,

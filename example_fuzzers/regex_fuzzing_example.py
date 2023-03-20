@@ -23,8 +23,8 @@ atheris.enabled_hooks.add("RegEx")
 
 with atheris.instrument_imports():
   import re
-  import struct
   import sys
+
 
 @atheris.instrument_func  # Instrument the TestOneInput function itself
 def TestOneInput(data):
@@ -46,6 +46,7 @@ def TestOneInput(data):
 
   if reg.search(data):
     raise RuntimeError("Solved RegEx")
+
 
 atheris.Setup(sys.argv, TestOneInput)
 atheris.Fuzz()

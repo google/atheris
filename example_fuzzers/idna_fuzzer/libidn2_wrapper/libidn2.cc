@@ -25,7 +25,7 @@ namespace libidn2_wrapper {
 namespace py = pybind11;
 
 py::bytes encode(const std::string& arg, bool uts46, bool transitional,
-                       bool nfc, bool std3) {
+                 bool nfc, bool std3) {
   char* result;
   int flags = 0;
 
@@ -64,15 +64,10 @@ std::string decode(const std::string& arg, bool uts46, bool std3) {
 }
 
 PYBIND11_MODULE(libidn2, m) {
-  m.def("encode", &encode,
-        py::arg("arg"),
-        py::arg("uts46") = false,
-        py::arg("transitional") = false,
-        py::arg("nfc") = false,
+  m.def("encode", &encode, py::arg("arg"), py::arg("uts46") = false,
+        py::arg("transitional") = false, py::arg("nfc") = false,
         py::arg("std3") = false);
-  m.def("decode", &decode,
-        py::arg("arg"),
-        py::arg("uts46") = false,
+  m.def("decode", &decode, py::arg("arg"), py::arg("uts46") = false,
         py::arg("std3") = false);
 }
 

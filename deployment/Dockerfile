@@ -27,7 +27,8 @@ RUN set -e -x -v; \
 
 RUN set -e -x -v; \
 	cd /root/llvm-project; \
-	cmake -S llvm -B build -G "Unix Makefiles" -DLLVM_ENABLE_PROJECTS="clang;compiler-rt";
+	git checkout 0982db188b661d6744b06244fda64d43dd80206e; \
+	cmake -S llvm -B build -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_PROJECTS="clang;compiler-rt";
 RUN set -e -x -v; \
 	cd /root/llvm-project/build; \
 	make compiler-rt;
@@ -37,10 +38,12 @@ RUN set -e -x -v; \
 
 WORKDIR /atheris
 
-CMD export LIBFUZZER_LIB="/root/llvm-project/build/lib/clang/$(ls /root/llvm-project/build/lib/clang/)/lib/linux/libclang_rt.fuzzer_no_main-x86_64.a"; \
+CMD export LIBFUZZER_LIB="/root/llvm-project/build/lib/clang/$(ls /root/llvm-project/build/lib/clang/)/lib/x86_64-unknown-linux-gnu/libclang_rt.fuzzer_no_main.a"; \
 	/opt/python/cp36-cp36m/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
 	/opt/python/cp37-cp37m/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
 	/opt/python/cp38-cp38/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
 	/opt/python/cp39-cp39/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
+	/opt/python/cp310-cp310/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
+	/opt/python/cp311-cp311/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
 	( cd /tmp/dist && find /tmp/dist/* | xargs -I{} auditwheel repair --plat manylinux2014_x86_64 {} ) && \
 	mkdir -p /atheris/dist && cp /tmp/dist/wheelhouse/* /atheris/dist/

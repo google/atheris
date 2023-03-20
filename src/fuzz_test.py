@@ -12,105 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import atheris
-import atexit
-import fcntl
 import os
+import re
 import sys
 import time
 import unittest
-import re
+import zlib
+import functools
 
+import atheris
 
-def _set_nonblocking(fd):
-  """Set the specified fd to a nonblocking mode."""
-  oflags = fcntl.fcntl(fd, fcntl.F_GETFL)
-  nflags = oflags | os.O_NONBLOCK
-  fcntl.fcntl(fd, fcntl.F_SETFL, nflags)
-
-
-def _fuzztest_child(test_one_input, pipe, args, enabled_hooks):
-  os.close(pipe[0])
-  os.dup2(pipe[1], 1)
-  os.dup2(pipe[1], 2)
-
-  try:
-    for hook in enabled_hooks:
-        atheris.enabled_hooks.add(hook)
-    atheris.Setup([sys.argv[0]] + args, test_one_input)
-    atheris.Fuzz()
-
-    # To avoid running tests multiple times due to fork(), never allow control
-    # flow to proceed past here. Report that we're exiting gracefully so that
-    # tests can verify that's what happened.
-  except SystemExit as e:
-    print("Exiting gracefully.")
-    sys.stdout.flush()
-    os._exit(e.code)
-  finally:
-    print("Exiting gracefully.")
-    sys.stdout.flush()
-    os._exit(0)
-
-
-def run_fuzztest(test_one_input, expected_output=None, timeout=10, args=[], enabled_hooks=[]):
-  """Fuzz test_one_input() in a subprocess.
-
-  This forks a child, and in the child, runs atheris.Setup(test_one_input) and
-  atheris.Fuzz(). Expects the fuzzer to quickly find a crash.
-
-  Args:
-    test_one_input: a callable that takes a bytes.
-    expected_output: bytes. If specified, the output of the fuzzer must contain
-      this data.
-    timeout: float. Time until the fuzzing is aborted and an assertion failure
-      is raised.
-    args: additional command-line arguments to pass to the fuzzing run.
-  """
-  pipe = os.pipe()
-
-  pid = os.fork()
-  if pid == 0:
-    _fuzztest_child(test_one_input, pipe, args, enabled_hooks)
-
-  os.close(pipe[1])
-  _set_nonblocking(pipe[0])
-
-  stdout = b""
-  start_time = time.time()
-  while True:
-    data = b""
-    try:
-      data = os.read(pipe[0], 1024)
-    except BlockingIOError:
-      pass
-
-    sys.stderr.buffer.write(data)
-    stdout += data
-
-    if len(data) != 0:
-      continue
-
-    wpid = os.waitpid(pid, os.WNOHANG)
-
-    if wpid == (0, 0):
-      # Process not done yet
-      if time.time() > start_time + timeout:
-        raise TimeoutError("Fuzz target failed to exit within expected time.")
-      time.sleep(0.1)
-      continue
-
-    # Process done, get any remaining output.
-    with os.fdopen(pipe[0], "rb") as f:
-      data = f.read()
-    sys.stderr.buffer.write(data)
-    stdout += data
-    break
-
-  if expected_output:
-    if expected_output not in stdout:
-      raise AssertionError("Fuzz target did not produce the expected output "
-                           f"{expected_output}; actually got:\n{stdout}")
+import fuzz_test_lib
 
 
 def fail_immediately(data):
@@ -142,6 +54,11 @@ def never_fail(data):
       pass
     elif d == 2:
       pass
+
+
+@atheris.instrument_func
+def raise_with_surrogates(data):
+  raise RuntimeError("abc \ud927 def")
 
 
 @atheris.instrument_func
@@ -181,51 +98,125 @@ def regex_match(data):
     raise RuntimeError("Was RegEx Match")
 
 
+@atheris.instrument_func
+def compressed_data(data):
+  try:
+    decompressed = zlib.decompress(data)
+  except zlib.error:
+    return
+
+  if len(decompressed) < 2:
+    return
+
+  try:
+    if decompressed.decode() == "FU":
+      raise RuntimeError("Boom")
+  except UnicodeDecodeError:
+    pass
+
+
+@atheris.instrument_func
+def reserve_counter_after_fuzz_start(data):
+  del data
+  atheris._reserve_counter()
+
+
+@functools.lru_cache(maxsize=None)
+def instrument_once(func):
+  """Instruments func, and verifies that this is the first time."""
+  assert("__ATHERIS_INSTRUMENTED__" not in func.__code__.co_consts)
+  atheris.instrument_func(func)
+  assert("__ATHERIS_INSTRUMENTED__" in func.__code__.co_consts)
+
+
+def foo(data):
+  if data == b"foobar":
+    raise RuntimeError("Code instrumented at runtime.")
+
+
+def runtime_instrument_code(data):
+  instrument_once(foo)
+  foo(data)
+
+
+
 class IntegrationTests(unittest.TestCase):
 
   def testFails(self):
-    run_fuzztest(fail_immediately, expected_output=b"Failed immediately")
+    fuzz_test_lib.run_fuzztest(
+        fail_immediately, expected_output=b"Failed immediately")
 
   def testManyBranches(self):
-    run_fuzztest(many_branches, expected_output=b"Many branches", timeout=30)
+    fuzz_test_lib.run_fuzztest(
+        many_branches, expected_output=b"Many branches", timeout=90)
 
   def testBytesComparison(self):
-    run_fuzztest(bytes_comparison, expected_output=b"Was foobarbazbiz")
+    fuzz_test_lib.run_fuzztest(
+        bytes_comparison, expected_output=b"Was foobarbazbiz", timeout=30)
 
   def testStringComparison(self):
-    run_fuzztest(string_comparison, expected_output=b"Was foobarbazbiz")
+    fuzz_test_lib.run_fuzztest(
+        string_comparison, expected_output=b"Was foobarbazbiz", timeout=30)
 
   def testUtf8Comparison(self):
-    run_fuzztest(utf8_comparison, expected_output=b"Was random unicode")
+    fuzz_test_lib.run_fuzztest(
+        utf8_comparison, expected_output=b"Was random unicode", timeout=60)
 
   def testTimeoutPy(self):
     """This test verifies that timeout messages are recorded from -timeout."""
-    run_fuzztest(
+    fuzz_test_lib.run_fuzztest(
         timeout_py,
         args=["-timeout=1"],
         expected_output=b"most recent call first")
-    run_fuzztest(
+    fuzz_test_lib.run_fuzztest(
         timeout_py,
         args=["-timeout=1"],
         expected_output=b"ERROR: libFuzzer: timeout after")
 
   def testRegExMatch(self):
-    run_fuzztest(
+    fuzz_test_lib.run_fuzztest(
         regex_match,
         expected_output=b"Was RegEx Match",
         enabled_hooks=["RegEx"])
 
   def testExitsGracefullyOnPyFail(self):
-    run_fuzztest(fail_immediately, expected_output=b"Exiting gracefully.")
+    fuzz_test_lib.run_fuzztest(
+        fail_immediately, expected_output=b"Exiting gracefully.")
 
   def testExitsGracefullyOnRunsOut(self):
-    run_fuzztest(
-        never_fail, args=["-atheris_runs=2"],
+    fuzz_test_lib.run_fuzztest(
+        never_fail,
+        args=["-atheris_runs=2"],
         expected_output=b"Exiting gracefully.")
 
+  def testExceptionWithSurrogates(self):
+    fuzz_test_lib.run_fuzztest(
+        raise_with_surrogates,
+        args=["-atheris_runs=1"],
+        expected_output=b"abc \\ud927 def")
+
   def testRunsOutCount(self):
-    run_fuzztest(never_fail, args=["-atheris_runs=3"],
-                 expected_output=b"Done 3 in ")
+    fuzz_test_lib.run_fuzztest(
+        never_fail, args=["-atheris_runs=3"], expected_output=b"Done 3 in ")
+
+  def testCompressedDataWithoutCustomMutator(self):
+    try:
+      fuzz_test_lib.run_fuzztest(compressed_data)
+    except TimeoutError:  # Expected to timeout without a custom mutator.
+      pass
+
+  def testReserveCounterAfterFuzzStart(self):
+    fuzz_test_lib.run_fuzztest(
+        reserve_counter_after_fuzz_start,
+        args=["-atheris_runs=2"],
+        expected_output=b"Exiting gracefully.")
+
+  def testInstrumentCodeWhileFuzzing(self):
+    fuzz_test_lib.run_fuzztest(
+        runtime_instrument_code,
+        timeout=90,
+        expected_output=b"Code instrumented at runtime.")
+
 
 if __name__ == "__main__":
   unittest.main()

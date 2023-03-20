@@ -19,8 +19,8 @@
 // header, and exactly one of them must be linked. See atheris.cc for
 // documentation on the behavior of these functions.
 
-#ifndef THIRD_PARTY_PY_ATHERIS_ATHERIS_H_
-#define THIRD_PARTY_PY_ATHERIS_ATHERIS_H_
+#ifndef ATHERIS_ATHERIS_H_
+#define ATHERIS_ATHERIS_H_
 
 #include <functional>
 #include <string>
@@ -43,9 +43,9 @@ void Fuzz();
 
 py::handle _trace_cmp(py::handle left, py::handle right, int opid, uint64_t idx,
                       bool left_is_const);
-void _reserve_counters(uint64_t num);
+int _reserve_counter();
 void _trace_branch(uint64_t idx);
 
 }  // namespace atheris
 
-#endif  // THIRD_PARTY_PY_ATHERIS_LIBFUZZER_H_
+#endif  // ATHERIS_ATHERIS_H_

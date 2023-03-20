@@ -15,8 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """ IDNA encoding/decoding differential fuzzer for Python idna vs libidn2
 
 This is a differential fuzzer that compares the Python `idna` package with the
@@ -63,11 +61,7 @@ def TestOneInput(input_bytes):
   try:
     nfc_original = unicodedata.normalize("NFC", original)
     libidn2_encoded = libidn2.encode(
-        original,
-        uts46=True,
-        transitional=transitional,
-        nfc=True,
-        std3=std3)
+        original, uts46=True, transitional=transitional, nfc=True, std3=std3)
     idna_encoded = idna.encode(
         original,
         strict=False,
@@ -97,6 +91,7 @@ def TestOneInput(input_bytes):
 def main():
   atheris.Setup(sys.argv, TestOneInput)
   atheris.Fuzz()
+
 
 if __name__ == "__main__":
   main()

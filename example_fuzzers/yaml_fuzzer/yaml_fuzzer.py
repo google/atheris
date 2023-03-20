@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """This fuzzer is an example of looking for weird exceptions in ruamel.yaml.
 
 While these do not necessarily indicate vulnerabilities, they often indicate
@@ -64,6 +63,7 @@ def TestOneInput(input_bytes):
 def main():
   atheris.Setup(sys.argv, TestOneInput)
   atheris.Fuzz()
+
 
 if __name__ == "__main__":
   main()

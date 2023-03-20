@@ -26,8 +26,10 @@
 #include <sstream>
 
 #include "atheris.h"
+#include "codetable_gen.h"
 #include "fuzzed_data_provider.h"
 #include "macros.h"
+#include "pybind11/cast.h"
 #include "pybind11/functional.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
@@ -43,9 +45,16 @@ std::function<void(py::bytes data)>& test_one_input_global =
       std::cerr << "You must call Setup() before Fuzz()." << std::endl;
       _exit(-1);
     });
+std::function<py::bytes(py::bytes data, size_t max_size, unsigned int seed)>
+    custom_mutator_global;
+bool use_custom_mutator = false;
+
+std::function<py::bytes(py::bytes data1, py::bytes data2, size_t max_out_size,
+                        unsigned int seed)>
+    custom_crossover_global;
+bool use_custom_crossover = false;
 
 std::vector<std::string>& args_global = *new std::vector<std::string>();
-uint64_t num_counters = 0;
 
 enum internal_libfuzzer_mode {
   INTERNAL_LIBFUZZER_AUTO = 0,
@@ -58,7 +67,7 @@ bool setup_called = false;
 
 }  // namespace
 
-// These versions of _trace_branch, _trace_cmp, and _reserve_counters are called
+// These versions of _trace_branch, _trace_cmp, and _reserve_counter are called
 // before fuzzing has begun.
 
 NO_SANITIZE
@@ -81,10 +90,7 @@ py::handle prefuzz_trace_cmp(py::handle left, py::handle right, int opid,
 }
 
 NO_SANITIZE
-void prefuzz_reserve_counters(uint64_t num) { num_counters += num; }
-
-NO_SANITIZE
-void prefuzz_trace_regex_match(py::handle pattern_match, py::handle object) {}
+void prefuzz_trace_regex_match(std::string pattern_match, py::handle object) {}
 
 NO_SANITIZE
 std::vector<std::string> Setup(
@@ -120,6 +126,23 @@ std::vector<std::string> Setup(
     }
   }
 
+  if (kwargs.contains("custom_mutator") &&
+      !kwargs["custom_mutator"].is_none()) {
+    use_custom_mutator = true;
+    custom_mutator_global =
+        kwargs["custom_mutator"]
+            .cast<std::function<py::bytes(py::bytes data, size_t max_size,
+                                          unsigned int seed)>>();
+  }
+  if (kwargs.contains("custom_crossover") &&
+      !kwargs["custom_crossover"].is_none()) {
+    use_custom_crossover = true;
+    custom_crossover_global =
+        kwargs["custom_crossover"]
+            .cast<std::function<py::bytes(py::bytes data1, py::bytes data2,
+                                          size_t max_out_size,
+                                          unsigned int seed)>>();
+  }
   return ret;
 }
 
@@ -156,6 +179,29 @@ py::module LoadCoreModule() {
 }
 
 NO_SANITIZE
+py::module LoadExternalFunctionsModule(const std::string& module_name) {
+  // Changing dlopenflags so external functions like LLVMFuzzerCustomMutator are
+  // in the global scope.
+  py::module sys = py::module::import("sys");
+  py::int_ flags = sys.attr("getdlopenflags")();
+  sys.attr("setdlopenflags")(py::cast<int>(flags) | RTLD_GLOBAL);
+  py::module module = py::module::import(module_name.data());
+  sys.attr("setdlopenflags")(flags);
+  return module;
+}
+
+NO_SANITIZE
+py::bytes Mutate(py::bytes data, size_t max_size) {
+  std::cerr << Colorize(STDERR_FILENO,
+                        "Fuzz() must be called before Mutate() can be called.")
+            << std::endl;
+  exit(-1);
+}
+
+int pending_counters = 0;
+int ReservePendingCounter() { return ++pending_counters; }
+
+NO_SANITIZE
 void Fuzz() {
   if (!setup_called) {
     std::cerr << Colorize(STDERR_FILENO,
@@ -166,24 +212,57 @@ void Fuzz() {
 
   py::module atheris =
       (py::module)py::module::import("sys").attr("modules")["atheris"];
+
+  std::string atheris_prefix = "atheris.";
+
+  if (use_custom_mutator) {
+    py::module custom_mutator =
+        LoadExternalFunctionsModule(atheris_prefix + "custom_mutator");
+    custom_mutator.attr("_set_custom_mutator")(custom_mutator_global);
+  }
+  if (use_custom_crossover) {
+    py::module custom_crossover =
+        LoadExternalFunctionsModule(atheris_prefix + "custom_crossover");
+    custom_crossover.attr("_set_custom_crossover")(custom_crossover_global);
+  }
   py::module core = LoadCoreModule();
 
+  // Reserve all pending counters
+  int res_ctrs = core.attr("_reserve_counters")(pending_counters).cast<int>();
+  if (res_ctrs != 0) {
+    std::cerr << Colorize(
+                     STDERR_FILENO,
+                     "Atheris internal error: expected 0 counters previously "
+                     "reserved when reserving preregistered batch; got " +
+                         std::to_string(res_ctrs))
+              << std::endl;
+    _exit(1);
+  }
+  pending_counters = 0;
+
+  atheris.attr("Mutate") = core.attr("Mutate");
   atheris.attr("_trace_cmp") = core.attr("_trace_cmp");
   atheris.attr("_trace_regex_match") = core.attr("_trace_regex_match");
   atheris.attr("_trace_branch") = core.attr("_trace_branch");
-  atheris.attr("_reserve_counters") = core.attr("_reserve_counters");
+  atheris.attr("_reserve_counter") = core.attr("_reserve_counter");
 
-  core.attr("start_fuzzing")(args_global, test_one_input_global, num_counters);
+  core.attr("start_fuzzing")(args_global, test_one_input_global);
 }
 
 PYBIND11_MODULE(native, m) {
   m.def("Setup", &Setup);
   m.def("Fuzz", &Fuzz);
+  m.def("Mutate", &Mutate);
   m.def("_trace_branch", &prefuzz_trace_branch);
   m.def("_trace_cmp", &prefuzz_trace_cmp, py::return_value_policy::move);
-  m.def("_reserve_counters", &prefuzz_reserve_counters);
+  m.def("_reserve_counter", &ReservePendingCounter);
   m.def("_trace_regex_match", &prefuzz_trace_regex_match);
   m.def("libfuzzer_is_loaded", &libfuzzer_is_loaded);
+#if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 11
+  // Implementations for 3.11+'s new code table data structures.
+  m.def("_generate_codetable", &GenerateCodetable);
+  m.def("_generate_exceptiontable", &GenerateExceptiontable);
+#endif
 
   py::class_<FuzzedDataProvider>(m, "FuzzedDataProvider")
       .def(py::init<py::bytes>())

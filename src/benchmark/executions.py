@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Benchmarks for Atheris execs/sec performance."""
 # In Google, must be built with --config=asan-fuzzer.
 
@@ -77,7 +76,11 @@ def _benchmark_child(test_one_input, num_runs, pipe, args, inst_all):
   assert False  # Does not return
 
 
-def run_benchmark(test_one_input, num_runs, timeout=10, inst_all=False, args=[]):
+def run_benchmark(test_one_input,
+                  num_runs,
+                  timeout=10,
+                  inst_all=False,
+                  args=[]):
   """Fuzz test_one_input() in a subprocess.
 
   This forks a child, and in the child, runs atheris.Setup(test_one_input) and
