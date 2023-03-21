@@ -33,9 +33,22 @@ from .version_dependent import get_code_object
 from .version_dependent import get_lnotab
 from .version_dependent import HAVE_ABS_REFERENCE
 from .version_dependent import HAVE_REL_REFERENCE
+from .version_dependent import REL_REFERENCE_IS_INVERTED
+from .version_dependent import rel_reference_scale
 from .version_dependent import jump_arg_bytes
 from .version_dependent import REVERSE_CMP_OP
 from .version_dependent import UNCONDITIONAL_JUMPS
+from .version_dependent import rot_n
+from .version_dependent import call
+from .version_dependent import cache_count
+from .version_dependent import caches
+from .version_dependent import get_instructions
+from .version_dependent import generate_exceptiontable
+from .version_dependent import parse_exceptiontable
+from .version_dependent import ExceptionTable
+from .version_dependent import ExceptionTableEntry
+from .version_dependent import args_terminator
+from .version_dependent import CALLABLE_STACK_ENTRIES
 
 _TARGET_MODULE = "atheris"
 _COVERAGE_FUNCTION = "_trace_branch"
@@ -73,23 +86,30 @@ class Instruction:
   def get_fixed_size(cls) -> int:
     return 2
 
-  def __init__(self,
-               lineno: int,
-               offset: int,
-               opcode: int,
-               arg: int = 0,
-               min_size: int = 0):
+  def __init__(
+      self,
+      lineno: int,
+      offset: int,
+      opcode: int,
+      arg: int = 0,
+      min_size: int = 0,
+      positions=None,
+  ):
     self.lineno = lineno
     self.offset = offset
     self.opcode = opcode
     self.mnemonic = dis.opname[opcode]
     self.arg = arg
     self._min_size = min_size
+    self.positions = positions
 
     if self.mnemonic in HAVE_REL_REFERENCE:
       self._is_relative: Optional[bool] = True
-      self.reference: Optional[int] = self.offset + self.get_size(
-      ) + jump_arg_bytes(self.arg)
+      self.reference: Optional[int] = (
+          self.offset
+          + self.get_size()
+          + jump_arg_bytes(self.arg) * rel_reference_scale(self.mnemonic)
+      )
     elif self.mnemonic in HAVE_ABS_REFERENCE:
       self._is_relative = False
       self.reference = jump_arg_bytes(self.arg)
@@ -100,8 +120,10 @@ class Instruction:
     self.check_state()
 
   def __repr__(self) -> str:
-    return (f"{self.mnemonic}(arg={self.arg} offset={self.offset} " +
-            f"reference={self.reference} getsize={self.get_size()})")
+    return (
+        f"{self.mnemonic}(arg={self.arg} offset={self.offset} "
+        + f"reference={self.reference} getsize={self.get_size()} positions={self.positions})"
+    )
 
   def has_argument(self) -> bool:
     return self.opcode >= dis.HAVE_ARGUMENT
@@ -160,7 +182,7 @@ class Instruction:
     Either way, adjust the current offset, reference and argument
     accordingly.
 
-    TODO(b/207008147): Replace the pattern of using +0.5 as a sentinal.
+    TODO(aidenhall): Replace the pattern of using +0.5 as a sentinal.
 
     Args:
       changed_offset: The offset where instructions are inserted.
@@ -173,7 +195,10 @@ class Instruction:
     if old_offset < changed_offset < (old_offset + 1):
       if old_reference is not None:
         if self._is_relative:
-          self.reference += size  # type: ignore[operator]
+          if self.mnemonic not in REL_REFERENCE_IS_INVERTED:
+            self.reference += size  # type: ignore[operator]
+          else:
+            self.arg = add_bytes_to_jump_arg(self.arg, size)
         elif old_reference > old_offset:
           self.reference += size  # type: ignore[operator]
           self.arg = add_bytes_to_jump_arg(self.arg, size)
@@ -188,7 +213,13 @@ class Instruction:
         self.reference += size  # type: ignore[operator]
 
       if self._is_relative:
-        if old_offset < changed_offset <= old_reference:
+        if self.mnemonic not in REL_REFERENCE_IS_INVERTED and (
+            old_offset < changed_offset <= old_reference
+        ):
+          self.arg = add_bytes_to_jump_arg(self.arg, size)
+        elif self.mnemonic in REL_REFERENCE_IS_INVERTED and (
+            old_offset >= changed_offset >= old_reference
+        ):
           self.arg = add_bytes_to_jump_arg(self.arg, size)
       else:
         if changed_offset <= old_reference:
@@ -202,8 +233,12 @@ class Instruction:
 
     if self.reference is not None:
       if self._is_relative:
-        assert self.offset + self.get_size() + jump_arg_bytes(
-            self.arg) == self.reference
+        assert (
+            self.offset
+            + self.get_size()
+            + jump_arg_bytes(self.arg) * rel_reference_scale(self.mnemonic)
+            == self.reference
+        )
       else:
         assert jump_arg_bytes(self.arg) == self.reference
 
@@ -217,6 +252,9 @@ class Instruction:
     self._is_relative = None
     self.reference = None
     self.check_state()
+
+  def cache_count(self) -> int:
+    return cache_count(self.opcode)
 
 
 class BasicBlock:
@@ -281,6 +319,16 @@ class Instrumentor:
     self._build_cfg()
     self._check_state()
 
+  def _insert_instruction(self, to_insert, lineno, offset, opcode, arg=0):
+    to_insert.append(Instruction(lineno, offset, opcode, arg))
+    offset += to_insert[-1].get_size()
+    return self._insert_instructions(to_insert, lineno, offset, caches(opcode))
+
+  def _insert_instructions(self, to_insert, lineno, offset, tuples):
+    for t in tuples:
+      offset = self._insert_instruction(to_insert, lineno, offset, t[0], t[1])
+    return offset
+
   def _build_cfg(self) -> None:
     """Builds control flow graph."""
     lineno = self._code.co_firstlineno
@@ -292,7 +340,9 @@ class Instrumentor:
     did_jump = False
     jump_targets = set()
 
-    for instruction in dis.get_instructions(self._code):
+    self.exception_table = parse_exceptiontable(self._code)
+
+    for instruction in get_instructions(self._code):
       if instruction.starts_line is not None:
         lineno = instruction.starts_line
 
@@ -319,15 +369,24 @@ class Instrumentor:
                 offset,
                 instruction.opcode,
                 combined_arg,
-                min_size=length))
+                min_size=length,
+                positions=getattr(instruction, "positions", None),
+            )
+        )
         arg = None
         offset = None
         length = Instruction.get_fixed_size()
 
       else:
         instr_list.append(
-            Instruction(lineno, instruction.offset, instruction.opcode,
-                        instruction.arg or 0))
+            Instruction(
+                lineno,
+                instruction.offset,
+                instruction.opcode,
+                instruction.arg or 0,
+                positions=getattr(instruction, "positions", None),
+            )
+        )
 
       if instr_list[-1].reference is not None:
         jump_targets.add(instr_list[-1].reference)
@@ -417,6 +476,15 @@ class Instrumentor:
       for instr in basic_block:
         instr.adjust(offset, size, instr in keep_refs)
 
+    entry: ExceptionTableEntry
+    for entry in self.exception_table.entries:
+      if entry.start_offset > offset:
+        entry.start_offset += size
+      if entry.end_offset >= offset:
+        entry.end_offset += size
+      if entry.target > offset:
+        entry.target += size
+
   def _handle_size_changes(self) -> None:
     """Fixes instructions who's size increased with the last insertion.
 
@@ -467,9 +535,19 @@ class Instrumentor:
       code += instr.to_bytes()
       stacksize = max(stacksize, stacksize + instr.get_stack_effect())
 
-    return get_code_object(self._code, stacksize, code,
-                           tuple(self.consts + ["__ATHERIS_INSTRUMENTED__"]),
-                           tuple(self._names), get_lnotab(self._code, listing))
+    co_exceptiontable = generate_exceptiontable(
+        self._code, self.exception_table.entries
+    )
+
+    return get_code_object(
+        self._code,
+        stacksize,
+        code,
+        tuple(self.consts + ["__ATHERIS_INSTRUMENTED__"]),
+        tuple(self._names),
+        get_lnotab(self._code, listing),
+        co_exceptiontable,
+    )
 
   def _generate_trace_branch_invocation(self, lineno: int,
                                         offset: int) -> _SizeAndInstructions:
@@ -479,20 +557,25 @@ class Instrumentor:
     const_atheris = self._get_const(sys.modules[_TARGET_MODULE])
     name_cov = self._get_name(_COVERAGE_FUNCTION)
 
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_atheris))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_ATTR"], name_cov))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_CONST"],
-                    self._get_counter()))
-    offset += to_insert[-1].get_size()
-    to_insert.append(Instruction(lineno, offset, dis.opmap["CALL_FUNCTION"], 1))
-    offset += to_insert[-1].get_size()
-    to_insert.append(Instruction(lineno, offset, dis.opmap["POP_TOP"]))
-    offset += to_insert[-1].get_size()
+    offset = self._insert_instructions(
+        to_insert, lineno, offset, args_terminator()
+    )
+
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_CONST"], const_atheris
+    )
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_ATTR"], name_cov
+    )
+
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_CONST"], self._get_counter()
+    )
+
+    offset = self._insert_instructions(to_insert, lineno, offset, call(1))
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["POP_TOP"], 0
+    )
 
     return offset - start_offset, to_insert
 
@@ -519,25 +602,29 @@ class Instrumentor:
     const_counter = self._get_counter()
     const_false = self._get_const(False)
 
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_atheris))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_ATTR"], name_cmp))
-    offset += to_insert[-1].get_size()
-    to_insert.append(Instruction(lineno, offset, dis.opmap["ROT_THREE"]))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_op))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_counter))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_false))
-    offset += to_insert[-1].get_size()
-    to_insert.append(Instruction(lineno, offset, dis.opmap["CALL_FUNCTION"], 5))
-    offset += to_insert[-1].get_size()
+    offset = self._insert_instructions(
+        to_insert, lineno, offset, args_terminator()
+    )
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_CONST"], const_atheris
+    )
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_ATTR"], name_cmp
+    )
+    rot = rot_n(2 + CALLABLE_STACK_ENTRIES, CALLABLE_STACK_ENTRIES)
+    offset = self._insert_instructions(to_insert, lineno, offset, rot)
+
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_CONST"], const_op
+    )
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_CONST"], const_counter
+    )
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_CONST"], const_false
+    )
+
+    offset = self._insert_instructions(to_insert, lineno, offset, call(5))
 
     return offset - start_offset, to_insert
 
@@ -571,30 +658,32 @@ class Instrumentor:
     else:
       const_op = self._get_const(op)
 
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_atheris))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_ATTR"], name_cmp))
-    offset += to_insert[-1].get_size()
-    to_insert.append(Instruction(lineno, offset, dis.opmap["ROT_THREE"]))
-    offset += to_insert[-1].get_size()
+    offset = self._insert_instructions(
+        to_insert, lineno, offset, args_terminator()
+    )
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_CONST"], const_atheris
+    )
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_ATTR"], name_cmp
+    )
+    rot = rot_n(2 + CALLABLE_STACK_ENTRIES, CALLABLE_STACK_ENTRIES)
+    offset = self._insert_instructions(to_insert, lineno, offset, rot)
 
     if switch:
-      to_insert.append(Instruction(lineno, offset, dis.opmap["ROT_TWO"]))
-      offset += to_insert[-1].get_size()
+      offset = self._insert_instructions(to_insert, lineno, offset, rot_n(2))
 
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_op))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_counter))
-    offset += to_insert[-1].get_size()
-    to_insert.append(
-        Instruction(lineno, offset, dis.opmap["LOAD_CONST"], const_true))
-    offset += to_insert[-1].get_size()
-    to_insert.append(Instruction(lineno, offset, dis.opmap["CALL_FUNCTION"], 5))
-    offset += to_insert[-1].get_size()
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_CONST"], const_op
+    )
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_CONST"], const_counter
+    )
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_CONST"], const_true
+    )
+
+    offset = self._insert_instructions(to_insert, lineno, offset, call(5))
 
     return offset - start_offset, to_insert
 
@@ -613,11 +702,31 @@ class Instrumentor:
     """
     already_instrumented = set()
 
-    offset = self._cfg[0].instructions[0].offset
+    # Insert at the first point after a RESUME instruction
+    first_real_instr = None
+    first_real_instr_slot = None
+    previous_instructions = []
+    for i in range(len(self._cfg[0].instructions)):
+      bb_instr = self._cfg[0].instructions[i]
+      if bb_instr.mnemonic not in ("RESUME", "GEN_START"):
+        first_real_instr = bb_instr
+        first_real_instr_slot = i
+        break
+
+    if first_real_instr is None:
+      # This was an empty code object (e.g. empty module)
+      return
+    assert first_real_instr_slot is not None
+
     total_size, to_insert = self._generate_trace_branch_invocation(
-        self._cfg[0].instructions[0].lineno, offset)
-    self._adjust(offset, total_size)
-    self._cfg[0].instructions = to_insert + self._cfg[0].instructions
+        first_real_instr.lineno, first_real_instr.offset
+    )
+    self._adjust(first_real_instr.offset, total_size)
+    self._cfg[0].instructions = (
+        self._cfg[0].instructions[0:first_real_instr_slot]
+        + to_insert
+        + self._cfg[0].instructions[first_real_instr_slot:]
+    )
 
     for basic_block in self._cfg.values():
       if len(basic_block.edges) == 2:
@@ -675,6 +784,11 @@ class Instrumentor:
         if instr.mnemonic == "LOAD_CONST":
           seen_consts.append(stack_size)
         elif instr.mnemonic == "COMPARE_OP" and instr.arg <= 5:
+          # If the instruction has CACHEs afterward, we'll need to NOP them too.
+          instr_caches = []
+          for i in range(c + 1, c + 1 + cache_count(instr.mnemonic)):
+            instr_caches.append(basic_block.instructions[i])
+
           # Determine the two values on the top of the stack before COMPARE_OP
           consts_on_stack = [
               c for c in seen_consts if stack_size - 2 <= c < stack_size
@@ -703,6 +817,8 @@ class Instrumentor:
               basic_block.instructions.insert(c + i, new_instr)
 
             instr.make_nop()
+            for cache_instr in instr_caches:
+              cache_instr.make_nop()
 
         stack_size += instr.get_stack_effect()
         seen_consts = [c for c in seen_consts if c < stack_size]

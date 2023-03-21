@@ -25,7 +25,7 @@ from setuptools import Extension
 from setuptools import setup
 from setuptools.command.build_ext import build_ext
 
-__version__ = os.getenv("ATHERIS_VERSION", "2.1.1")
+__version__ = os.getenv("ATHERIS_VERSION", "2.2.2")
 
 
 if len(sys.argv) > 1 and sys.argv[1] == "print_version":
@@ -118,12 +118,14 @@ ext_modules = [
             "src/native/atheris.cc",
             "src/native/util.cc",
             "src/native/fuzzed_data_provider.cc",
+            "src/native/codetable_gen.cc",
         ]),
         include_dirs=[
             # Path to pybind11 headers
             PybindIncludeGetter(),
         ],
-        language="c++"),
+        language="c++",
+    ),
     Extension(
         "atheris.core_with_libfuzzer",
         sorted([
@@ -137,7 +139,8 @@ ext_modules = [
             # Path to pybind11 headers
             PybindIncludeGetter(),
         ],
-        language="c++"),
+        language="c++",
+    ),
     Extension(
         "atheris.core_without_libfuzzer",
         sorted([
@@ -151,7 +154,8 @@ ext_modules = [
             # Path to pybind11 headers
             PybindIncludeGetter(),
         ],
-        language="c++"),
+        language="c++",
+    ),
     Extension(
         "atheris.custom_crossover",
         sorted([
@@ -162,7 +166,8 @@ ext_modules = [
             # Path to pybind11 headers
             PybindIncludeGetter(),
         ],
-        language="c++"),
+        language="c++",
+    ),
     Extension(
         "atheris.custom_mutator",
         sorted([
@@ -173,7 +178,8 @@ ext_modules = [
             # Path to pybind11 headers
             PybindIncludeGetter(),
         ],
-        language="c++"),
+        language="c++",
+    ),
 ]
 
 
@@ -352,7 +358,12 @@ class BuildExt(build_ext):
     # TODO(ipudney): Detect compiler support for the flags and re-add them.
     c_opts = []
 
-    c_opts += ["-Wno-attributes", "-Wno-address", "-Wno-deprecated-declarations"]
+    c_opts += [
+        "-DPYBIND11_DETAILED_ERROR_MESSAGES=1",
+        "-Wno-attributes",
+        "-Wno-address",
+        "-Wno-deprecated-declarations",
+    ]
     l_opts = []
 
     if sys.platform == "darwin":

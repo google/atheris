@@ -55,6 +55,8 @@ CLANG_BIN="$(pwd)/bin/clang" pip3 install <whatever>
 ### Example
 
 ```python
+#!/usr/bin/python3
+
 import atheris
 
 with atheris.instrument_imports():

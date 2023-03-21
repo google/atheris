@@ -26,6 +26,7 @@
 #include <sstream>
 
 #include "atheris.h"
+#include "codetable_gen.h"
 #include "fuzzed_data_provider.h"
 #include "macros.h"
 #include "pybind11/cast.h"
@@ -257,6 +258,11 @@ PYBIND11_MODULE(native, m) {
   m.def("_reserve_counter", &ReservePendingCounter);
   m.def("_trace_regex_match", &prefuzz_trace_regex_match);
   m.def("libfuzzer_is_loaded", &libfuzzer_is_loaded);
+#if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 11
+  // Implementations for 3.11+'s new code table data structures.
+  m.def("_generate_codetable", &GenerateCodetable);
+  m.def("_generate_exceptiontable", &GenerateExceptiontable);
+#endif
 
   py::class_<FuzzedDataProvider>(m, "FuzzedDataProvider")
       .def(py::init<py::bytes>())
