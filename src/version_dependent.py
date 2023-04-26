@@ -37,10 +37,10 @@ from typing import List
 
 PYTHON_VERSION = sys.version_info[:2]
 
-if PYTHON_VERSION < (3, 6) or PYTHON_VERSION > (3, 11):
+if PYTHON_VERSION < (3, 6) or PYTHON_VERSION > (3, 12):
   raise RuntimeError(
       "You are fuzzing on an unsupported python version: "
-      + f"{PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.11 are "
+      + f"{PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.12 are "
       + "supported by atheris 2.0. Use atheris 1.0 for older python versions."
   )
 
