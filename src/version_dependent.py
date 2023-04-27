@@ -139,7 +139,7 @@ if PYTHON_VERSION <= (3, 10):
       "JUMP_IF_TRUE_OR_POP",
       "JUMP_IF_FALSE_OR_POP",
   ])
-else:
+elif PYTHON_VERSION < (3, 12):
   HAVE_REL_REFERENCE.extend([
       "JUMP_IF_TRUE_OR_POP",
       "JUMP_IF_FALSE_OR_POP",
