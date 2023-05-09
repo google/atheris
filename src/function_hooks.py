@@ -14,9 +14,13 @@
 """Provides Atheris instrumentation hooks for particular functions like regex."""
 
 import re
-import sre_parse
 import sys
 from typing import Set, Any, Pattern, List, Match, Optional, Iterator, Union, Callable, AnyStr
+try:
+  import re._parser as sre_parse
+except ImportError:
+  import sre_parse
+
 
 # mypy does not like the implicit rexport of the constants available in
 # sre_parse, and also does not support ignoring for blocks of code. Rather
