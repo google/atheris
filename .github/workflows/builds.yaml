@@ -1,0 +1,30 @@
+name: Builds
+
+on: [push, pull_request]
+
+env:
+  FORCE_COLOR: 1
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    - name: Install dependencies
+      run: pip3 install PyInstaller
+    - name: Build
+      run: pip3 install .
+    - name: Run tests
+      run: cd src; python -m unittest discover . -p '*_test.py'
