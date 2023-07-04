@@ -212,9 +212,8 @@ class Instruction:
 
     if old_reference is not None:
       assert(self.reference is not None)  # appease mypy
-      if not keep_ref:
-        if changed_offset <= old_reference:
-          self.reference += size  # type: ignore[operator]
+      if not keep_ref and changed_offset <= old_reference:
+        self.reference += size  # type: ignore[operator]
 
         if self._is_relative:
           if self.mnemonic not in REL_REFERENCE_IS_INVERTED and (

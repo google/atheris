@@ -65,7 +65,7 @@ def to_correct_type(
     return bytes(to_convert, "utf-8")
 
 
-@typing.no_type_check # mypy chokes on `return_type`
+@typing.no_type_check  # mypy chokes on `return_type`
 def gen_match_recursive(ops: Any,
                         return_type: Callable[[], Union[str, bytes]] = str,
                         respect_lookarounds: bool = False) -> Union[str, bytes]:
