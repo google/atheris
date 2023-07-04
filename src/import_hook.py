@@ -25,7 +25,7 @@ from importlib import abc
 from importlib import machinery
 import sys
 import types
-from typing import Set, Optional, Sequence, Type, Union, Any
+from typing import Set, Optional, Sequence, Union, Any
 from .instrument_bytecode import patch_code
 
 _warned_experimental = False
