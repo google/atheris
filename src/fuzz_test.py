@@ -15,7 +15,6 @@
 import functools
 import os
 import re
-import sys
 import time
 import unittest
 import zlib
