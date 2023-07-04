@@ -45,7 +45,6 @@ from .version_dependent import caches
 from .version_dependent import get_instructions
 from .version_dependent import generate_exceptiontable
 from .version_dependent import parse_exceptiontable
-from .version_dependent import ExceptionTable
 from .version_dependent import ExceptionTableEntry
 from .version_dependent import args_terminator
 from .version_dependent import CALLABLE_STACK_ENTRIES
