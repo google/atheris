@@ -20,6 +20,7 @@ helper class Instrumentor.
 import collections
 import dis
 import gc
+import itertools
 import sys
 import types
 from typing import Any, Callable, Iterator, List, Optional, Tuple, TypeVar, Union
@@ -507,11 +508,7 @@ class Instrumentor:
         break
 
   def _get_linear_instruction_listing(self) -> List[Instruction]:
-    listing = []
-    for basic_block in self._cfg.values():
-      for instr in basic_block:
-        listing.append(instr)
-    return listing
+    return list(itertools.chain.from_iterable(self._cfg.values()))
 
   def to_code(self) -> types.CodeType:
     """Returns the instrumented code object."""
