@@ -42,8 +42,10 @@ static bool dummy_initializer = []() {
   opcode_caches[COMPARE_OP] = 2;
   opcode_caches[LOAD_GLOBAL] = 5;
   opcode_caches[BINARY_OP] = 1;
+#if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION == 11
   opcode_caches[LOAD_METHOD] = 10;
   opcode_caches[PRECALL] = 1;
+#endif
   opcode_caches[CALL] = 4;
   return true;
 }();

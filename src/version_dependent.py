@@ -14,7 +14,7 @@
 # limitations under the License.
 """This module manages the version specific aspects of bytecode instrumentation.
 
-Accross Python versions there are variations in:
+Across Python versions there are variations in:
     - Instructions
     - Instruction arguments
     - Shape of a code object
@@ -37,10 +37,10 @@ from typing import List
 
 PYTHON_VERSION = sys.version_info[:2]
 
-if PYTHON_VERSION < (3, 6) or PYTHON_VERSION > (3, 11):
+if PYTHON_VERSION < (3, 6) or PYTHON_VERSION > (3, 12):
   raise RuntimeError(
       "You are fuzzing on an unsupported python version: "
-      + f"{PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.11 are "
+      + f"{PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.12 are "
       + "supported by atheris 2.0. Use atheris 1.0 for older python versions."
   )
 
@@ -139,7 +139,7 @@ if PYTHON_VERSION <= (3, 10):
       "JUMP_IF_TRUE_OR_POP",
       "JUMP_IF_FALSE_OR_POP",
   ])
-else:
+elif PYTHON_VERSION < (3, 12):
   HAVE_REL_REFERENCE.extend([
       "JUMP_IF_TRUE_OR_POP",
       "JUMP_IF_FALSE_OR_POP",
@@ -328,7 +328,7 @@ if (3, 10) <= PYTHON_VERSION <= (3, 10):
     return bytes(lnotab)
 
 
-if (3, 11) <= PYTHON_VERSION <= (3, 11):
+if (3, 11) <= PYTHON_VERSION:
   from .native import _generate_codetable
   def get_lnotab(code, listing):
     ret = _generate_codetable(code, listing)
@@ -391,7 +391,7 @@ def parse_exceptiontable(code):
   return ExceptionTable([])
 
 
-if (3, 11) <= PYTHON_VERSION <= (3, 11):
+if (3, 11) <= PYTHON_VERSION:
   from .native import _generate_exceptiontable
 
   def generate_exceptiontable(original_code, exception_table_entries):
@@ -520,13 +520,15 @@ if PYTHON_VERSION >= (3, 11):
   # 3.11 requires a PRECALL instruction prior to every CALL instruction.
   def call(argc: int):
     ret = []
-    ret.append((dis.opmap["PRECALL"], argc))
+    if PYTHON_VERSION == (3, 11):
+      ret.append((dis.opmap["PRECALL"], argc))
     ret.append((dis.opmap["CALL"], argc))
     return ret
 
   # A call pops 2 items off the stack in addition to the args: the callable
   # itself, and a null terminator.
   CALLABLE_STACK_ENTRIES = 2
+
 
 ### disassembler compatibility ###
 # In 3.11, we need to pass show_caches=True.
