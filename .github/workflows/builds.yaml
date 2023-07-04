@@ -36,10 +36,11 @@ jobs:
     - name: Run mypy checks
       run: mypy src/
   build:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+        os: ["ubuntu-latest", "osx-latest"]
+    runs-on: ${{ matrix.os }}
     needs: [ruff, mypy]
     steps:
     - uses: actions/checkout@v3
