@@ -295,7 +295,7 @@ if (3, 6) <= PYTHON_VERSION <= (3, 9):
     return bytes(lnotab)
 
 
-if (3, 10) <= PYTHON_VERSION <= (3, 10):
+elif (3, 10) <= PYTHON_VERSION <= (3, 10):
   def get_lnotab(code, listing):
     """Returns line number table."""
     lnotab = []
@@ -328,7 +328,7 @@ if (3, 10) <= PYTHON_VERSION <= (3, 10):
     return bytes(lnotab)
 
 
-if (3, 11) <= PYTHON_VERSION <= (3, 11):
+elif (3, 11) <= PYTHON_VERSION <= (3, 11):
   from .native import _generate_codetable
   def get_lnotab(code, listing):
     ret = _generate_codetable(code, listing)
