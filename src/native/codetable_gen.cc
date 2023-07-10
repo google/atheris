@@ -113,7 +113,9 @@ struct assembler {
 
 static int instr_size(struct instr* instruction) {
   int opcode = instruction->i_opcode;
+#if PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION == 12
   assert(!IS_PSEUDO_OPCODE(opcode));
+  #endif
   int oparg = HAS_ARG(opcode) ? instruction->i_oparg : 0;
   int extended_args = (0xFFFFFF < oparg) + (0xFFFF < oparg) + (0xFF < oparg);
   int caches = opcode_caches[opcode];
