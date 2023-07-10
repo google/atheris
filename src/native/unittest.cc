@@ -23,6 +23,7 @@
 #include <limits>
 #include <sstream>
 
+#include "codetable_gen.h"
 #include "fuzzed_data_provider.h"
 #include "macros.h"
 #include "pybind11/functional.h"
@@ -142,6 +143,8 @@ PYBIND11_MODULE(native, m) {
   m.def("_trace_cmp", &_trace_cmp, py::return_value_policy::move);
   m.def("_reserve_counter", &_reserve_counter);
   m.def("_trace_regex_match", &_trace_regex_match);
+  m.def("_generate_codetable", &GenerateCodetable);
+  m.def("_generate_exceptiontable", &GenerateExceptiontable);
 
   py::class_<FuzzedDataProvider>(m, "FuzzedDataProvider")
       .def(py::init<py::bytes>())
