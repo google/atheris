@@ -815,6 +815,8 @@ class Instrumentor:
 
             for i, new_instr in enumerate(to_insert):
               basic_block.instructions.insert(c + i, new_instr)
+            # Need to account for stack size effect of 0th new instruction
+            stack_size += basic_block.instructions[c].get_stack_effect()
 
             instr.make_nop()
             for cache_instr in instr_caches:

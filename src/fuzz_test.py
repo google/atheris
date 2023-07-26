@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 import os
 import re
 import sys
 import time
 import unittest
 import zlib
-import functools
 
 import atheris
 
@@ -87,6 +87,19 @@ def utf8_comparison(data):
 
 
 @atheris.instrument_func
+def nested_utf8_comparison(data):
+  try:
+    decoded = data.decode("utf-8")
+    x = "sup"
+    if (x == "sup" and decoded == "foobarbazbiz") and (
+        decoded == "foobarbazbiz"
+    ):
+      raise RuntimeError("Was hello")
+  except UnicodeDecodeError:
+    pass
+
+
+@atheris.instrument_func
 def timeout_py(data):
   del data
   time.sleep(100000000)
@@ -139,7 +152,6 @@ def runtime_instrument_code(data):
   foo(data)
 
 
-
 class IntegrationTests(unittest.TestCase):
 
   def testFails(self):
@@ -161,6 +173,13 @@ class IntegrationTests(unittest.TestCase):
   def testUtf8Comparison(self):
     fuzz_test_lib.run_fuzztest(
         utf8_comparison, expected_output=b"Was random unicode", timeout=60)
+
+  def testNestedUtf8Comparison(self):
+    fuzz_test_lib.run_fuzztest(
+        nested_utf8_comparison,
+        expected_output=b"Was hello",
+        timeout=60,
+    )
 
   def testTimeoutPy(self):
     """This test verifies that timeout messages are recorded from -timeout."""

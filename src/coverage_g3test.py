@@ -46,6 +46,11 @@ def cmp_greater(a, b):
 
 
 @atheris.instrument_func
+def cmp_equal_nested(a, b, c):
+  return (a == b) == c
+
+
+@atheris.instrument_func
 def cmp_const_less(a):
   return 1 < a
 
@@ -144,6 +149,23 @@ class CoverageTest(unittest.TestCase):
     self.assertTraceCmpWas(trace_cmp_mock.call_args[0], 1, 2, "<", False)
     third_cmp_idx = trace_cmp_mock.call_args[0][3]
     self.assertEqual(first_cmp_idx, third_cmp_idx)
+    trace_cmp_mock.reset_mock()
+
+    self.assertTrue(cmp_equal_nested(3, 3, True))
+    self.assertEqual(len(trace_cmp_mock.call_args_list), 2)
+    self.assertTraceCmpWas(
+        trace_cmp_mock.call_args_list[0][0], 3, 3, "==", False
+    )
+    fourth_cmp_idx = trace_cmp_mock.call_args_list[0][0][3]
+    self.assertNotEqual(first_cmp_idx, fourth_cmp_idx)
+    self.assertNotEqual(second_cmp_idx, fourth_cmp_idx)
+    self.assertTraceCmpWas(
+        trace_cmp_mock.call_args_list[1][0], True, True, "==", False
+    )
+    fifth_cmp_idx = trace_cmp_mock.call_args_list[1][0][3]
+    self.assertNotEqual(first_cmp_idx, fifth_cmp_idx)
+    self.assertNotEqual(second_cmp_idx, fifth_cmp_idx)
+    self.assertNotEqual(fourth_cmp_idx, fifth_cmp_idx)
 
   def testConstCompare(self, trace_branch_mock, trace_cmp_mock,
                        trace_regex_match_mock):
