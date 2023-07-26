@@ -34,6 +34,10 @@ def cmp_greater(a, b):
   return a > b
 
 
+def cmp_equal_nested(a, b, c):
+  return (a == b) == c
+
+
 def cmp_const_less(a):
   return 1 < a
 
