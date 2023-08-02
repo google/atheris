@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Make sure we propegate exit codes, for kokoro.
+# Make sure we propagate exit codes, for kokoro.
 set -e
 
 if [ -z "$PYTHON" ]; then
