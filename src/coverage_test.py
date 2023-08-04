@@ -14,6 +14,7 @@
 """Tests for coverage instrumentation."""
 
 import dis
+import logging
 import re
 import unittest
 from unittest import mock
