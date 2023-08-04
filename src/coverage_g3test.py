@@ -24,6 +24,8 @@ with atheris.instrument_imports():
 
 # Enable RegEx instrumentation.
 atheris.enabled_hooks.add("RegEx")
+# Enable str method instrumentation.
+atheris.enabled_hooks.add("str")
 
 
 @atheris.instrument_func
@@ -68,6 +70,46 @@ def decorator_instrumented(x):
 @atheris.instrument_func
 def regex_match(re_obj, a):
   re_obj.match(a)
+
+
+@atheris.instrument_func
+def starts_with(s, prefix):
+  s.startswith(prefix)
+
+
+@atheris.instrument_func
+def ends_with(s, suffix):
+  s.endswith(suffix)
+
+
+# Verifying that no tracing happens when var args are passed in to startswith
+# method calls
+@atheris.instrument_func
+def starts_with_var_args(s, *args):
+  s.startswith(*args)
+
+
+class FakeStr:
+
+  def startswith(self, s, prefix):
+    pass
+
+  def endswith(self, s, suffix):
+    pass
+
+
+# Verifying that even though this code gets patched, no tracing happens
+@atheris.instrument_func
+def fake_starts_with(s, prefix):
+  fake_str = FakeStr()
+  fake_str.startswith(s=s, prefix=prefix)
+
+
+# Verifying that even though this code gets patched, no tracing happens
+@atheris.instrument_func
+def fake_ends_with(s, suffix):
+  fake_str = FakeStr()
+  fake_str.endswith(s, suffix)
 
 
 @atheris.instrument_func
@@ -122,9 +164,42 @@ class CoverageTest(unittest.TestCase):
     trace_branch_mock.assert_called()
     trace_regex_match_mock.assert_called()
 
+  def testStrMethods(
+      self, trace_branch_mock, trace_cmp_mock, trace_regex_match_mock
+  ):
+    trace_branch_mock.assert_not_called()
+    trace_regex_match_mock.assert_not_called()
+    starts_with("foobar", "foo")
+    trace_branch_mock.assert_called()
+    trace_regex_match_mock.assert_called()
+    trace_branch_mock.reset_mock()
+    trace_regex_match_mock.reset_mock()
+
+    trace_branch_mock.assert_not_called()
+    trace_regex_match_mock.assert_not_called()
+    ends_with("bazbiz", "biz")
+    trace_branch_mock.assert_called()
+    trace_regex_match_mock.assert_called()
+    trace_regex_match_mock.reset_mock()
+
+    trace_regex_match_mock.assert_not_called()
+    starts_with_var_args("foobar", "foo")
+    trace_regex_match_mock.assert_not_called()
+    trace_regex_match_mock.reset_mock()
+
+    # Check that non-str method calls do not get traced
+    trace_regex_match_mock.assert_not_called()
+    fake_starts_with("foobar", "foo")
+    trace_regex_match_mock.assert_not_called()
+    trace_regex_match_mock.reset_mock()
+
+    trace_regex_match_mock.assert_not_called()
+    fake_ends_with("bazbiz", "biz")
+    trace_regex_match_mock.assert_not_called()
+
   def assertTraceCmpWas(self, call_args, left, right, op, left_is_const):
     """Compare a _trace_cmp call to expected values."""
-    #call_args: tuple(left, right, opid, idx, left_is_const)
+    # call_args: tuple(left, right, opid, idx, left_is_const)
     self.assertEqual(call_args[0], left)
     self.assertEqual(call_args[1], right)
     self.assertEqual(dis.cmp_op[call_args[2]], op)

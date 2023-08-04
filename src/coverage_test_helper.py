@@ -53,3 +53,37 @@ def while_loop(a):
 
 def regex_match(re_obj, a):
   re_obj.match(a)
+
+
+def starts_with(s, prefix):
+  s.startswith(prefix)
+
+
+def ends_with(s, suffix):
+  s.endswith(suffix)
+
+
+# Verifying that no tracing happens when var args are passed in to startswith
+# method calls
+def starts_with_var_args(s, *args):
+  s.startswith(*args)
+
+
+# Verifying that even though this code gets patched, no tracing happens
+class FakeStr:
+
+  def startswith(self, s, prefix):
+    pass
+
+  def endswith(self, s, suffix):
+    pass
+
+
+def fake_starts_with(s, prefix):
+  fake_str = FakeStr()
+  fake_str.startswith(s=s, prefix=prefix)
+
+
+def fake_ends_with(s, suffix):
+  fake_str = FakeStr()
+  fake_str.endswith(s, suffix)
