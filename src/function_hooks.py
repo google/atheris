@@ -24,7 +24,6 @@ except ImportError:
   import sre_parse
 
 
-
 # mypy does not like the implicit rexport of the constants available in
 # sre_parse, and also does not support ignoring for blocks of code. Rather
 # than having a whole-file ignore, or interrupting every line of every statement

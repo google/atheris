@@ -268,7 +268,7 @@ class IntegrationTests(unittest.TestCase):
         expected_output=b"Was RegEx Match",
         enabled_hooks=["RegEx"])
 
-  def testStrStartswith(self):
+  def testStrStartsWith(self):
     fuzz_test_lib.run_fuzztest(
         str_startswith,
         expected_output=b"Started with foobar",
@@ -276,7 +276,7 @@ class IntegrationTests(unittest.TestCase):
         timeout=60,
     )
 
-  def testStrEndswith(self):
+  def testStrEndsWith(self):
     fuzz_test_lib.run_fuzztest(
         str_endswith,
         expected_output=b"Ended with bazbiz",
@@ -316,7 +316,7 @@ class IntegrationTests(unittest.TestCase):
         timeout=60,
     )
 
-  def testStrEndswithStartEndArgs(self):
+  def testStrEndsWithStartEndArgs(self):
     fuzz_test_lib.run_fuzztest(
         str_endswith_with_start_and_end,
         expected_output=b"Ended with supyo at end index 15",
