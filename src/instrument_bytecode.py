@@ -20,6 +20,7 @@ helper class Instrumentor.
 import collections
 import dis
 import gc
+import logging
 import sys
 import types
 from typing import Any, Callable, Iterator, List, Optional, Tuple, TypeVar, Union
@@ -27,32 +28,33 @@ from typing import Any, Callable, Iterator, List, Optional, Tuple, TypeVar, Unio
 from . import utils
 from .native import _reserve_counter  # type: ignore[import]
 from .version_dependent import add_bytes_to_jump_arg
+from .version_dependent import args_terminator
+from .version_dependent import cache_count
+from .version_dependent import caches
+from .version_dependent import call
+from .version_dependent import CALLABLE_STACK_ENTRIES
 from .version_dependent import CONDITIONAL_JUMPS
 from .version_dependent import ENDS_FUNCTION
+from .version_dependent import ExceptionTable
+from .version_dependent import ExceptionTableEntry
+from .version_dependent import generate_exceptiontable
 from .version_dependent import get_code_object
+from .version_dependent import get_instructions
 from .version_dependent import get_lnotab
 from .version_dependent import HAVE_ABS_REFERENCE
 from .version_dependent import HAVE_REL_REFERENCE
+from .version_dependent import jump_arg_bytes
+from .version_dependent import parse_exceptiontable
 from .version_dependent import REL_REFERENCE_IS_INVERTED
 from .version_dependent import rel_reference_scale
-from .version_dependent import jump_arg_bytes
 from .version_dependent import REVERSE_CMP_OP
-from .version_dependent import UNCONDITIONAL_JUMPS
 from .version_dependent import rot_n
-from .version_dependent import call
-from .version_dependent import cache_count
-from .version_dependent import caches
-from .version_dependent import get_instructions
-from .version_dependent import generate_exceptiontable
-from .version_dependent import parse_exceptiontable
-from .version_dependent import ExceptionTable
-from .version_dependent import ExceptionTableEntry
-from .version_dependent import args_terminator
-from .version_dependent import CALLABLE_STACK_ENTRIES
+from .version_dependent import UNCONDITIONAL_JUMPS
 
 _TARGET_MODULE = "atheris"
 _COVERAGE_FUNCTION = "_trace_branch"
 _COMPARE_FUNCTION = "_trace_cmp"
+_HOOK_STR_FUNCTION = "_hook_str"
 
 # TODO(b/207008147): Use NewType to differentiate the many int and str types.
 
@@ -443,7 +445,7 @@ class Instrumentor:
       self._names.append(name)
       return len(self._names) - 1
 
-  def _get_const(self, constant: Union[int, types.ModuleType]) -> int:
+  def _get_const(self, constant: Union[int, str, types.ModuleType]) -> int:
     """Returns the index of `constant` in self.consts, inserting if needed."""
     for i in range(len(self.consts)):
       if isinstance(self.consts[i],
@@ -687,6 +689,74 @@ class Instrumentor:
 
     return offset - start_offset, to_insert
 
+  def _generate_hook_str_invocation(
+      self, str_method: str, lineno: int, offset: int
+  ) -> _SizeAndInstructions:
+    """Builds the bytecode that loads in and sets up atheris._trace_str().
+
+    Args:
+      str_method: The str method
+      lineno: The line number of the operation
+      offset: The offset to the operation instruction
+
+    Returns:
+      The size of the instructions to insert,
+      The instructions to insert
+    """
+    to_insert = []
+    start_offset = offset
+    const_atheris = self._get_const(sys.modules[_TARGET_MODULE])
+    name_hook_str = self._get_name(_HOOK_STR_FUNCTION)
+    const_str_method = self._get_const(str_method)
+
+    offset = self._insert_instructions(
+        to_insert, lineno, offset, args_terminator()
+    )
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_CONST"], const_atheris
+    )
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_ATTR"], name_hook_str
+    )
+    # Put self argument at the top
+    rot = rot_n(1 + CALLABLE_STACK_ENTRIES, CALLABLE_STACK_ENTRIES)
+    offset = self._insert_instructions(to_insert, lineno, offset, rot)
+
+    offset = self._insert_instruction(
+        to_insert, lineno, offset, dis.opmap["LOAD_CONST"], const_str_method
+    )
+
+    return offset - start_offset, to_insert
+
+  def _generate_call(
+      self, opname: str, num_args: int, lineno: int, offset: int
+  ) -> _SizeAndInstructions:
+    """Builds the bytecode that makes the function call to atheris._trace_str().
+
+    Args:
+      opname: The opname that is being replaced
+      num_args: The number of args that are passed in
+      lineno: The line number of the operation
+      offset: The offset to the operation instruction
+
+    Returns:
+      The size of the instructions to insert,
+      The instructions to insert
+    """
+    to_insert = []
+    start_offset = offset
+
+    if opname == "CALL_FUNCTION_KW":
+      offset = self._insert_instruction(
+          to_insert, lineno, offset, dis.opmap["CALL_FUNCTION_KW"], num_args
+      )
+    else:
+      offset = self._insert_instructions(
+          to_insert, lineno, offset, call(num_args)
+      )
+
+    return offset - start_offset, to_insert
+
   def trace_control_flow(self) -> None:
     """Insert a call to atheris._trace_branch() branch's target block.
 
@@ -827,6 +897,175 @@ class Instrumentor:
 
     self._handle_size_changes()
 
+  def _is_str_hookable(self, instr) -> bool:
+    return instr.mnemonic in ("LOAD_ATTR", "LOAD_METHOD") and self._names[
+        instr.arg
+    ] in ("startswith", "endswith")
+
+  def _is_call_replaceable(
+      self, instr, stack_size, traced_methods, num_new_args_inserted
+  ) -> bool:
+    """Checks whether current instruction is a call instruction to be replaced.
+
+    Since there are different call instruction variations depending on the way
+    the args were passed in the original method, we need to check for them all.
+    We also need to check that the call instruction corresponds to a method that
+    is being traced.
+
+    Args:
+      instr: The instruction being checked
+      stack_size: The current size of the stack
+      traced_methods: The list of methods to be traced
+      num_new_args_inserted: The number of new function arguments inserted
+
+    Returns:
+      Whether the current instruction is a call instruction that should be
+      replaced
+    """
+    return (
+        instr.mnemonic in ("PRECALL", "CALL_METHOD", "CALL_FUNCTION")
+        and (
+            stack_size - instr.arg - num_new_args_inserted - 1 in traced_methods
+        )
+    ) or (
+        instr.mnemonic == "CALL_FUNCTION_KW"
+        and (
+            stack_size - instr.arg - num_new_args_inserted - 2 in traced_methods
+        )
+    )
+
+  def trace_str_flow(self) -> None:
+    """Instruments bytecode for tracing calls to str methods.
+
+    Note that this function can be generalized to instrumenting other method
+    calls in the future.
+
+    This function is experimental.
+
+    This function does not patch code whenever the str methods are called with
+    variable arguments.
+
+    This works by replacing the instruction LOAD_ATTR or LOAD_METHOD that also
+    has oneof arg (startswith, endswith) with a call to hook_str().
+    The arguments for hook_str() are as follows:
+        - self: The value that the original method was called by
+        - str_method: Name of the str method
+        - *args
+
+    The bytecode that gets inserted looks like this:
+      LOAD_CONST     atheris
+      LOAD_ATTR      _trace_str
+      ROT_TWO                     ; move atheris._trace_str below arg
+      LOAD_CONST     <str_method>
+
+    Additionally, the associated method call instructions are replaced with
+    a function call instruction.
+    """
+    stack_size = 0
+    seen_consts = []
+    # Keeps track of stack positions of traced methods so that the associated
+    # call instructions can be identified properly
+    traced_methods = []
+    for basic_block in self._cfg.values():
+      for c, instr in enumerate(basic_block.instructions):
+        offset = instr.offset
+        total_size = None
+        to_insert = None
+
+        instrs_to_nop = []
+
+        if instr.mnemonic == "LOAD_CONST":
+          seen_consts.append(stack_size)
+        # This hooks all method calls, not just the str ones
+        elif self._is_str_hookable(instr):
+          # Check to see if this method is called with variable args
+          has_variable_args = False
+          temp_stack_size = stack_size + instr.get_stack_effect()
+          i = c + 1
+          while (
+              temp_stack_size >= stack_size + instr.get_stack_effect()
+          ) and i < len(basic_block.instructions):
+            temp_instr = basic_block.instructions[i]
+            if (
+                temp_instr.mnemonic == "CALL_FUNCTION_EX"
+                and temp_stack_size - (temp_instr.arg & 0x01) - 1
+                == stack_size + instr.get_stack_effect()
+            ):
+              has_variable_args = True
+              logging.warning(
+                  "Tracing str methods does not work when variable args are"
+                  " passed in"
+              )
+              break
+            temp_stack_size += temp_instr.get_stack_effect()
+            i += 1
+
+          # Determine the value on the top of the stack before LOAD_ATTR
+          const_on_tos = [
+              c for c in seen_consts if c == stack_size - 1
+          ]
+          tos_is_constant = stack_size - 1 in const_on_tos
+
+          # Only trace when self is non-constant and variable args are not
+          # present
+          if not tos_is_constant and not has_variable_args:
+            callable_extra_stack_effect = CALLABLE_STACK_ENTRIES - 2
+            true_stack_position = stack_size + callable_extra_stack_effect
+            traced_methods.append(true_stack_position)
+
+            str_method = self._names[instr.arg]
+
+            total_size, to_insert = self._generate_hook_str_invocation(
+                str_method, instr.lineno, offset
+            )
+        # Need to also replace the call instruction, since we replaced the
+        # original method with our _hook_str function and added the 2 arguments:
+        # self (the original method caller) and the str method name
+        elif self._is_call_replaceable(
+            instr, stack_size, traced_methods, num_new_args_inserted=2
+        ):
+          # PRECALL instruction requires extra logic because we also need to
+          # nop the following CALL instruction
+          if instr.mnemonic == "PRECALL":
+            call_instr_idx = c + 1
+            while basic_block.instructions[call_instr_idx].mnemonic != "CALL":
+              call_instr_idx += 1
+            call_instr = basic_block.instructions[call_instr_idx]
+            instrs_to_nop.append(call_instr)
+            for i in range(
+                call_instr_idx + 1,
+                call_instr_idx + 1 + cache_count(call_instr.mnemonic),
+            ):
+              instrs_to_nop.append(basic_block.instructions[i])
+
+          new_arg_count = instr.arg + 2
+          total_size, to_insert = self._generate_call(
+              instr.mnemonic, new_arg_count, instr.lineno, offset
+          )
+
+        # Here we actually insert the new instructions and nop the old ones
+        if to_insert:
+          instrs_to_nop.append(instr)
+          # If the instruction has CACHEs afterward, we'll need to NOP them too.
+          for i in range(c + 1, c + 1 + cache_count(instr.mnemonic)):
+            instrs_to_nop.append(basic_block.instructions[i])
+
+          self._adjust(offset, total_size)
+
+          for i, new_instr in enumerate(to_insert):
+            basic_block.instructions.insert(c + i, new_instr)
+          # Need to account for stack size effect of 0th new instruction
+          stack_size += basic_block.instructions[c].get_stack_effect()
+
+          for instr_to_nop in instrs_to_nop:
+            instr_to_nop.make_nop()
+
+        stack_size += instr.get_stack_effect()
+        seen_consts = [c for c in seen_consts if c < stack_size]
+        traced_methods = [m for m in traced_methods if m < stack_size]
+
+    self._handle_size_changes()
+
   def _print_disassembly(self) -> None:
     """Prints disassembly."""
     print(f"Disassembly of {self._code.co_filename}:{self._code.co_name}")
@@ -867,6 +1106,9 @@ def patch_code(code: types.CodeType,
 
   if trace_dataflow:
     inst.trace_data_flow()
+    # Note that the user still needs to add "str" to enabled_hooks to actually
+    # enable tracing
+    inst.trace_str_flow()
 
   # Repeat this for all nested code objects
   for i in range(len(inst.consts)):

@@ -112,6 +112,46 @@ def regex_match(data):
 
 
 @atheris.instrument_func
+def str_startswith(data):
+  try:
+    decoded = data.decode("utf-8")
+    if decoded.startswith("foobar"):
+      raise RuntimeError("Started with foobar")
+  except UnicodeDecodeError:
+    pass
+
+
+@atheris.instrument_func
+def str_endswith(data):
+  try:
+    decoded = data.decode("utf-8")
+    if decoded.endswith("bazbiz"):
+      raise RuntimeError("Ended with bazbiz")
+  except UnicodeDecodeError:
+    pass
+
+
+@atheris.instrument_func
+def str_startswith_with_start_and_end(data):
+  try:
+    decoded = data.decode("utf-8")
+    if decoded.startswith("hellohi", 10, 20):
+      raise RuntimeError("Started with hellohi at index 10")
+  except UnicodeDecodeError:
+    pass
+
+
+@atheris.instrument_func
+def str_endswith_with_start_and_end(data):
+  try:
+    decoded = data.decode("utf-8")
+    if decoded.endswith("supyo", 5, 15):
+      raise RuntimeError("Ended with supyo at end index 15")
+  except UnicodeDecodeError:
+    pass
+
+
+@atheris.instrument_func
 def compressed_data(data):
   try:
     decompressed = zlib.decompress(data)
@@ -197,6 +237,38 @@ class IntegrationTests(unittest.TestCase):
         regex_match,
         expected_output=b"Was RegEx Match",
         enabled_hooks=["RegEx"])
+
+  def testStrStartsWith(self):
+    fuzz_test_lib.run_fuzztest(
+        str_startswith,
+        expected_output=b"Started with foobar",
+        enabled_hooks=["str"],
+        timeout=60,
+    )
+
+  def testStrEndsWith(self):
+    fuzz_test_lib.run_fuzztest(
+        str_endswith,
+        expected_output=b"Ended with bazbiz",
+        enabled_hooks=["str"],
+        timeout=60,
+    )
+
+  def testStrStartsWithStartEndArgs(self):
+    fuzz_test_lib.run_fuzztest(
+        str_startswith_with_start_and_end,
+        expected_output=b"Started with hellohi at index 10",
+        enabled_hooks=["str"],
+        timeout=60,
+    )
+
+  def testStrEndsWithStartEndArgs(self):
+    fuzz_test_lib.run_fuzztest(
+        str_endswith_with_start_and_end,
+        expected_output=b"Ended with supyo at end index 15",
+        enabled_hooks=["str"],
+        timeout=60,
+    )
 
   def testExitsGracefullyOnPyFail(self):
     fuzz_test_lib.run_fuzztest(

@@ -109,6 +109,10 @@ To your script before your code calls `re.compile`.
 Internally this will import the `re` module and instrument the necessary functions.
 This is currently an experimental feature.
 
+Similarly, Atheris can instrument str methods; currently only `str.startswith`
+and `str.endswith` are supported. To enable this feature, add
+`atheris.enabled_hooks.add("str")`. This is currently an experimental feature.
+
 #### Why am I getting "No interesting inputs were found"?
 
 You might see this error:

@@ -14,6 +14,7 @@
 """Tests for coverage instrumentation."""
 
 import dis
+import logging
 import re
 import unittest
 from unittest import mock
@@ -25,6 +26,8 @@ with atheris.instrument_imports():
 
 # Enable RegEx instrumentation.
 atheris.enabled_hooks.add("RegEx")
+# Enable str methods instrumentation.
+atheris.enabled_hooks.add("str")
 
 
 @atheris.instrument_func
@@ -96,9 +99,42 @@ class CoverageTest(unittest.TestCase):
     trace_branch_mock.assert_called()
     trace_regex_match_mock.assert_called()
 
+  def testStrMethods(
+      self, trace_branch_mock, trace_cmp_mock, trace_regex_match_mock
+  ):
+    trace_branch_mock.assert_not_called()
+    trace_regex_match_mock.assert_not_called()
+    coverage_test_helper.starts_with("foobar", "foo")
+    trace_branch_mock.assert_called()
+    trace_regex_match_mock.assert_called()
+    trace_branch_mock.reset_mock()
+    trace_regex_match_mock.reset_mock()
+
+    trace_branch_mock.assert_not_called()
+    trace_regex_match_mock.assert_not_called()
+    coverage_test_helper.ends_with("bazbiz", "biz")
+    trace_branch_mock.assert_called()
+    trace_regex_match_mock.assert_called()
+    trace_regex_match_mock.reset_mock()
+
+    trace_regex_match_mock.assert_not_called()
+    coverage_test_helper.starts_with_var_args("foobar", "foo")
+    trace_regex_match_mock.assert_not_called()
+    trace_regex_match_mock.reset_mock()
+
+    # Check that non-str method calls do not get traced
+    trace_regex_match_mock.assert_not_called()
+    coverage_test_helper.fake_starts_with("foobar", "foo")
+    trace_regex_match_mock.assert_not_called()
+    trace_regex_match_mock.reset_mock()
+
+    trace_regex_match_mock.assert_not_called()
+    coverage_test_helper.fake_ends_with("bazbiz", "biz")
+    trace_regex_match_mock.assert_not_called()
+
   def assertTraceCmpWas(self, call_args, left, right, op, left_is_const):
     """Compare a _trace_cmp call to expected values."""
-    #call_args: tuple(left, right, opid, idx, left_is_const)
+    # call_args: tuple(left, right, opid, idx, left_is_const)
     self.assertEqual(call_args[0], left)
     self.assertEqual(call_args[1], right)
     self.assertEqual(dis.cmp_op[call_args[2]], op)

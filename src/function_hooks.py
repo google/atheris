@@ -13,10 +13,11 @@
 # limitations under the License.
 """Provides Atheris instrumentation hooks for particular functions like regex."""
 
+import logging
 import re
 import sre_parse
 import sys
-from typing import Set, Any, Pattern, List, Match, Optional, Iterator, Union, Callable, AnyStr
+from typing import Any, AnyStr, Callable, Iterator, List, Match, Optional, Pattern, Set, Tuple, Union
 
 
 # mypy does not like the implicit rexport of the constants available in
@@ -222,6 +223,7 @@ def hook_re_module() -> None:
   re._compile = _compile_hook  # type: ignore[attr-defined]
   # pylint: enable=protected-access
 
+
 class EnabledHooks:
   """Manages the set of enabled hooks."""
 
@@ -234,6 +236,11 @@ class EnabledHooks:
       if hook == "regex":
         hook_re_module()
         self._enabled_hooks.add(hook)
+      elif hook == "str":
+        self._enabled_hooks.add(hook)
+
+  def __contains__(self, hook: str) -> bool:
+    return hook.lower() in self._enabled_hooks
 
 
 enabled_hooks = EnabledHooks()
@@ -289,5 +296,59 @@ class AtherisPatternProxy:
 
   def __getattr__(self, attr: str) -> Any:
     return getattr(self.re_obj, attr)
+
+  # pylint: enable=g-import-not-at-top
+
+
+_str_pattern_gen_map = {}
+
+
+def _hook_str(*args, **kwargs) -> bool:
+  """Proxy routing str functions through Atheris regex tracing.
+
+  Even though bytecode is modified for hooking the str methods, we use this
+  proxy function for typechecking the caller at runtime.
+
+  Args:
+    *args: The positional arguments
+    **kwargs: The keyword arguments
+
+  Returns:
+    The result of s (args[0]) calling str_method (args[1]) with *args[2:],
+    **kwargs
+  """
+  # Importing at the top will not work. TODO(b/207008147): Why does it fail?
+  # pylint: disable=g-import-not-at-top
+
+  if not args or len(args) < 2:
+    logging.error("_hook_str was not patched properly")
+    return None
+
+  s = args[0]
+  str_method = args[1]
+  new_args: Tuple[Any] = args[2:]
+
+  # Since all startswith methods are hooked, only trace startswith calls from
+  # str objects.
+  if isinstance(s, str) and ("str" in enabled_hooks) and new_args:
+    pattern = new_args[0]
+    if str_method == "startswith" and len(new_args) >= 2:
+      start = new_args[1]
+      pattern = r".{%d}%s" % (start, pattern)
+    elif str_method == "endswith" and len(new_args) >= 3:
+      end = new_args[2]
+      pattern = r".{%d}%s" % (end - len(pattern), pattern)
+
+    if pattern not in _str_pattern_gen_map:
+      _str_pattern_gen_map[pattern] = gen_match(pattern)
+    generated: AnyStr = _str_pattern_gen_map[pattern]  # pytype: disable=invalid-annotation
+    from atheris import _trace_regex_match  # type: ignore[import]
+    _trace_regex_match(generated, s)
+
+  # Now call the original method
+  if str_method == "startswith":
+    return s.startswith(*new_args, **kwargs)
+  elif str_method == "endswith":
+    return s.endswith(*new_args, **kwargs)
 
   # pylint: enable=g-import-not-at-top

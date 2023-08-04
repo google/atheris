@@ -15,13 +15,14 @@
 """Atheris is a coverage-guided Python fuzzing engine."""
 
 from typing import List
+
+from .function_hooks import _hook_str
 from .function_hooks import enabled_hooks
 from .function_hooks import gen_match
 from .import_hook import instrument_imports
 from .instrument_bytecode import instrument_all
 from .instrument_bytecode import instrument_func
 from .instrument_bytecode import patch_code
-from .utils import path
 # MyPy cannot find native code.
 from .native import _reserve_counter  # type: ignore[import]
 from .native import _trace_branch  # type: ignore[import]
@@ -32,6 +33,8 @@ from .native import Fuzz  # type: ignore[import]
 from .native import FuzzedDataProvider  # type: ignore[import]
 from .native import Mutate  # type: ignore[import]
 from .native import Setup  # type: ignore[import]
+from .utils import path
+
 
 # PyInstaller Support
 # PyInstaller doesn't automatically support lazy imports, which happens because
