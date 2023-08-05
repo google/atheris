@@ -63,13 +63,18 @@ def ends_with(s, suffix):
   s.endswith(suffix)
 
 
-# Verifying that no tracing happens when var args are passed in to startswith
-# method calls
+# Verifying that no tracing happens when var args are passed in to
+# startswith method calls
 def starts_with_var_args(s, *args):
   s.startswith(*args)
 
 
-# Verifying that even though this code gets patched, no tracing happens
+# Verifying that no tracing happens when var args are passed in to
+# endswith method calls
+def ends_with_var_args(s, *args):
+  s.startswith(*args)
+
+
 class FakeStr:
 
   def startswith(self, s, prefix):
@@ -79,11 +84,30 @@ class FakeStr:
     pass
 
 
+# Verifying that even though this code gets patched, no tracing happens
 def fake_starts_with(s, prefix):
   fake_str = FakeStr()
   fake_str.startswith(s=s, prefix=prefix)
 
 
+# Verifying that even though this code gets patched, no tracing happens
 def fake_ends_with(s, suffix):
   fake_str = FakeStr()
   fake_str.endswith(s, suffix)
+
+
+class StrProperties:
+  startswith = None
+  endswith = None
+
+
+# Verifying that no tracing happens since startswith is a property
+def property_starts_with():
+  fake_str = StrProperties()
+  fake_str.startswith = None
+
+
+# Verifying that no patching happens since endswith is a property
+def property_ends_with():
+  fake_str = StrProperties()
+  fake_str.endswith = None

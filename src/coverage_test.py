@@ -14,7 +14,6 @@
 """Tests for coverage instrumentation."""
 
 import dis
-import logging
 import re
 import unittest
 from unittest import mock
@@ -121,6 +120,7 @@ class CoverageTest(unittest.TestCase):
     coverage_test_helper.ends_with("bazbiz", "biz")
     trace_branch_mock.assert_called()
     trace_regex_match_mock.assert_called()
+    trace_branch_mock.reset_mock()
     trace_regex_match_mock.reset_mock()
 
     trace_regex_match_mock.assert_not_called()
@@ -135,8 +135,29 @@ class CoverageTest(unittest.TestCase):
     trace_regex_match_mock.reset_mock()
 
     trace_regex_match_mock.assert_not_called()
+    coverage_test_helper.ends_with_var_args("bazbiz", "biz")
+    trace_regex_match_mock.assert_not_called()
+    trace_regex_match_mock.reset_mock()
+
+    trace_regex_match_mock.assert_not_called()
+    coverage_test_helper.fake_starts_with("foobar", "foo")
+    trace_regex_match_mock.assert_not_called()
+    trace_regex_match_mock.reset_mock()
+
+    trace_regex_match_mock.assert_not_called()
     coverage_test_helper.fake_ends_with("bazbiz", "biz")
     trace_regex_match_mock.assert_not_called()
+    trace_regex_match_mock.reset_mock()
+
+    trace_regex_match_mock.assert_not_called()
+    coverage_test_helper.property_starts_with()
+    trace_regex_match_mock.assert_not_called()
+    trace_regex_match_mock.reset_mock()
+
+    trace_regex_match_mock.assert_not_called()
+    coverage_test_helper.property_ends_with()
+    trace_regex_match_mock.assert_not_called()
+    trace_regex_match_mock.reset_mock()
 
   def assertTraceCmpWas(self, call_args, left, right, op, left_is_const):
     """Compare a _trace_cmp call to expected values."""

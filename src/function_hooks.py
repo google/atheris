@@ -309,8 +309,42 @@ class AtherisPatternProxy:
 _str_pattern_gen_map = {}
 
 
+def _trace_str(
+    s: str, str_method: str, new_args: Tuple[Any], pattern: str
+) -> None:
+  """Handles pattern generation and calls _trace_regex_match."""
+
+  # pylint: disable=g-import-not-at-top
+
+  if str_method == "startswith":
+    # start arg present
+    if len(new_args) >= 2:
+      start = new_args[1]
+      if start >= 0:
+        pattern = r".{%d}%s" % (start, pattern)
+  elif str_method == "endswith":
+    # end arg present
+    if len(new_args) >= 3:
+      end = new_args[2]
+      if end - len(pattern) >= 0:
+        pattern = r".{%d}%s" % (end - len(pattern), pattern)
+    # Only start arg present
+    elif len(new_args) >= 2:
+      start = new_args[1]
+      if start >= 0:
+        pattern = r".{%d}%s" % (start, pattern)
+
+  if pattern not in _str_pattern_gen_map:
+    _str_pattern_gen_map[pattern] = gen_match(pattern)
+  generated: AnyStr = _str_pattern_gen_map[pattern]  # pytype: disable=invalid-annotation
+  from atheris import _trace_regex_match  # type: ignore[import]
+  _trace_regex_match(generated, s)
+
+  # pylint: enable=g-import-not-at-top
+
+
 def _hook_str(*args, **kwargs) -> bool:
-  """Proxy routing str functions through Atheris regex tracing.
+  """Proxy routing str functions through Atheris tracing.
 
   Even though bytecode is modified for hooking the str methods, we use this
   proxy function for typechecking the caller at runtime.
@@ -323,38 +357,27 @@ def _hook_str(*args, **kwargs) -> bool:
     The result of s (args[0]) calling str_method (args[1]) with *args[2:],
     **kwargs
   """
-  # Importing at the top will not work. TODO(b/207008147): Why does it fail?
-  # pylint: disable=g-import-not-at-top
 
   if not args or len(args) < 2:
-    logging.error("_hook_str was not patched properly")
+    logging.error("_hook_str call was not patched in properly")
     return None
 
   s = args[0]
-  str_method = args[1]
+  str_method: str = args[1]
   new_args: Tuple[Any] = args[2:]
+
+  # Call the original method before tracing
+  rtn = getattr(s, str_method)(*new_args, **kwargs)
 
   # Since all startswith methods are hooked, only trace startswith calls from
   # str objects.
   if isinstance(s, str) and ("str" in enabled_hooks) and new_args:
-    pattern = new_args[0]
-    if str_method == "startswith" and len(new_args) >= 2:
-      start = new_args[1]
-      pattern = r".{%d}%s" % (start, pattern)
-    elif str_method == "endswith" and len(new_args) >= 3:
-      end = new_args[2]
-      pattern = r".{%d}%s" % (end - len(pattern), pattern)
+    if isinstance(new_args[0], str):
+      pattern = new_args[0]
+      _trace_str(s, str_method, new_args, pattern)
+    elif isinstance(new_args[0], tuple):
+      for pattern in new_args[0]:
+        if isinstance(pattern, str):
+          _trace_str(s, str_method, new_args, pattern)
 
-    if pattern not in _str_pattern_gen_map:
-      _str_pattern_gen_map[pattern] = gen_match(pattern)
-    generated: AnyStr = _str_pattern_gen_map[pattern]  # pytype: disable=invalid-annotation
-    from atheris import _trace_regex_match  # type: ignore[import]
-    _trace_regex_match(generated, s)
-
-  # Now call the original method
-  if str_method == "startswith":
-    return s.startswith(*new_args, **kwargs)
-  elif str_method == "endswith":
-    return s.endswith(*new_args, **kwargs)
-
-  # pylint: enable=g-import-not-at-top
+  return rtn

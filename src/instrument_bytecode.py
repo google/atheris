@@ -897,13 +897,73 @@ class Instrumentor:
 
     self._handle_size_changes()
 
-  def _is_str_hookable(self, instr) -> bool:
-    return instr.mnemonic in ("LOAD_ATTR", "LOAD_METHOD") and self._names[
-        instr.arg
-    ] in ("startswith", "endswith")
+  def _is_str_hookable(
+      self,
+      instr: Instruction,
+      remaining_instructions: List[Instruction],
+      stack_size: int,
+  ) -> bool:
+    """Checks whether current method should be patched.
+
+    We need to see if instr has the name of a method that we are hooking. We
+    also need to verify that the method is called with a valid call instruction.
+    Since we don't support hooking str methods when variable args are passed in,
+    we also check for this.
+
+    Args:
+      instr: The instruction being checked
+      remaining_instructions: The rest of the instructions in the basic block
+      stack_size: The current stack size when instr was encountered
+
+    Returns:
+      Whether the current method should be patched
+    """
+    if not (
+        instr.mnemonic in ("LOAD_ATTR", "LOAD_METHOD")
+        and self._names[instr.arg] in ("startswith", "endswith")
+    ):
+      return False
+
+    # Check to see what call instruction variant is used to call this method
+    method_stack_size = stack_size + instr.get_stack_effect()
+    temp_stack_size = method_stack_size
+    i = 0
+    while (temp_stack_size >= method_stack_size) and i < len(
+        remaining_instructions
+    ):
+      temp_instr = remaining_instructions[i]
+
+      # Don't patch methods called with variable arguments
+      if (
+          temp_instr.mnemonic == "CALL_FUNCTION_EX"
+          and temp_stack_size - (temp_instr.arg & 0x01) - 1 == method_stack_size
+      ):
+        logging.warning(
+            "Tracing str methods does not work when variable args are passed in"
+        )
+        return False
+      # Need to check that we are working with a valid callable instead of just
+      # a property
+      elif self._is_call_replaceable(
+          temp_instr,
+          [method_stack_size - 1],  # -1 to get 0-indexed stack position
+          temp_stack_size,
+          num_new_args_inserted=0,
+      ):
+        return True
+
+      temp_stack_size += temp_instr.get_stack_effect()
+      i += 1
+
+    # No associated call instruction was encountered
+    return False
 
   def _is_call_replaceable(
-      self, instr, stack_size, traced_methods, num_new_args_inserted
+      self,
+      instr: Instruction,
+      traced_methods: List[int],
+      stack_size: int,
+      num_new_args_inserted: int,
   ) -> bool:
     """Checks whether current instruction is a call instruction to be replaced.
 
@@ -914,8 +974,8 @@ class Instrumentor:
 
     Args:
       instr: The instruction being checked
-      stack_size: The current size of the stack
       traced_methods: The list of methods to be traced
+      stack_size: The current size of the stack
       num_new_args_inserted: The number of new function arguments inserted
 
     Returns:
@@ -977,38 +1037,18 @@ class Instrumentor:
         if instr.mnemonic == "LOAD_CONST":
           seen_consts.append(stack_size)
         # This hooks all method calls, not just the str ones
-        elif self._is_str_hookable(instr):
-          # Check to see if this method is called with variable args
-          has_variable_args = False
-          temp_stack_size = stack_size + instr.get_stack_effect()
-          i = c + 1
-          while (
-              temp_stack_size >= stack_size + instr.get_stack_effect()
-          ) and i < len(basic_block.instructions):
-            temp_instr = basic_block.instructions[i]
-            if (
-                temp_instr.mnemonic == "CALL_FUNCTION_EX"
-                and temp_stack_size - (temp_instr.arg & 0x01) - 1
-                == stack_size + instr.get_stack_effect()
-            ):
-              has_variable_args = True
-              logging.warning(
-                  "Tracing str methods does not work when variable args are"
-                  " passed in"
-              )
-              break
-            temp_stack_size += temp_instr.get_stack_effect()
-            i += 1
-
-          # Determine the value on the top of the stack before LOAD_ATTR
-          const_on_tos = [
-              c for c in seen_consts if c == stack_size - 1
-          ]
+        elif self._is_str_hookable(
+            instr,
+            remaining_instructions=basic_block.instructions[c + 1:],
+            stack_size=stack_size,
+        ):
+          # Determine the value on the top of the stack
+          const_on_tos = [c for c in seen_consts if c == stack_size - 1]
           tos_is_constant = stack_size - 1 in const_on_tos
 
-          # Only trace when self is non-constant and variable args are not
-          # present
-          if not tos_is_constant and not has_variable_args:
+          # Only trace when self is non-constant (ex. of self being
+          # constant: "hello".startswith("he"))
+          if not tos_is_constant:
             callable_extra_stack_effect = CALLABLE_STACK_ENTRIES - 2
             true_stack_position = stack_size + callable_extra_stack_effect
             traced_methods.append(true_stack_position)
@@ -1022,7 +1062,7 @@ class Instrumentor:
         # original method with our _hook_str function and added the 2 arguments:
         # self (the original method caller) and the str method name
         elif self._is_call_replaceable(
-            instr, stack_size, traced_methods, num_new_args_inserted=2
+            instr, traced_methods, stack_size, num_new_args_inserted=2
         ):
           # PRECALL instruction requires extra logic because we also need to
           # nop the following CALL instruction
