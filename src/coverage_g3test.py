@@ -82,10 +82,17 @@ def ends_with(s, suffix):
   s.endswith(suffix)
 
 
-# Verifying that no tracing happens when var args are passed in to startswith
-# method calls
+# Verifying that no tracing happens when var args are passed in to
+# startswith method calls
 @atheris.instrument_func
 def starts_with_var_args(s, *args):
+  s.startswith(*args)
+
+
+# Verifying that no tracing happens when var args are passed in to
+# endswith method calls
+@atheris.instrument_func
+def ends_with_var_args(s, *args):
   s.startswith(*args)
 
 
@@ -110,6 +117,25 @@ def fake_starts_with(s, prefix):
 def fake_ends_with(s, suffix):
   fake_str = FakeStr()
   fake_str.endswith(s, suffix)
+
+
+class StrProperties:
+  startswith = None
+  endswith = None
+
+
+# Verifying that no tracing happens since startswith is a property
+@atheris.instrument_func
+def property_starts_with():
+  fake_str = StrProperties()
+  fake_str.startswith = None
+
+
+# Verifying that no patching happens since endswith is a property
+@atheris.instrument_func
+def property_ends_with():
+  fake_str = StrProperties()
+  fake_str.endswith = None
 
 
 @atheris.instrument_func
@@ -180,6 +206,7 @@ class CoverageTest(unittest.TestCase):
     ends_with("bazbiz", "biz")
     trace_branch_mock.assert_called()
     trace_regex_match_mock.assert_called()
+    trace_branch_mock.reset_mock()
     trace_regex_match_mock.reset_mock()
 
     trace_regex_match_mock.assert_not_called()
@@ -187,7 +214,11 @@ class CoverageTest(unittest.TestCase):
     trace_regex_match_mock.assert_not_called()
     trace_regex_match_mock.reset_mock()
 
-    # Check that non-str method calls do not get traced
+    trace_regex_match_mock.assert_not_called()
+    ends_with_var_args("bazbiz", "biz")
+    trace_regex_match_mock.assert_not_called()
+    trace_regex_match_mock.reset_mock()
+
     trace_regex_match_mock.assert_not_called()
     fake_starts_with("foobar", "foo")
     trace_regex_match_mock.assert_not_called()
@@ -196,6 +227,17 @@ class CoverageTest(unittest.TestCase):
     trace_regex_match_mock.assert_not_called()
     fake_ends_with("bazbiz", "biz")
     trace_regex_match_mock.assert_not_called()
+    trace_regex_match_mock.reset_mock()
+
+    trace_regex_match_mock.assert_not_called()
+    property_starts_with()
+    trace_regex_match_mock.assert_not_called()
+    trace_regex_match_mock.reset_mock()
+
+    trace_regex_match_mock.assert_not_called()
+    property_ends_with()
+    trace_regex_match_mock.assert_not_called()
+    trace_regex_match_mock.reset_mock()
 
   def assertTraceCmpWas(self, call_args, left, right, op, left_is_const):
     """Compare a _trace_cmp call to expected values."""

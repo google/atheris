@@ -132,6 +132,26 @@ def str_endswith(data):
 
 
 @atheris.instrument_func
+def str_startswith_tuple_prefix(data):
+  try:
+    decoded = data.decode("utf-8")
+    if decoded.startswith(("foobar", "hellohi", "supyo")):
+      raise RuntimeError("Started with oneof (foobar, hellohi, supyo)")
+  except UnicodeDecodeError:
+    pass
+
+
+@atheris.instrument_func
+def str_endswith_tuple_suffix(data):
+  try:
+    decoded = data.decode("utf-8")
+    if decoded.endswith(("bazbiz", "byebye", "cyalater")):
+      raise RuntimeError("Ended with oneof (bazbiz, byebye, cyalater)")
+  except UnicodeDecodeError:
+    pass
+
+
+@atheris.instrument_func
 def str_startswith_with_start_and_end(data):
   try:
     decoded = data.decode("utf-8")
@@ -238,7 +258,7 @@ class IntegrationTests(unittest.TestCase):
         expected_output=b"Was RegEx Match",
         enabled_hooks=["RegEx"])
 
-  def testStrStartsWith(self):
+  def testStrStartswith(self):
     fuzz_test_lib.run_fuzztest(
         str_startswith,
         expected_output=b"Started with foobar",
@@ -246,7 +266,7 @@ class IntegrationTests(unittest.TestCase):
         timeout=60,
     )
 
-  def testStrEndsWith(self):
+  def testStrEndswith(self):
     fuzz_test_lib.run_fuzztest(
         str_endswith,
         expected_output=b"Ended with bazbiz",
@@ -254,7 +274,23 @@ class IntegrationTests(unittest.TestCase):
         timeout=60,
     )
 
-  def testStrStartsWithStartEndArgs(self):
+  def testStrStartswithTuplePrefix(self):
+    fuzz_test_lib.run_fuzztest(
+        str_startswith_tuple_prefix,
+        expected_output=b"Started with oneof (foobar, hellohi, supyo)",
+        enabled_hooks=["str"],
+        timeout=60,
+    )
+
+  def testStrEndswithTupleSuffix(self):
+    fuzz_test_lib.run_fuzztest(
+        str_endswith_tuple_suffix,
+        expected_output=b"Ended with oneof (bazbiz, byebye, cyalater)",
+        enabled_hooks=["str"],
+        timeout=60,
+    )
+
+  def testStrStartswithStartEndArgs(self):
     fuzz_test_lib.run_fuzztest(
         str_startswith_with_start_and_end,
         expected_output=b"Started with hellohi at index 10",
@@ -262,7 +298,7 @@ class IntegrationTests(unittest.TestCase):
         timeout=60,
     )
 
-  def testStrEndsWithStartEndArgs(self):
+  def testStrEndswithStartEndArgs(self):
     fuzz_test_lib.run_fuzztest(
         str_endswith_with_start_and_end,
         expected_output=b"Ended with supyo at end index 15",
