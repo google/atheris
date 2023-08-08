@@ -132,6 +132,16 @@ def str_endswith(data):
 
 
 @atheris.instrument_func
+def str_methods_combined(data):
+  try:
+    decoded = data.decode("utf-8")
+    if decoded.startswith("foo") and decoded.endswith("bar"):
+      raise RuntimeError("Started with foo and ended with bar")
+  except UnicodeDecodeError:
+    pass
+
+
+@atheris.instrument_func
 def str_startswith_tuple_prefix(data):
   try:
     decoded = data.decode("utf-8")
@@ -270,6 +280,14 @@ class IntegrationTests(unittest.TestCase):
     fuzz_test_lib.run_fuzztest(
         str_endswith,
         expected_output=b"Ended with bazbiz",
+        enabled_hooks=["str"],
+        timeout=60,
+    )
+
+  def testStrMethodsCombined(self):
+    fuzz_test_lib.run_fuzztest(
+        str_methods_combined,
+        expected_output=b"Started with foo and ended with bar",
         enabled_hooks=["str"],
         timeout=60,
     )
