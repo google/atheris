@@ -982,17 +982,13 @@ class Instrumentor:
       Whether the current instruction is a call instruction that should be
       replaced
     """
-    return (
-        instr.mnemonic in ("PRECALL", "CALL_METHOD", "CALL_FUNCTION")
-        and (
-            stack_size - instr.arg - num_new_args_inserted - 1 in traced_methods
-        )
-    ) or (
-        instr.mnemonic == "CALL_FUNCTION_KW"
-        and (
-            stack_size - instr.arg - num_new_args_inserted - 2 in traced_methods
-        )
-    )
+    method_stack_position = None
+    if instr.mnemonic in ("PRECALL", "CALL_METHOD", "CALL_FUNCTION"):
+      method_stack_position = stack_size - instr.arg - num_new_args_inserted - 1
+    elif instr.mnemonic == "CALL_FUNCTION_KW":
+      method_stack_position = stack_size - instr.arg - num_new_args_inserted - 2
+
+    return method_stack_position in traced_methods
 
   def trace_str_flow(self) -> None:
     """Instruments bytecode for tracing calls to str methods.
@@ -1062,8 +1058,11 @@ class Instrumentor:
         # original method with our _hook_str function and added the 2 arguments:
         # self (the original method caller) and the str method name
         elif self._is_call_replaceable(
-            instr, traced_methods, stack_size, num_new_args_inserted=2
+            instr, traced_methods[-1:], stack_size, num_new_args_inserted=2
         ):
+          # Just replaced the method, so don't keep track of it anymore
+          traced_methods.pop()
+
           # PRECALL instruction requires extra logic because we also need to
           # nop the following CALL instruction
           if instr.mnemonic == "PRECALL":
