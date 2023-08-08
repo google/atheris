@@ -14,7 +14,7 @@ CC="/usr/bin/clang" CFLAGS="-fsanitize=address,fuzzer-no-link" CXX="/usr/bin/cla
 Here, `address` means Address Sanitizer. You can also use `undefined` for the
 Undefined Behavior Sanitizer.
 
-If you use want to confirm that the built library is compiled/linked properly,
+If you want to confirm that the built library is compiled/linked properly,
 you can do it by checking if it contains asan and sancov related symbols via a
 command like `nm <path to .so file> | grep asan` (or `grep sancov`).
 
@@ -37,13 +37,13 @@ These files will be called:
  - `ubsan_with_fuzzer.so`
  - `ubsan_cxx_with_fuzzer.so`
 
-If these files are present, it means Atheris succesfully generated the files at installation time, and you can use this option. Simply `LD_PRELOAD` the right `.so` file, and you're good to go. Here's a complete example:
+If these files are present, it means Atheris successfully generated the files at installation time, and you can use this option. Simply `LD_PRELOAD` the right `.so` file, and you're good to go. Here's a complete example:
 
 ```
 LD_PRELOAD="$(python -c "import atheris; print(atheris.path())")/asan_with_fuzzer.so" python ./my_fuzzer.py
 ```
 
-### Option 2: Linking libFuzzer into Python
+### Option B: Linking libFuzzer into Python
 
 This option doesn't rely on these custom shared libraries; instead, it involves building a modified CPython. We provide a script and patch file that attempts to do this
 for Python 3.8.6 in the `third_party` directory.
