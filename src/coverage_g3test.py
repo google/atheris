@@ -68,6 +68,12 @@ def decorator_instrumented(x):
 
 
 @atheris.instrument_func
+def while_loop(a):
+  while a:
+    a -= 1
+
+
+@atheris.instrument_func
 def regex_match(re_obj, a):
   re_obj.match(a)
 
@@ -180,6 +186,13 @@ class CoverageTest(unittest.TestCase):
     third_call_set = trace_branch_mock.call_args_list
 
     self.assertNotEqual(first_call_set, third_call_set)
+
+  def testWhile(
+      self, trace_branch_mock, trace_cmp_mock, trace_regex_match_mock
+  ):
+    trace_branch_mock.assert_not_called()
+    while_loop(1)
+    trace_branch_mock.assert_called()
 
   def testRegex(self, trace_branch_mock, trace_cmp_mock,
                 trace_regex_match_mock):
