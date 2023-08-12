@@ -17,12 +17,11 @@ import logging
 import re
 import sys
 import typing
-from typing import Set, Any, Pattern, List, Match, Optional, Iterator, Union, Callable, AnyStr, Dict
+from typing import Any, AnyStr, Callable, Iterator, List, Match, Optional, Pattern, Set, Tuple, Union
 try:
-  import re._parser as sre_parse
+  import re._parser as sre_parse  # type: ignore[import]
 except ImportError:
   import sre_parse
-
 
 
 # mypy does not like the implicit rexport of the constants available in
