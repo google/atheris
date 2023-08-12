@@ -20,14 +20,13 @@ helper class Instrumentor.
 import collections
 import dis
 import gc
-import itertools
 import logging
 import sys
 import types
 from typing import Any, Callable, Iterator, List, Optional, Tuple, TypeVar, Union
 
 from . import utils
-from .native import _reserve_counter  # type: ignore[attr-defined]
+from .native import _reserve_counter  # type: ignore[import]
 from .version_dependent import add_bytes_to_jump_arg
 from .version_dependent import args_terminator
 from .version_dependent import cache_count
@@ -221,7 +220,6 @@ class Instruction:
       self.offset += size
 
     if old_reference is not None:
-      assert(self.reference is not None)  # appease mypy
       if not keep_ref:
         if changed_offset <= old_reference:
           self.reference += size  # type: ignore[operator]
@@ -412,7 +410,11 @@ class Instrumentor:
     for c, instr in enumerate(instr_list):
       if instr.offset == 0 or instr.offset in jump_targets or did_jump:
         basic_block_borders.append(c)
-      did_jump = instr.is_jump()
+
+      if instr.is_jump():
+        did_jump = True
+      else:
+        did_jump = False
 
     basic_block_borders.append(len(instr_list))
 
@@ -532,7 +534,11 @@ class Instrumentor:
         break
 
   def _get_linear_instruction_listing(self) -> List[Instruction]:
-    return list(itertools.chain.from_iterable(self._cfg.values()))
+    listing = []
+    for basic_block in self._cfg.values():
+      for instr in basic_block:
+        listing.append(instr)
+    return listing
 
   def to_code(self) -> types.CodeType:
     """Returns the instrumented code object."""
@@ -562,7 +568,7 @@ class Instrumentor:
   def _generate_trace_branch_invocation(self, lineno: int,
                                         offset: int) -> _SizeAndInstructions:
     """Builds the bytecode that calls atheris._trace_branch()."""
-    to_insert = []  # type: List[Instruction]
+    to_insert = []
     start_offset = offset
     const_atheris = self._get_const(sys.modules[_TARGET_MODULE])
     name_cov = self._get_name(_COVERAGE_FUNCTION)
@@ -604,7 +610,7 @@ class Instrumentor:
       The size of the instructions to insert,
       The instructions to insert
     """
-    to_insert = []  # type: List[Instruction]
+    to_insert = []
     start_offset = offset
     const_atheris = self._get_const(sys.modules[_TARGET_MODULE])
     name_cmp = self._get_name(_COMPARE_FUNCTION)
@@ -655,7 +661,7 @@ class Instrumentor:
     Returns:
       The number of bytes to insert, and the instructions.
     """
-    to_insert = []  # type: List[Instruction]
+    to_insert = []
     start_offset = offset
     const_atheris = self._get_const(sys.modules[_TARGET_MODULE])
     name_cmp = self._get_name(_COMPARE_FUNCTION)
@@ -711,7 +717,7 @@ class Instrumentor:
       The size of the instructions to insert,
       The instructions to insert
     """
-    to_insert = []  # type: List[Instruction]
+    to_insert = []
     start_offset = offset
     const_atheris = self._get_const(sys.modules[_TARGET_MODULE])
     name_hook_str = self._get_name(_HOOK_STR_FUNCTION)
@@ -751,7 +757,7 @@ class Instrumentor:
       The size of the instructions to insert,
       The instructions to insert
     """
-    to_insert = []  # type: List[Instruction]
+    to_insert = []
     start_offset = offset
 
     if opname == "CALL_FUNCTION_KW":
@@ -783,6 +789,7 @@ class Instrumentor:
     # Insert at the first point after a RESUME instruction
     first_real_instr = None
     first_real_instr_slot = None
+    previous_instructions = []
     for i in range(len(self._cfg[0].instructions)):
       bb_instr = self._cfg[0].instructions[i]
       if bb_instr.mnemonic not in ("RESUME", "GEN_START"):
@@ -806,31 +813,26 @@ class Instrumentor:
     )
 
     for basic_block in self._cfg.values():
-      # A condition needs two edges
-      if len(basic_block.edges) != 2:
-        continue
+      if len(basic_block.edges) == 2:
+        for edge in basic_block.edges:
+          bb = self._cfg[edge]
 
-      for edge in basic_block.edges:
-        bb = self._cfg[edge]
+          if bb.id not in already_instrumented:
+            already_instrumented.add(bb.id)
+            source_instr = []
+            offset = bb.instructions[0].offset
 
-        if bb.id in already_instrumented:
-          continue
+            for source_bb in self._cfg.values():
+              if bb.id in source_bb.edges and source_bb.instructions[
+                  -1].reference == offset:
+                source_instr.append(source_bb.instructions[-1])
 
-        already_instrumented.add(bb.id)
-        source_instr = []
-        offset = bb.instructions[0].offset
+            total_size, to_insert = self._generate_trace_branch_invocation(
+                bb.instructions[0].lineno, offset)
 
-        for source_bb in self._cfg.values():
-          if bb.id in source_bb.edges and source_bb.instructions[
-              -1].reference == offset:
-            source_instr.append(source_bb.instructions[-1])
+            self._adjust(offset, total_size, *source_instr)
 
-        total_size, to_insert = self._generate_trace_branch_invocation(
-            bb.instructions[0].lineno, offset)
-
-        self._adjust(offset, total_size, *source_instr)
-
-        bb.instructions = to_insert + bb.instructions
+            bb.instructions = to_insert + bb.instructions
 
     self._handle_size_changes()
 
@@ -1203,7 +1205,8 @@ def _is_instrumentable(obj: Any) -> bool:
     if hasattr(obj, "__self__"):
       return False
     # Only Python functions and methods can be instrumented, nothing native
-    if not isinstance(obj, (types.FunctionType, types.MethodType)):
+    if (not isinstance(obj, types.FunctionType)) and (not isinstance(
+        obj, types.MethodType)):
       return False
   except Exception:  # pylint: disable=broad-except
     # If accessing any of those fields produced an exception, the object

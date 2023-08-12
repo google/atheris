@@ -18,7 +18,6 @@
 
 #include <sys/mman.h>
 
-#include <cstdint>
 #include <iostream>
 
 #include "macros.h"

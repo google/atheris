@@ -382,15 +382,16 @@ class ExceptionTable:
         return False
     return True
 
-if PYTHON_VERSION < (3, 11):
+# Default implementations
+# 3.11+ override these.
+def generate_exceptiontable(original_code, exception_table_entries):
+  return b""
 
-  def generate_exceptiontable(original_code, exception_table_entries):
-    return b""
+def parse_exceptiontable(code):
+  return ExceptionTable([])
 
-  def parse_exceptiontable(code):
-    return ExceptionTable([])
 
-elif (3, 11) <= PYTHON_VERSION <= (3, 11):
+if (3, 11) <= PYTHON_VERSION <= (3, 11):
   from .native import _generate_exceptiontable
 
   def generate_exceptiontable(original_code, exception_table_entries):
@@ -489,7 +490,7 @@ if (3, 6) <= PYTHON_VERSION <= (3, 10):
   CALLABLE_STACK_ENTRIES = 1
 
 
-elif PYTHON_VERSION >= (3, 11):
+if PYTHON_VERSION >= (3, 11):
 
   # The number of CACHE instructions that must go after the given instr.
   def cache_count(op):
@@ -536,7 +537,7 @@ if (3, 6) <= PYTHON_VERSION <= (3, 10):
     return dis.get_instructions(x, first_line=first_line)
 
 
-elif (3, 11) <= PYTHON_VERSION:
+if (3, 11) <= PYTHON_VERSION:
 
   def get_instructions(x, *, first_line=None, adaptive=False):
     return dis.get_instructions(
