@@ -89,8 +89,16 @@ class CoverageTest(unittest.TestCase):
 
     self.assertNotEqual(first_call_set, third_call_set)
 
-  def testRegex(self, trace_branch_mock, trace_cmp_mock,
-                trace_regex_match_mock):
+  def testWhile(
+      self, trace_branch_mock, trace_cmp_mock, trace_regex_match_mock
+  ):
+    trace_branch_mock.assert_not_called()
+    coverage_test_helper.while_loop(1)
+    trace_branch_mock.assert_called()
+
+  def testRegex(
+      self, trace_branch_mock, trace_cmp_mock, trace_regex_match_mock
+  ):
     trace_branch_mock.reset_mock()
     trace_branch_mock.assert_not_called()
     trace_regex_match_mock.assert_not_called()

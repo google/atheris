@@ -210,22 +210,27 @@ class Instruction:
     if changed_offset <= old_offset:
       self.offset += size
 
-    if old_reference is not None and not keep_ref:
-      if changed_offset <= old_reference:
-        self.reference += size  # type: ignore[operator]
-
-      if self._is_relative:
-        if self.mnemonic not in REL_REFERENCE_IS_INVERTED and (
-            old_offset < changed_offset <= old_reference
-        ):
-          self.arg = add_bytes_to_jump_arg(self.arg, size)
-        elif self.mnemonic in REL_REFERENCE_IS_INVERTED and (
-            old_offset >= changed_offset >= old_reference
-        ):
-          self.arg = add_bytes_to_jump_arg(self.arg, size)
-      else:
+    if old_reference is not None:
+      if not keep_ref:
         if changed_offset <= old_reference:
-          self.arg = add_bytes_to_jump_arg(self.arg, size)
+          self.reference += size  # type: ignore[operator]
+
+        if self._is_relative:
+          if self.mnemonic not in REL_REFERENCE_IS_INVERTED and (
+              old_offset < changed_offset <= old_reference
+          ):
+            self.arg = add_bytes_to_jump_arg(self.arg, size)
+          elif self.mnemonic in REL_REFERENCE_IS_INVERTED and (
+              old_offset >= changed_offset >= old_reference
+          ):
+            self.arg = add_bytes_to_jump_arg(self.arg, size)
+        else:
+          if changed_offset <= old_reference:
+            self.arg = add_bytes_to_jump_arg(self.arg, size)
+      else:
+        if self._is_relative and self.mnemonic in REL_REFERENCE_IS_INVERTED:
+          zero = self.offset + self.get_size()
+          self.arg = add_bytes_to_jump_arg(0, abs(self.reference - zero))
 
   def check_state(self) -> None:
     """Asserts that internal state is consistent."""
