@@ -536,7 +536,7 @@ if (3, 6) <= PYTHON_VERSION <= (3, 10):
     return dis.get_instructions(x, first_line=first_line)
 
 
-if (3, 11) <= PYTHON_VERSION:
+elif (3, 11) <= PYTHON_VERSION:
 
   def get_instructions(x, *, first_line=None, adaptive=False):
     return dis.get_instructions(
