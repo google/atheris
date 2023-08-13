@@ -489,7 +489,7 @@ if (3, 6) <= PYTHON_VERSION <= (3, 10):
   CALLABLE_STACK_ENTRIES = 1
 
 
-if PYTHON_VERSION >= (3, 11):
+elif PYTHON_VERSION >= (3, 11):
 
   # The number of CACHE instructions that must go after the given instr.
   def cache_count(op):
