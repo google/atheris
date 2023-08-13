@@ -382,16 +382,15 @@ class ExceptionTable:
         return False
     return True
 
-# Default implementations
-# 3.11+ override these.
-def generate_exceptiontable(original_code, exception_table_entries):
-  return b""
+if PYTHON_VERSION < (3, 11):
 
-def parse_exceptiontable(code):
-  return ExceptionTable([])
+  def generate_exceptiontable(original_code, exception_table_entries):
+    return b""
 
+  def parse_exceptiontable(code):
+    return ExceptionTable([])
 
-if (3, 11) <= PYTHON_VERSION <= (3, 11):
+elif (3, 11) <= PYTHON_VERSION <= (3, 11):
   from .native import _generate_exceptiontable
 
   def generate_exceptiontable(original_code, exception_table_entries):
