@@ -36,7 +36,6 @@ from .version_dependent import call
 from .version_dependent import CALLABLE_STACK_ENTRIES
 from .version_dependent import CONDITIONAL_JUMPS
 from .version_dependent import ENDS_FUNCTION
-from .version_dependent import ExceptionTable
 from .version_dependent import ExceptionTableEntry
 from .version_dependent import generate_exceptiontable
 from .version_dependent import get_code_object
