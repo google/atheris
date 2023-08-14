@@ -812,26 +812,31 @@ class Instrumentor:
     )
 
     for basic_block in self._cfg.values():
-      if len(basic_block.edges) == 2:
-        for edge in basic_block.edges:
-          bb = self._cfg[edge]
+      # A condition needs two edges
+      if len(basic_block.edges) != 2:
+        continue
 
-          if bb.id not in already_instrumented:
-            already_instrumented.add(bb.id)
-            source_instr = []
-            offset = bb.instructions[0].offset
+      for edge in basic_block.edges:
+        bb = self._cfg[edge]
 
-            for source_bb in self._cfg.values():
-              if bb.id in source_bb.edges and source_bb.instructions[
-                  -1].reference == offset:
-                source_instr.append(source_bb.instructions[-1])
+        if bb.id in already_instrumented:
+          continue
 
-            total_size, to_insert = self._generate_trace_branch_invocation(
-                bb.instructions[0].lineno, offset)
+        already_instrumented.add(bb.id)
+        source_instr = []
+        offset = bb.instructions[0].offset
 
-            self._adjust(offset, total_size, *source_instr)
+        for source_bb in self._cfg.values():
+          if bb.id in source_bb.edges and source_bb.instructions[
+              -1].reference == offset:
+            source_instr.append(source_bb.instructions[-1])
 
-            bb.instructions = to_insert + bb.instructions
+        total_size, to_insert = self._generate_trace_branch_invocation(
+            bb.instructions[0].lineno, offset)
+
+        self._adjust(offset, total_size, *source_instr)
+
+        bb.instructions = to_insert + bb.instructions
 
     self._handle_size_changes()
 
