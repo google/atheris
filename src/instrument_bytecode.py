@@ -710,7 +710,7 @@ class Instrumentor:
       The size of the instructions to insert,
       The instructions to insert
     """
-    to_insert = []
+    to_insert = []  # type: List[Instruction]
     start_offset = offset
     const_atheris = self._get_const(sys.modules[_TARGET_MODULE])
     name_hook_str = self._get_name(_HOOK_STR_FUNCTION)
@@ -750,7 +750,7 @@ class Instrumentor:
       The size of the instructions to insert,
       The instructions to insert
     """
-    to_insert = []
+    to_insert = []  # type: List[Instruction]
     start_offset = offset
 
     if opname == "CALL_FUNCTION_KW":
