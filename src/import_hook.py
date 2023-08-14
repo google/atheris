@@ -78,7 +78,7 @@ class AtherisMetaPathFinder(abc.MetaPathFinder):
   def find_spec(
       self,
       fullname: str,
-      path: Optional[Sequence[Union[bytes, str]]],
+      path: Optional[Sequence[str]],
       target: Optional[types.ModuleType] = None
   ) -> Optional[machinery.ModuleSpec]:
     """Returns the module spec if any.

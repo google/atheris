@@ -27,7 +27,7 @@ import types
 from typing import Any, Callable, Iterator, List, Optional, Tuple, TypeVar, Union
 
 from . import utils
-from .native import _reserve_counter  # type: ignore[import]
+from .native import _reserve_counter  # type: ignore[attr-defined]
 from .version_dependent import add_bytes_to_jump_arg
 from .version_dependent import args_terminator
 from .version_dependent import cache_count
@@ -211,6 +211,7 @@ class Instruction:
       self.offset += size
 
     if old_reference is not None:
+      assert(self.reference is not None)  # appease mypy
       if not keep_ref:
         if changed_offset <= old_reference:
           self.reference += size  # type: ignore[operator]
@@ -551,7 +552,7 @@ class Instrumentor:
   def _generate_trace_branch_invocation(self, lineno: int,
                                         offset: int) -> _SizeAndInstructions:
     """Builds the bytecode that calls atheris._trace_branch()."""
-    to_insert = []
+    to_insert = []  # type: List[Instruction]
     start_offset = offset
     const_atheris = self._get_const(sys.modules[_TARGET_MODULE])
     name_cov = self._get_name(_COVERAGE_FUNCTION)
@@ -593,7 +594,7 @@ class Instrumentor:
       The size of the instructions to insert,
       The instructions to insert
     """
-    to_insert = []
+    to_insert = []  # type: List[Instruction]
     start_offset = offset
     const_atheris = self._get_const(sys.modules[_TARGET_MODULE])
     name_cmp = self._get_name(_COMPARE_FUNCTION)
@@ -644,7 +645,7 @@ class Instrumentor:
     Returns:
       The number of bytes to insert, and the instructions.
     """
-    to_insert = []
+    to_insert = []  # type: List[Instruction]
     start_offset = offset
     const_atheris = self._get_const(sys.modules[_TARGET_MODULE])
     name_cmp = self._get_name(_COMPARE_FUNCTION)
@@ -700,7 +701,7 @@ class Instrumentor:
       The size of the instructions to insert,
       The instructions to insert
     """
-    to_insert = []
+    to_insert = []  # type: List[Instruction]
     start_offset = offset
     const_atheris = self._get_const(sys.modules[_TARGET_MODULE])
     name_hook_str = self._get_name(_HOOK_STR_FUNCTION)
@@ -740,7 +741,7 @@ class Instrumentor:
       The size of the instructions to insert,
       The instructions to insert
     """
-    to_insert = []
+    to_insert = []  # type: List[Instruction]
     start_offset = offset
 
     if opname == "CALL_FUNCTION_KW":
