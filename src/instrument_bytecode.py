@@ -1194,8 +1194,7 @@ def _is_instrumentable(obj: Any) -> bool:
     if hasattr(obj, "__self__"):
       return False
     # Only Python functions and methods can be instrumented, nothing native
-    if (not isinstance(obj, types.FunctionType)) and (not isinstance(
-        obj, types.MethodType)):
+    if not isinstance(obj, (types.FunctionType, types.MethodType)):
       return False
   except Exception:  # pylint: disable=broad-except
     # If accessing any of those fields produced an exception, the object
