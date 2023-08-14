@@ -16,7 +16,8 @@
 import logging
 import re
 import sys
-from typing import Any, AnyStr, Callable, Iterator, List, Match, Optional, Pattern, Set, Tuple, Union
+import typing
+from typing import Any, AnyStr, Callable, Dict, Iterator, List, Match, Optional, Pattern, Set, Tuple, Union
 try:
   import re._parser as sre_parse  # type: ignore[import]
 except ImportError:
@@ -47,14 +48,16 @@ _RANGE = sre_parse.RANGE  # type: ignore[attr-defined]
 _SUBPATTERN = sre_parse.SUBPATTERN  # type: ignore[attr-defined]
 
 
-def to_correct_type(to_convert: Union[str, bytes],
-                    return_type: Callable[[], AnyStr]) -> AnyStr:
+def to_correct_type(
+    to_convert: Union[str, bytes], return_type: Callable[[], AnyStr]
+) -> Union[str, bytes]:
   if return_type != str and return_type != bytes:
-    raise TypeError("Expected `return_type` to be str or bytes, got {}" %
-                    return_type)
-  if (isinstance(to_convert, bytes) and
-      return_type == bytes) or (isinstance(to_convert, str) and
-                                return_type == str):
+    raise TypeError(
+        f"Expected `return_type` to be str or bytes, got {return_type}"
+    )
+  if (isinstance(to_convert, bytes) and return_type == bytes) or (
+      isinstance(to_convert, str) and return_type == str
+  ):
     return to_convert
   elif isinstance(to_convert, bytes):
     return str(to_convert)
@@ -62,9 +65,10 @@ def to_correct_type(to_convert: Union[str, bytes],
     return bytes(to_convert, "utf-8")
 
 
+@typing.no_type_check # mypy chokes on `return_type`
 def gen_match_recursive(ops: Any,
-                        return_type: Callable[[], AnyStr] = str,
-                        respect_lookarounds: bool = False) -> AnyStr:
+                        return_type: Callable[[], Union[str, bytes]] = str,
+                        respect_lookarounds: bool = False) -> Union[str, bytes]:
   """Returns a matching string given a regex expression."""
   # TODO(cffsmith): This generator is *not* feature complete.
 
@@ -188,26 +192,27 @@ def gen_match_recursive(ops: Any,
 
 def gen_match(pattern: AnyStr) -> AnyStr:
   pat = sre_parse.parse(pattern)
-  return gen_match_recursive(pat, type(pattern), respect_lookarounds=True)
+  return gen_match_recursive(pat, type(pattern), respect_lookarounds=True)  # type: ignore[bad-return-type]
 
 
 def hook_re_module() -> None:
   """Adds Atheris instrumentation hooks to the `re` module."""
-  pattern_gen_map = {}
+  pattern_gen_map = {}  # type: ignore
 
-  original_compile_func = re._compile  # type: ignore[attr-defined]
+  original_compile_func = re._compile  # type: ignore[module-attr]
 
+  @typing.no_type_check  # mypy chokes on the return type
   def _compile_hook(pattern: AnyStr, flags: int) -> "AtherisPatternProxy":
     """Overrides re._compile."""
 
-    generated: AnyStr  # pytype: disable=invalid-annotation  # enable-bare-annotations
+    generated: re.Pattern
     if pattern not in pattern_gen_map:
-      generated = gen_match(pattern)
+      generated = gen_match(pattern)  # type: ignore[annotation-type-mismatch]
 
       try:
         if original_compile_func(pattern, flags).search(generated) is None:
-          sys.stderr.write(f"ERROR: generated match '{generated}' did not " +
-                           "match the RegEx pattern '{_pattern}'!\n")
+          sys.stderr.write(f"ERROR: generated match '{generated!r}' did not " +
+                           "match the RegEx pattern '{_pattern!r}'!\n")
       except Exception as e:  # pylint: disable=broad-except
         sys.stderr.write("Could not check the generated match against the " +
                          f"RegEx pattern: {e}\n")
