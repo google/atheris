@@ -807,13 +807,13 @@ class Instrumentor:
     for basic_block in self._cfg.values():
       # A condition needs two edges
       if len(basic_block.edges) != 2:
-          continue
+        continue
 
       for edge in basic_block.edges:
         bb = self._cfg[edge]
 
         if bb.id in already_instrumented:
-            continue
+          continue
 
         already_instrumented.add(bb.id)
         source_instr = []
