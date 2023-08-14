@@ -400,11 +400,7 @@ class Instrumentor:
     for c, instr in enumerate(instr_list):
       if instr.offset == 0 or instr.offset in jump_targets or did_jump:
         basic_block_borders.append(c)
-
-      if instr.is_jump():
-        did_jump = True
-      else:
-        did_jump = False
+      did_jump = instr.is_jump()
 
     basic_block_borders.append(len(instr_list))
 
