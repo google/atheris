@@ -1,0 +1,10 @@
+
+[tool.ruff]
+exclude = ["src/benchmark/"]
+ignore-init-module-imports = true
+# E501 Line too long
+# F401 … imported but unused; consider adding to `__all__` or using a redundant alias
+ignore = ["E501", "F401"]
+
+
+
