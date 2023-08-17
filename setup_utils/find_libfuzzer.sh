@@ -29,6 +29,8 @@ elif [[ "$uname" == "Linux" ]]; then
     libpath="lib/linux/libclang_rt.fuzzer_no_main-i386.a"
   elif [[ "$machine" == "i686" ]]; then
     libpath="lib/linux/libclang_rt.fuzzer_no_main-i386.a"
+  elif [[ "$machine" == "aarch64" ]]; then
+    libpath="lib/linux/libclang_rt.fuzzer_no_main-aarch64.a"
   else
     >&2 echo "Failed to identify platform machine (got $machine); set \$LIBFUZZER_LIB to point directly to your libfuzzer .a file."
   fi
