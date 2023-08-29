@@ -23,7 +23,7 @@ function upload_to() {
 function download_from_test_pypi() {
   TMP_DIR="$1"
   OLD_DIR="$(pwd)"
-  python3 -m pip download --index-url 'https://test.pypi.org/simple/' --no-binary=:all: atheris=="${ATHERIS_VERSION}" -d "${TMP_DIR?}" 1>/dev/null
+  python3 -m pip download --no-build-isolation --index-url 'https://test.pypi.org/simple/' --no-binary=:all: atheris=="${ATHERIS_VERSION}" -d "${TMP_DIR?}" 1>/dev/null
   cd "${TMP_DIR}"
   tar vxf $(ls *.tar*) >/dev/null
   UNPACKED_DIR="$(ls *.tar* | sed s/\\.tar.*//)"
