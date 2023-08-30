@@ -303,12 +303,10 @@ class CoverageTest(unittest.TestCase):
 
     self.assertTrue(cmp_const_less(2))
     self.assertTraceCmpWas(trace_cmp_mock.call_args[0], 1, 2, "<", True)
-    first_cmp_idx = trace_cmp_mock.call_args[0][3]
     trace_cmp_mock.reset_mock()
 
     self.assertFalse(cmp_const_less_inverted(3))
     self.assertTraceCmpWas(trace_cmp_mock.call_args[0], 1, 3, ">", True)
-    first_cmp_idx = trace_cmp_mock.call_args[0][3]
     trace_cmp_mock.reset_mock()
 
   def testInstrumentationAppliedOnce(self, trace_branch_mock, trace_cmp_mock,

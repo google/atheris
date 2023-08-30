@@ -49,15 +49,6 @@ from .version_dependent import REL_REFERENCE_IS_INVERTED
 from .version_dependent import rel_reference_scale
 from .version_dependent import REVERSE_CMP_OP
 from .version_dependent import rot_n
-from .version_dependent import call
-from .version_dependent import cache_count
-from .version_dependent import caches
-from .version_dependent import get_instructions
-from .version_dependent import generate_exceptiontable
-from .version_dependent import parse_exceptiontable
-from .version_dependent import ExceptionTableEntry
-from .version_dependent import args_terminator
-from .version_dependent import CALLABLE_STACK_ENTRIES
 from .version_dependent import UNCONDITIONAL_JUMPS
 
 _TARGET_MODULE = "atheris"
@@ -786,7 +777,6 @@ class Instrumentor:
     # Insert at the first point after a RESUME instruction
     first_real_instr = None
     first_real_instr_slot = None
-    previous_instructions = []
     for i in range(len(self._cfg[0].instructions)):
       bb_instr = self._cfg[0].instructions[i]
       if bb_instr.mnemonic not in ("RESUME", "GEN_START"):
