@@ -29,7 +29,7 @@ if sys.version_info[0] >= 3:
 
 else:
   # functionality from python3's chr() function is called unichr() in python2
-  codepoint = unichr
+  codepoint = unichr  # noqa: F821
 
   # functionality from python3's int.to_bytes()
   def to_bytes(n, length):
@@ -250,7 +250,7 @@ class FuzzedDataProviderTest(unittest.TestCase):
       arr += to_bytes(random.randint(0, 255), 1)
     fdp = atheris.FuzzedDataProvider(arr)
 
-    l = fdp.ConsumeIntList(4321, 1)
+    l = fdp.ConsumeIntList(4321, 1)  # noqa: E741
     self.assertEqual(len(l), 4321)
     for i in range(0, 1000):
       if arr[i] < 0:
@@ -271,7 +271,7 @@ class FuzzedDataProviderTest(unittest.TestCase):
       arr += to_bytes(random.randint(0, 2**72 - 1), 9)
     fdp = atheris.FuzzedDataProvider(arr)
 
-    l = fdp.ConsumeIntList(4321, 9)
+    l = fdp.ConsumeIntList(4321, 9)  # noqa: E741
     self.assertEqual(len(l), 4321)
 
     for i in range(0, 1000):
@@ -355,7 +355,7 @@ class FuzzedDataProviderTest(unittest.TestCase):
       self.assertLess(val, 1.79769313e+308)
 
   def testPickValueInList1(self):
-    l = [3, 3]
+    l = [3, 3]  # noqa: E741
 
     arr = to_bytes(random.getrandbits(1024), int(1024 / 8))
     arr = to_bytes(1234, 8) + arr
@@ -368,7 +368,7 @@ class FuzzedDataProviderTest(unittest.TestCase):
     self.assertEqual(fdp.PickValueInList(l), 3)
 
   def testPickValueInList7(self):
-    l = [4, 17, 52, 12, 8, 71, 2]
+    l = [4, 17, 52, 12, 8, 71, 2]  # noqa: E741
     s = set()
 
     arr = to_bytes(random.getrandbits(1024 * 1024), int(1024 * 1024 / 8))
@@ -381,7 +381,7 @@ class FuzzedDataProviderTest(unittest.TestCase):
     self.assertEqual(fdp.PickValueInList(l), 4)
 
   def testPickValueInListShort(self):
-    l = []
+    l = []  # noqa: E741
     for i in range(1, 10001):
       l.append(i * 13)
 

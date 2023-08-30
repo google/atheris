@@ -394,10 +394,10 @@ def parse_exceptiontable(code):
 if (3, 11) <= PYTHON_VERSION <= (3, 11):
   from .native import _generate_exceptiontable
 
-  def generate_exceptiontable(original_code, exception_table_entries):
+  def generate_exceptiontable(original_code, exception_table_entries):  # noqa: F811
     return _generate_exceptiontable(original_code, exception_table_entries)
 
-  def parse_exceptiontable(co_exceptiontable):
+  def parse_exceptiontable(co_exceptiontable):  # noqa: F811
     if isinstance(co_exceptiontable, types.CodeType):
       return parse_exceptiontable(co_exceptiontable.co_exceptiontable)
 
