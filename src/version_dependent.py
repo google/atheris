@@ -496,7 +496,7 @@ elif PYTHON_VERSION >= (3, 11):
     if isinstance(op, str):
       op = dis.opmap[op]
 
-    return opcode._inline_cache_entries[op]
+    return opcode._inline_cache_entries[op]  # pytype: disable=module-attr  # py311-upgrade
 
   # Generate a list of CACHE instructions for the given instr.
   def caches(op):
