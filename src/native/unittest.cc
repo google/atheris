@@ -119,7 +119,10 @@ void Fuzz() {
   char** args_ptr = &args[0];
   int args_size = args_global.size();
 
-  exit(UnittestFuzz(args_size, args_ptr, &TestOneInput));
+  int returnCode = UnittestFuzz(args_size, args_ptr, &TestOneInput);
+  if(returnCode != 0) {
+    exit(returnCode);
+  }
 }
 
 NO_SANITIZE
