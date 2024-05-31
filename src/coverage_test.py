@@ -21,7 +21,7 @@ from unittest import mock
 import atheris
 
 with atheris.instrument_imports():
-  import coverage_test_helper
+  import coverage_test_helper  # pytype: disable=import-error
 
 # Enable RegEx instrumentation.
 atheris.enabled_hooks.add("RegEx")
