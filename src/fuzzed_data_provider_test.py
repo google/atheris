@@ -245,10 +245,10 @@ class FuzzedDataProviderTest(unittest.TestCase):
         self.assertLessEqual(result, one)
 
   def testIntList1(self):
-    arr = b""
+    arr = bytearray()
     for _ in range(0, 1000):
       arr += to_bytes(random.randint(0, 255), 1)
-    fdp = atheris.FuzzedDataProvider(arr)
+    fdp = atheris.FuzzedDataProvider(bytes(arr))
 
     l = fdp.ConsumeIntList(4321, 1)  # noqa: E741
     self.assertEqual(len(l), 4321)

@@ -19,9 +19,11 @@ jobs:
         python-version: '3.11'
         cache: 'pip'
     - name: Install dependencies
-      run: pip3 install ruff
+      run: pip3 install asn1crypto atheris pytype ruff
     - name: Run ruff checks
       run: ruff check src
+    - name: Run pytype checks
+      run: pytype src
 # mypy:
 #   runs-on: ubuntu-latest
 #   steps:

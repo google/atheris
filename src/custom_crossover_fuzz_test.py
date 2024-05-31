@@ -19,7 +19,7 @@ import zlib
 
 import atheris
 
-import fuzz_test_lib
+import fuzz_test_lib  # pytype: disable=import-error
 
 
 def concatenate_crossover(data1, data2, max_size, seed):

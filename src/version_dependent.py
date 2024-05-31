@@ -329,7 +329,7 @@ elif (3, 10) <= PYTHON_VERSION <= (3, 10):
 
 
 elif (3, 11) <= PYTHON_VERSION <= (3, 11):
-  from .native import _generate_codetable
+  from .native import _generate_codetable  # pytype: disable=import-error
   def get_lnotab(code, listing):
     ret = _generate_codetable(code, listing)
     return ret
@@ -392,7 +392,7 @@ def parse_exceptiontable(code):
 
 
 if (3, 11) <= PYTHON_VERSION <= (3, 11):
-  from .native import _generate_exceptiontable
+  from .native import _generate_exceptiontable  # pytype: disable=import-error
 
   def generate_exceptiontable(original_code, exception_table_entries):  # noqa: F811
     return _generate_exceptiontable(original_code, exception_table_entries)
@@ -497,7 +497,7 @@ if PYTHON_VERSION >= (3, 11):
     if isinstance(op, str):
       op = dis.opmap[op]
 
-    return opcode._inline_cache_entries[op]
+    return getattr(opcode, '_inline_cache_entries')[op]
 
   # Generate a list of CACHE instructions for the given instr.
   def caches(op):

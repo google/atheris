@@ -22,7 +22,7 @@ import zlib
 
 import atheris
 
-import fuzz_test_lib
+import fuzz_test_lib  # pytype: disable=import-error
 
 
 def fail_immediately(data):
