@@ -149,7 +149,7 @@ else:
 # Returns -1 for instructions that have backward relative references
 # (e.g. JUMP_BACKWARD, an instruction that uses a positive number to
 # indicate a negative jump)
-def rel_reference_scale(opname):
+def rel_reference_scale(opname: str) -> int:
   assert opname in HAVE_REL_REFERENCE
   if opname in REL_REFERENCE_IS_INVERTED:
     return -1
@@ -345,12 +345,12 @@ class ExceptionTableEntry:
     self.depth = depth
     self.lasti = lasti
 
-  def __repr__(self):
+  def __repr__(self) -> str:
     return (
         f"(start_offset={self.start_offset} end_offset={self.end_offset} target={self.target} depth={self.depth} lasti={self.lasti})"
     )
 
-  def __str__(self):
+  def __str__(self) -> str:
     return self.__repr__()
 
   def __eq__(self, other):
@@ -368,10 +368,10 @@ class ExceptionTable:
   def __init__(self, entries: List[ExceptionTableEntry]):
     self.entries = entries
 
-  def __repr__(self):
+  def __repr__(self) -> str:
     return "\n".join([repr(x) for x in self.entries])
 
-  def __str__(self):
+  def __str__(self) -> str:
     return "\n".join([repr(x) for x in self.entries])
 
   def __eq__(self, other):

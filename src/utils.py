@@ -17,7 +17,7 @@ import sys
 import os
 
 
-def path():
+def path() -> str:
   dir, _ = os.path.split(sys.modules["atheris"].__file__)
   dir, _ = os.path.split(dir)
   return dir
@@ -26,7 +26,7 @@ def path():
 class ProgressRenderer:
   """Displays an updating progress meter in the terminal."""
 
-  def __init__(self, stream, total_count):
+  def __init__(self, stream, total_count: int):
     assert stream.isatty()
     self.stream = stream
 
@@ -56,10 +56,10 @@ class ProgressRenderer:
     sys.stderr.write("\n")
 
   @property
-  def count(self):
+  def count(self) -> int:
     return self._count
 
   @count.setter
-  def count(self, new_count):
+  def count(self, new_count: int):
     self._count = new_count
     self.render()
