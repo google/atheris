@@ -22,20 +22,20 @@ import atheris
 import fuzz_test_lib  # pytype: disable=import-error
 
 
-def concatenate_crossover(data1, data2, max_size, seed):
+def concatenate_crossover(data1: bytes, data2: bytes, max_size: int, seed: int) -> bytes:
   res = data1 + b"|" + data2
   if max_size < len(res):
     return data1
   return res
 
 
-def noop_crossover(data1, data2, max_size, seed):
+def noop_crossover(data1: bytes, data2: bytes, max_size: int, seed: int) -> bytes:
   print("Hello from crossover")
   return data1
 
 
 @atheris.instrument_func
-def bytes_comparison(data):
+def bytes_comparison(data: bytes):
   if data == b"a|b|c|d|e":
     raise RuntimeError("Was a|b|c|d|e")
 

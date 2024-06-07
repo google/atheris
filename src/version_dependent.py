@@ -30,10 +30,10 @@ Currently supported python versions are:
 """
 
 import sys
-import types
 import dis
 import opcode
-from typing import List
+import types
+from typing import TYPE_CHECKING, Iterator, List, Optional, Sequence, Tuple, Union
 
 PYTHON_VERSION = sys.version_info[:2]
 
@@ -165,7 +165,7 @@ REVERSE_CMP_OP = [4, 5, 2, 3, 0, 1]
 if (3, 6) <= PYTHON_VERSION <= (3, 7):
 
   def get_code_object(
-      code_obj, stacksize, bytecode, consts, names, lnotab, exceptiontable
+      code_obj: types.CodeType, stacksize: int, bytecode: bytes, consts: Tuple[str, ...], names: Tuple[str, ...], lnotab: bytes, exceptiontable: bytes
   ):
     return types.CodeType(code_obj.co_argcount, code_obj.co_kwonlyargcount,
                           code_obj.co_nlocals, stacksize, code_obj.co_flags,
@@ -177,7 +177,7 @@ if (3, 6) <= PYTHON_VERSION <= (3, 7):
 elif (3, 8) <= PYTHON_VERSION <= (3, 10):
 
   def get_code_object(
-      code_obj, stacksize, bytecode, consts, names, lnotab, exceptiontable
+      code_obj: types.CodeType, stacksize: int, bytecode: bytes, consts: Tuple[str, ...], names: Tuple[str, ...], lnotab: bytes, exceptiontable: bytes
   ):
     return types.CodeType(code_obj.co_argcount, code_obj.co_posonlyargcount,
                           code_obj.co_kwonlyargcount, code_obj.co_nlocals,
@@ -189,7 +189,7 @@ elif (3, 8) <= PYTHON_VERSION <= (3, 10):
 else:
 
   def get_code_object(
-      code_obj, stacksize, bytecode, consts, names, lnotab, exceptiontable
+      code_obj: types.CodeType, stacksize: int, bytecode: bytes, consts: Tuple[str, ...], names: Tuple[str, ...], lnotab: bytes, exceptiontable: bytes
   ):
     return types.CodeType(
         code_obj.co_argcount,
@@ -241,7 +241,7 @@ else:
 
 
 if (3, 6) <= PYTHON_VERSION <= (3, 9):
-  def get_lnotab(code, listing):
+  def get_lnotab(code: types.CodeType, listing: List) -> bytes:
     """Returns line number table."""
     lnotab = []
     current_lineno = listing[0].lineno
@@ -296,7 +296,7 @@ if (3, 6) <= PYTHON_VERSION <= (3, 9):
 
 
 elif (3, 10) <= PYTHON_VERSION <= (3, 10):
-  def get_lnotab(code, listing):
+  def get_lnotab(code: types.CodeType, listing: List) -> bytes:
     """Returns line number table."""
     lnotab = []
     prev_lineno = listing[0].lineno
@@ -330,7 +330,7 @@ elif (3, 10) <= PYTHON_VERSION <= (3, 10):
 
 elif (3, 11) <= PYTHON_VERSION <= (3, 11):
   from .native import _generate_codetable  # pytype: disable=import-error
-  def get_lnotab(code, listing):
+  def get_lnotab(code: types.CodeType, listing: List) -> bytes:
     ret = _generate_codetable(code, listing)
     return ret
 
@@ -338,7 +338,7 @@ elif (3, 11) <= PYTHON_VERSION <= (3, 11):
 
 class ExceptionTableEntry:
 
-  def __init__(self, start_offset, end_offset, target, depth, lasti):
+  def __init__(self, start_offset: int, end_offset: int, target: int, depth: int, lasti: bool):
     self.start_offset = start_offset
     self.end_offset = end_offset
     self.target = target
@@ -353,9 +353,10 @@ class ExceptionTableEntry:
   def __str__(self) -> str:
     return self.__repr__()
 
-  def __eq__(self, other):
+  def __eq__(self, other: object) -> bool:
     return (
-        self.start_offset == other.start_offset
+        isinstance(other, ExceptionTableEntry)
+        and self.start_offset == other.start_offset
         and self.end_offset == other.end_offset
         and self.target == other.target
         and self.depth == other.depth
@@ -374,7 +375,9 @@ class ExceptionTable:
   def __str__(self) -> str:
     return "\n".join([repr(x) for x in self.entries])
 
-  def __eq__(self, other):
+  def __eq__(self, other: object) -> bool:
+    if not isinstance(other, ExceptionTable):
+      return False
     if len(self.entries) != len(other.entries):
       return False
     for i in range(len(self.entries)):
@@ -384,26 +387,26 @@ class ExceptionTable:
 
 # Default implementations
 # 3.11+ override these.
-def generate_exceptiontable(original_code, exception_table_entries):
+def generate_exceptiontable(original_code: types.CodeType, exception_table_entries: List[ExceptionTableEntry]) -> bytes:
   return b""
 
-def parse_exceptiontable(code):
+def parse_exceptiontable(code: Union[types.CodeType, bytes]) -> ExceptionTable:
   return ExceptionTable([])
 
 
 if (3, 11) <= PYTHON_VERSION <= (3, 11):
   from .native import _generate_exceptiontable  # pytype: disable=import-error
 
-  def generate_exceptiontable(original_code, exception_table_entries):  # noqa: F811
+  def generate_exceptiontable(original_code: types.CodeType, exception_table_entries: List[ExceptionTableEntry]) -> bytes:  # noqa: F811
     return _generate_exceptiontable(original_code, exception_table_entries)
 
-  def parse_exceptiontable(co_exceptiontable):  # noqa: F811
+  def parse_exceptiontable(co_exceptiontable: Union[types.CodeType, bytes]) -> ExceptionTable:  # noqa: F811
     if isinstance(co_exceptiontable, types.CodeType):
       return parse_exceptiontable(co_exceptiontable.co_exceptiontable)
 
     # These functions taken from:
     # https://github.com/python/cpython/blob/main/Objects/exception_handling_notes.txt
-    def parse_varint(iterator):
+    def parse_varint(iterator: Iterator[int]) -> int:
       b = next(iterator)
       val = b & 63
       while b & 64:
@@ -412,7 +415,7 @@ if (3, 11) <= PYTHON_VERSION <= (3, 11):
         val |= b & 63
       return val
 
-    def parse_exception_table(co_exceptiontable):
+    def parse_exception_table(co_exceptiontable: bytes) -> Iterator[tuple[int, int, int, int, bool]]:
       iterator = iter(co_exceptiontable)
       try:
         while True:
@@ -441,15 +444,15 @@ if (3, 11) <= PYTHON_VERSION <= (3, 11):
 if (3, 6) <= PYTHON_VERSION <= (3, 10):
 
   # There are no CACHE instructions in these versions, so return 0.
-  def cache_count(op):
+  def cache_count(op: Union[str, int]) -> int:
     return 0
 
   # There are no CACHE instructions in these versions, so return empty list.
-  def caches(op):
+  def caches(op: int) -> List[Tuple[int, int]]:
     return []
 
   # Rotate the top width_n instructions, shift_n times.
-  def rot_n(width_n: int, shift_n: int = 1):
+  def rot_n(width_n: int, shift_n: int = 1) -> List[Sequence[int]]:
     if shift_n != 1:
       return RuntimeError("rot_n not supported with shift_n!=1. (Support could be emulated if needed.)")
 
@@ -478,11 +481,11 @@ if (3, 6) <= PYTHON_VERSION <= (3, 10):
     return [(dis.opmap["ROT_N"], width_n)]
 
   # 3.11+ needs a null terminator for the argument list, but 3.10- does not.
-  def args_terminator():
+  def args_terminator() -> List[Tuple[int, int]]:
     return []
 
   # In 3.10-, all you need to call a function is CALL_FUNCTION.
-  def call(argc: int):
+  def call(argc: int) -> List[Tuple[int, int]]:
     return [(dis.opmap["CALL_FUNCTION"], argc)]
 
   # In 3.10-, each call pops 1 thing other than the arguments off the stack:
@@ -493,19 +496,19 @@ if (3, 6) <= PYTHON_VERSION <= (3, 10):
 if PYTHON_VERSION >= (3, 11):
 
   # The number of CACHE instructions that must go after the given instr.
-  def cache_count(op):
+  def cache_count(op: str | int) -> int:
     if isinstance(op, str):
       op = dis.opmap[op]
 
     return getattr(opcode, '_inline_cache_entries')[op]
 
   # Generate a list of CACHE instructions for the given instr.
-  def caches(op):
+  def caches(op: int) -> List[Tuple[int, int]]:
     cc = cache_count(op)
     return [(dis.opmap["CACHE"], 0)] * cc
 
   # Rotate the top width_n instructions, shift_n times.
-  def rot_n(width_n: int, shift_n: int = 1):
+  def rot_n(width_n: int, shift_n: int = 1) -> List[Sequence[int]]:
     ret = []
     for j in range(shift_n):
       for i in range(width_n, 1, -1):
@@ -514,11 +517,11 @@ if PYTHON_VERSION >= (3, 11):
 
   # Calling a free function in 3.11 requires a null terminator for the
   # args list on the stack.
-  def args_terminator():
+  def args_terminator() -> List[Tuple[int, int]]:
     return [(dis.opmap["PUSH_NULL"], 0)]
 
   # 3.11 requires a PRECALL instruction prior to every CALL instruction.
-  def call(argc: int):
+  def call(argc: int) -> List[Tuple[int, int]]:
     ret = []
     ret.append((dis.opmap["PRECALL"], argc))
     ret.append((dis.opmap["CALL"], argc))
@@ -533,13 +536,13 @@ if PYTHON_VERSION >= (3, 11):
 
 if (3, 6) <= PYTHON_VERSION <= (3, 10):
 
-  def get_instructions(x, *, first_line=None):
+  def get_instructions(x: types.CodeType, *, first_line: Optional[int] = None) -> Iterator[dis.Instruction]:
     return dis.get_instructions(x, first_line=first_line)
 
 
 if (3, 11) <= PYTHON_VERSION:
 
-  def get_instructions(x, *, first_line=None, adaptive=False):
+  def get_instructions(x: types.CodeType, *, first_line: Optional[int] = None, adaptive: bool = False) -> Iterator[dis.Instruction]:
     return dis.get_instructions(
         x, first_line=first_line, adaptive=adaptive, show_caches=True
     )

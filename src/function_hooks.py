@@ -345,7 +345,7 @@ def _trace_str(
   # pylint: enable=g-import-not-at-top
 
 
-def _hook_str(*args, **kwargs) -> bool:
+def _hook_str(*args: Any, **kwargs: Any) -> bool:
   """Proxy routing str functions through Atheris tracing.
 
   Even though bytecode is modified for hooking the str methods, we use this

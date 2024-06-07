@@ -22,7 +22,7 @@ import atheris
 import fuzz_test_lib  # pytype: disable=import-error
 
 
-def compressed_mutator(data, max_size, seed):
+def compressed_mutator(data: bytes, max_size: int, seed: int) -> bytes:
   try:
     decompressed = zlib.decompress(data)
   except zlib.error:
@@ -33,7 +33,7 @@ def compressed_mutator(data, max_size, seed):
 
 
 @atheris.instrument_func
-def compressed_data(data):
+def compressed_data(data: bytes):
   try:
     decompressed = zlib.decompress(data)
   except zlib.error:

@@ -15,6 +15,7 @@
 
 import dis
 import re
+from typing import Tuple
 import unittest
 from unittest import mock
 
@@ -30,7 +31,7 @@ atheris.enabled_hooks.add("str")
 
 
 @atheris.instrument_func
-def decorator_instrumented(x):
+def decorator_instrumented(x: int) -> int:
   return 2 * x
 
 
@@ -39,7 +40,7 @@ def decorator_instrumented(x):
 @atheris.instrument_func
 @atheris.instrument_func
 @atheris.instrument_func
-def multi_instrumented(x):
+def multi_instrumented(x: int) -> int:
   return 2 * x
 
 
@@ -51,8 +52,8 @@ original_trace_cmp = atheris._trace_cmp
 @mock.patch.object(atheris, "_trace_branch")
 class CoverageTest(unittest.TestCase):
 
-  def testBasicBlock(self, trace_branch_mock, trace_cmp_mock,
-                     trace_regex_match_mock):
+  def testBasicBlock(self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock,
+                     trace_regex_match_mock: mock.MagicMock):
     trace_branch_mock.assert_not_called()
     coverage_test_helper.simple_func(7)
     trace_branch_mock.assert_called()
@@ -61,8 +62,8 @@ class CoverageTest(unittest.TestCase):
     coverage_test_helper.simple_func(2)
     trace_branch_mock.assert_called()
 
-  def testDecoratorBasicBlock(self, trace_branch_mock, trace_cmp_mock,
-                              trace_regex_match_mock):
+  def testDecoratorBasicBlock(self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock,
+                              trace_regex_match_mock: mock.MagicMock):
     trace_branch_mock.assert_not_called()
     decorator_instrumented(7)
     trace_branch_mock.assert_called()
@@ -71,8 +72,8 @@ class CoverageTest(unittest.TestCase):
     decorator_instrumented(2)
     trace_branch_mock.assert_called()
 
-  def testBranch(self, trace_branch_mock, trace_cmp_mock,
-                 trace_regex_match_mock):
+  def testBranch(self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock,
+                 trace_regex_match_mock: mock.MagicMock):
     trace_branch_mock.assert_not_called()
     coverage_test_helper.if_func(True)
     first_call_set = trace_branch_mock.call_args_list
@@ -90,14 +91,14 @@ class CoverageTest(unittest.TestCase):
     self.assertNotEqual(first_call_set, third_call_set)
 
   def testWhile(
-      self, trace_branch_mock, trace_cmp_mock, trace_regex_match_mock
+      self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock, trace_regex_match_mock: mock.MagicMock
   ):
     trace_branch_mock.assert_not_called()
     coverage_test_helper.while_loop(1)
     trace_branch_mock.assert_called()
 
-  def testRegex(self, trace_branch_mock, trace_cmp_mock,
-                trace_regex_match_mock):
+  def testRegex(self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock,
+                trace_regex_match_mock: mock.MagicMock):
     trace_branch_mock.reset_mock()
     trace_branch_mock.assert_not_called()
     trace_regex_match_mock.assert_not_called()
@@ -106,7 +107,7 @@ class CoverageTest(unittest.TestCase):
     trace_regex_match_mock.assert_called()
 
   def testStrMethods(
-      self, trace_branch_mock, trace_cmp_mock, trace_regex_match_mock
+      self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock, trace_regex_match_mock: mock.MagicMock
   ):
     trace_branch_mock.assert_not_called()
     trace_regex_match_mock.assert_not_called()
@@ -160,7 +161,7 @@ class CoverageTest(unittest.TestCase):
     trace_regex_match_mock.assert_not_called()
     trace_regex_match_mock.reset_mock()
 
-  def assertTraceCmpWas(self, call_args, left, right, op, left_is_const):
+  def assertTraceCmpWas(self, call_args: Tuple[int, int, int, int, bool], left: int, right: int, op: str, left_is_const: bool):
     """Compare a _trace_cmp call to expected values."""
     # call_args: tuple(left, right, opid, idx, left_is_const)
     self.assertEqual(call_args[0], left)
@@ -168,8 +169,8 @@ class CoverageTest(unittest.TestCase):
     self.assertEqual(dis.cmp_op[call_args[2]], op)
     self.assertEqual(call_args[4], left_is_const)
 
-  def testCompare(self, trace_branch_mock, trace_cmp_mock,
-                  trace_regex_match_mock):
+  def testCompare(self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock,
+                  trace_regex_match_mock: mock.MagicMock):
     trace_cmp_mock.side_effect = original_trace_cmp
 
     self.assertTrue(coverage_test_helper.cmp_less(1, 2))
@@ -205,8 +206,8 @@ class CoverageTest(unittest.TestCase):
     self.assertNotEqual(second_cmp_idx, fifth_cmp_idx)
     self.assertNotEqual(fourth_cmp_idx, fifth_cmp_idx)
 
-  def testConstCompare(self, trace_branch_mock, trace_cmp_mock,
-                       trace_regex_match_mock):
+  def testConstCompare(self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock,
+                       trace_regex_match_mock: mock.MagicMock):
     trace_cmp_mock.side_effect = original_trace_cmp
 
     self.assertTrue(coverage_test_helper.cmp_const_less(2))
@@ -217,8 +218,8 @@ class CoverageTest(unittest.TestCase):
     self.assertTraceCmpWas(trace_cmp_mock.call_args[0], 1, 3, ">", True)
     trace_cmp_mock.reset_mock()
 
-  def testInstrumentationAppliedOnce(self, trace_branch_mock, trace_cmp_mock,
-                                     trace_regex_match_mock):
+  def testInstrumentationAppliedOnce(self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock,
+                                     trace_regex_match_mock: mock.MagicMock):
     trace_branch_mock.assert_not_called()
     multi_instrumented(7)
     trace_branch_mock.assert_called_once()

@@ -17,19 +17,20 @@ import os
 import signal
 import sys
 import time
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import atheris
 
 
-def _set_nonblocking(fd):
+def _set_nonblocking(fd: int):
   """Set the specified fd to a nonblocking mode."""
   oflags = fcntl.fcntl(fd, fcntl.F_GETFL)
   nflags = oflags | os.O_NONBLOCK
   fcntl.fcntl(fd, fcntl.F_SETFL, nflags)
 
 
-def _fuzztest_child(test_one_input, custom_setup, setup_kwargs, pipe, args,
-                    enabled_hooks):
+def _fuzztest_child(test_one_input: Callable[[bytes], None], custom_setup: Callable[..., Any], setup_kwargs: Optional[Dict[str, str]], pipe: Tuple[int, int], args: Optional[List[str]],
+                    enabled_hooks: Optional[List[str]]):
   """Fuzzing target to run as a separate process."""
   os.close(pipe[0])
   os.dup2(pipe[1], 1)
@@ -61,13 +62,13 @@ def _fuzztest_child(test_one_input, custom_setup, setup_kwargs, pipe, args,
     os._exit(0)
 
 
-def run_fuzztest(test_one_input,
-                 custom_setup=None,
-                 setup_kwargs=None,
-                 expected_output=None,
-                 timeout=10,
-                 args=None,
-                 enabled_hooks=None):
+def run_fuzztest(test_one_input: Callable[[bytes], Any],
+                 custom_setup: Optional[Callable[..., Any]] = None,
+                 setup_kwargs: Optional[Dict[str, str]] = None,
+                 expected_output: Optional[bytes] = None,
+                 timeout: float = 10,
+                 args: Optional[List[str]] = None,
+                 enabled_hooks: Optional[List[str]] = None):
   """Fuzz test_one_input() in a subprocess.
 
   This forks a child, and in the child, runs atheris.Setup(test_one_input) and
