@@ -52,7 +52,7 @@ supports Unicode 11, but uses Unicode 9 tables. This conflict results in it
 decoding some internationalized domain names incorrectly. [İ᷹.com](İ᷹.com), for
 example. This could result in a domain name that resolves to a different website
 depending on who accesses it, and (if a legitimate website ever uses such
-characters), could allow someone to impersonte that website to any tool using
+characters), could allow someone to impersonate that website to any tool using
 libidn2.
 
 ## Denial of Service errors
