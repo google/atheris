@@ -17,6 +17,7 @@ import atheris
 import dis
 import re
 import unittest
+from typing import Any, Tuple
 from unittest import mock
 
 with atheris.instrument_imports():
@@ -29,7 +30,7 @@ atheris.enabled_hooks.add("str")
 
 
 @atheris.instrument_func
-def if_func(a):
+def if_func(a: float) -> int:
   x = a
   if x:
     return 2
@@ -38,89 +39,89 @@ def if_func(a):
 
 
 @atheris.instrument_func
-def cmp_less(a, b):
+def cmp_less(a: float, b: float):
   return a < b
 
 
 @atheris.instrument_func
-def cmp_greater(a, b):
+def cmp_greater(a: float, b: float):
   return a > b
 
 
 @atheris.instrument_func
-def cmp_equal_nested(a, b, c):
+def cmp_equal_nested(a: float, b: float, c: float) -> bool:
   return (a == b) == c
 
 
 @atheris.instrument_func
-def cmp_const_less(a):
+def cmp_const_less(a: float) -> bool:
   return 1 < a
 
 
 @atheris.instrument_func
-def cmp_const_less_inverted(a):
+def cmp_const_less_inverted(a: float) -> bool:
   return a < 1
 
 
 @atheris.instrument_func
-def decorator_instrumented(x):
+def decorator_instrumented(x: int):
   return 2 * x
 
 
 @atheris.instrument_func
-def while_loop(a):
+def while_loop(a: float):
   while a:
     a -= 1
 
 
 @atheris.instrument_func
-def regex_match(re_obj, a):
+def regex_match(re_obj: re.Pattern, a: str):
   re_obj.match(a)
 
 
 @atheris.instrument_func
-def starts_with(s, prefix):
+def starts_with(s: str, prefix: str):
   s.startswith(prefix)
 
 
 @atheris.instrument_func
-def ends_with(s, suffix):
+def ends_with(s: str, suffix: str):
   s.endswith(suffix)
 
 
 # Verifying that no tracing happens when var args are passed in to
 # startswith method calls
 @atheris.instrument_func
-def starts_with_var_args(s, *args):
+def starts_with_var_args(s: str, *args: Any):
   s.startswith(*args)
 
 
 # Verifying that no tracing happens when var args are passed in to
 # endswith method calls
 @atheris.instrument_func
-def ends_with_var_args(s, *args):
+def ends_with_var_args(s: str, *args: Any):
   s.startswith(*args)
 
 
 class FakeStr:
 
-  def startswith(self, s, prefix):
+  def startswith(self, s: str, prefix: str):
     pass
 
-  def endswith(self, s, suffix):
+  def endswith(self, s: str, suffix: str):
     pass
 
 
 # Verifying that even though this code gets patched, no tracing happens
 @atheris.instrument_func
-def fake_starts_with(s, prefix):
+def fake_starts_with(s: str, prefix: str):
   fake_str = FakeStr()
   fake_str.startswith(s=s, prefix=prefix)
 
 
 # Verifying that even though this code gets patched, no tracing happens
 @atheris.instrument_func
-def fake_ends_with(s, suffix):
+def fake_ends_with(s: str, suffix: str):
   fake_str = FakeStr()
   fake_str.endswith(s, suffix)
 
@@ -161,16 +162,16 @@ original_trace_cmp = atheris._trace_cmp
 @mock.patch.object(atheris, "_trace_branch")
 class CoverageTest(unittest.TestCase):
 
-  def testImport(self, trace_branch_mock, trace_cmp_mock,
-                 trace_regex_match_mock):
+  def testImport(self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock,
+                 trace_regex_match_mock: mock.MagicMock):
     trace_cmp_mock.side_effect = original_trace_cmp
 
     trace_branch_mock.assert_not_called()
     Sequence.load(b"0\0")
     trace_branch_mock.assert_called()
 
-  def testBranch(self, trace_branch_mock, trace_cmp_mock,
-                 trace_regex_match_mock):
+  def testBranch(self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock,
+                 trace_regex_match_mock: mock.MagicMock):
     trace_branch_mock.assert_not_called()
     if_func(True)
     first_call_set = trace_branch_mock.call_args_list
@@ -188,14 +189,14 @@ class CoverageTest(unittest.TestCase):
     self.assertNotEqual(first_call_set, third_call_set)
 
   def testWhile(
-      self, trace_branch_mock, trace_cmp_mock, trace_regex_match_mock
+      self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock, trace_regex_match_mock: mock.MagicMock
   ):
     trace_branch_mock.assert_not_called()
     while_loop(1)
     trace_branch_mock.assert_called()
 
-  def testRegex(self, trace_branch_mock, trace_cmp_mock,
-                trace_regex_match_mock):
+  def testRegex(self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock,
+                trace_regex_match_mock: mock.MagicMock):
     trace_branch_mock.reset_mock()
     trace_branch_mock.assert_not_called()
     trace_regex_match_mock.assert_not_called()
@@ -204,7 +205,7 @@ class CoverageTest(unittest.TestCase):
     trace_regex_match_mock.assert_called()
 
   def testStrMethods(
-      self, trace_branch_mock, trace_cmp_mock, trace_regex_match_mock
+      self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock, trace_regex_match_mock: mock.MagicMock
   ):
     trace_branch_mock.assert_not_called()
     trace_regex_match_mock.assert_not_called()
@@ -252,7 +253,7 @@ class CoverageTest(unittest.TestCase):
     trace_regex_match_mock.assert_not_called()
     trace_regex_match_mock.reset_mock()
 
-  def assertTraceCmpWas(self, call_args, left, right, op, left_is_const):
+  def assertTraceCmpWas(self, call_args: Tuple[int, int, int, int, bool], left: int, right: int, op: str, left_is_const: bool):
     """Compare a _trace_cmp call to expected values."""
     # call_args: tuple(left, right, opid, idx, left_is_const)
     self.assertEqual(call_args[0], left)
@@ -260,8 +261,8 @@ class CoverageTest(unittest.TestCase):
     self.assertEqual(dis.cmp_op[call_args[2]], op)
     self.assertEqual(call_args[4], left_is_const)
 
-  def testCompare(self, trace_branch_mock, trace_cmp_mock,
-                  trace_regex_match_mock):
+  def testCompare(self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock,
+                  trace_regex_match_mock: mock.MagicMock):
     trace_cmp_mock.side_effect = original_trace_cmp
 
     self.assertTrue(cmp_less(1, 2))
@@ -297,8 +298,8 @@ class CoverageTest(unittest.TestCase):
     self.assertNotEqual(second_cmp_idx, fifth_cmp_idx)
     self.assertNotEqual(fourth_cmp_idx, fifth_cmp_idx)
 
-  def testConstCompare(self, trace_branch_mock, trace_cmp_mock,
-                       trace_regex_match_mock):
+  def testConstCompare(self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock,
+                       trace_regex_match_mock: mock.MagicMock):
     trace_cmp_mock.side_effect = original_trace_cmp
 
     self.assertTrue(cmp_const_less(2))
@@ -309,8 +310,8 @@ class CoverageTest(unittest.TestCase):
     self.assertTraceCmpWas(trace_cmp_mock.call_args[0], 1, 3, ">", True)
     trace_cmp_mock.reset_mock()
 
-  def testInstrumentationAppliedOnce(self, trace_branch_mock, trace_cmp_mock,
-                                     trace_regex_match_mock):
+  def testInstrumentationAppliedOnce(self, trace_branch_mock: mock.MagicMock, trace_cmp_mock: mock.MagicMock,
+                                     trace_regex_match_mock: mock.MagicMock):
     trace_branch_mock.assert_not_called()
     multi_instrumented(7)
     trace_branch_mock.assert_called_once()

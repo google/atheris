@@ -24,7 +24,7 @@ import unittest
 if sys.version_info[0] >= 3:
   codepoint = chr
 
-  def to_bytes(n, length):
+  def to_bytes(n: int, length: int) -> bytes:
     return n.to_bytes(length, "little")
 
 else:
@@ -32,7 +32,7 @@ else:
   codepoint = unichr  # noqa: F821
 
   # functionality from python3's int.to_bytes()
-  def to_bytes(n, length):
+  def to_bytes(n: int, length: int) -> str:
     h = "%x" % n
     s = ("0" * (len(h) % 2) + h).zfill(length * 2).decode("hex")
     return s[::-1]

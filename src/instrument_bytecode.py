@@ -17,6 +17,7 @@
 Mainly the function patch_code(), which can instrument a code object and the
 helper class Instrumentor.
 """
+import ast
 import collections
 import dis
 import gc
@@ -24,7 +25,7 @@ import itertools
 import logging
 import sys
 import types
-from typing import Any, Callable, Iterator, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union
 
 from . import utils
 from .native import _reserve_counter  # type: ignore[attr-defined]
@@ -95,7 +96,7 @@ class Instruction:
       opcode: int,
       arg: int = 0,
       min_size: int = 0,
-      positions=None,
+      positions: Optional[List[ast.AST]] = None,
   ):
     self.lineno = lineno
     self.offset = offset
@@ -327,12 +328,12 @@ class Instrumentor:
     self._build_cfg()
     self._check_state()
 
-  def _insert_instruction(self, to_insert, lineno, offset, opcode, arg=0):
+  def _insert_instruction(self, to_insert: List[Instruction], lineno: int, offset: int, opcode: int, arg: int = 0) -> int:
     to_insert.append(Instruction(lineno, offset, opcode, arg))
     offset += to_insert[-1].get_size()
     return self._insert_instructions(to_insert, lineno, offset, caches(opcode))
 
-  def _insert_instructions(self, to_insert, lineno, offset, tuples):
+  def _insert_instructions(self, to_insert: List[Instruction], lineno: int, offset: int, tuples: List[Sequence[int]]) -> int:
     for t in tuples:
       offset = self._insert_instruction(to_insert, lineno, offset, t[0], t[1])
     return offset

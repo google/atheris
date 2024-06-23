@@ -15,6 +15,7 @@
 
 import sys
 import os
+from typing import IO
 
 
 def path() -> str:
@@ -26,7 +27,7 @@ def path() -> str:
 class ProgressRenderer:
   """Displays an updating progress meter in the terminal."""
 
-  def __init__(self, stream, total_count: int):
+  def __init__(self, stream: IO[str], total_count: int):
     assert stream.isatty()
     self.stream = stream
 

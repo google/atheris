@@ -19,18 +19,19 @@ import sys
 import time
 import unittest
 import zlib
+from typing import Callable, NoReturn
 
 import atheris
 
 import fuzz_test_lib  # pytype: disable=import-error
 
 
-def fail_immediately(data):
+def fail_immediately(data: bytes) -> NoReturn:
   raise RuntimeError("Failed immediately")
 
 
 @atheris.instrument_func
-def many_branches(data):
+def many_branches(data: bytes):
   if len(data) < 4:
     return
   if data[0] != 12:
@@ -46,7 +47,7 @@ def many_branches(data):
 
 
 @atheris.instrument_func
-def never_fail(data):
+def never_fail(data: bytes):
   for d in data:
     if d == 0:
       pass
@@ -57,18 +58,18 @@ def never_fail(data):
 
 
 @atheris.instrument_func
-def raise_with_surrogates(data):
+def raise_with_surrogates(data: bytes) -> NoReturn:
   raise RuntimeError("abc \ud927 def")
 
 
 @atheris.instrument_func
-def bytes_comparison(data):
+def bytes_comparison(data: bytes):
   if data == b"foobarbazbiz":
     raise RuntimeError("Was foobarbazbiz")
 
 
 @atheris.instrument_func
-def string_comparison(data):
+def string_comparison(data: bytes):
   try:
     if data.decode("utf-8") == "foobarbazbiz":
       raise RuntimeError("Was foobarbazbiz")
@@ -77,7 +78,7 @@ def string_comparison(data):
 
 
 @atheris.instrument_func
-def utf8_comparison(data):
+def utf8_comparison(data: bytes):
   try:
     decoded = data.decode("utf-8")
     if decoded == "⾐∾ⶑ➠":
@@ -87,7 +88,7 @@ def utf8_comparison(data):
 
 
 @atheris.instrument_func
-def nested_utf8_comparison(data):
+def nested_utf8_comparison(data: bytes):
   try:
     decoded = data.decode("utf-8")
     x = "sup"
@@ -100,19 +101,19 @@ def nested_utf8_comparison(data):
 
 
 @atheris.instrument_func
-def timeout_py(data):
+def timeout_py(data: bytes):
   del data
   time.sleep(100000000)
 
 
 @atheris.instrument_func
-def regex_match(data):
+def regex_match(data: bytes):
   if re.search(b"(Sun|Mon)day", data) is not None:
     raise RuntimeError("Was RegEx Match")
 
 
 @atheris.instrument_func
-def str_startswith(data):
+def str_startswith(data: bytes):
   try:
     decoded = data.decode("utf-8")
     if decoded.startswith("foobar"):
@@ -122,7 +123,7 @@ def str_startswith(data):
 
 
 @atheris.instrument_func
-def str_endswith(data):
+def str_endswith(data: bytes):
   try:
     decoded = data.decode("utf-8")
     if decoded.endswith("bazbiz"):
@@ -132,7 +133,7 @@ def str_endswith(data):
 
 
 @atheris.instrument_func
-def str_methods_combined(data):
+def str_methods_combined(data: bytes):
   try:
     decoded = data.decode("utf-8")
     if decoded.startswith("foo") and decoded.endswith("bar"):
@@ -142,7 +143,7 @@ def str_methods_combined(data):
 
 
 @atheris.instrument_func
-def str_startswith_tuple_prefix(data):
+def str_startswith_tuple_prefix(data: bytes):
   try:
     decoded = data.decode("utf-8")
     if decoded.startswith(("foobar", "hellohi", "supyo")):
@@ -152,7 +153,7 @@ def str_startswith_tuple_prefix(data):
 
 
 @atheris.instrument_func
-def str_endswith_tuple_suffix(data):
+def str_endswith_tuple_suffix(data: bytes):
   try:
     decoded = data.decode("utf-8")
     if decoded.endswith(("bazbiz", "byebye", "cyalater")):
@@ -162,7 +163,7 @@ def str_endswith_tuple_suffix(data):
 
 
 @atheris.instrument_func
-def str_startswith_with_start_and_end(data):
+def str_startswith_with_start_and_end(data: bytes):
   try:
     decoded = data.decode("utf-8")
     if decoded.startswith("hellohi", 10, 20):
@@ -172,7 +173,7 @@ def str_startswith_with_start_and_end(data):
 
 
 @atheris.instrument_func
-def str_endswith_with_start_and_end(data):
+def str_endswith_with_start_and_end(data: bytes):
   try:
     decoded = data.decode("utf-8")
     if decoded.endswith("supyo", 5, 15):
@@ -182,7 +183,7 @@ def str_endswith_with_start_and_end(data):
 
 
 @atheris.instrument_func
-def compressed_data(data):
+def compressed_data(data: bytes):
   try:
     decompressed = zlib.decompress(data)
   except zlib.error:
@@ -199,25 +200,25 @@ def compressed_data(data):
 
 
 @atheris.instrument_func
-def reserve_counter_after_fuzz_start(data):
+def reserve_counter_after_fuzz_start(data: Callable[[bytes], None]):
   del data
   atheris._reserve_counter()
 
 
 @functools.lru_cache(maxsize=None)
-def instrument_once(func):
+def instrument_once(func: Callable[[bytes], None]):
   """Instruments func, and verifies that this is the first time."""
   assert("__ATHERIS_INSTRUMENTED__" not in func.__code__.co_consts)
   atheris.instrument_func(func)
   assert("__ATHERIS_INSTRUMENTED__" in func.__code__.co_consts)
 
 
-def foo(data):
+def foo(data: bytes):
   if data == b"foobar":
     raise RuntimeError("Code instrumented at runtime.")
 
 
-def runtime_instrument_code(data):
+def runtime_instrument_code(data: bytes):
   instrument_once(foo)
   foo(data)
 

@@ -22,19 +22,19 @@ import atheris
 import fuzz_test_lib  # pytype: disable=import-error
 
 
-def noop_mutator(data, max_size, seed):
+def noop_mutator(data: bytes, max_size: int, seed: int) -> bytes:
   print("Hello from mutator")
   res = atheris.Mutate(data, len(data))
   return res
 
 
-def noop_crossover(data1, data2, max_size, seed):
+def noop_crossover(data1: bytes, data2: bytes, max_size: int, seed: int) -> bytes:
   print("Hello from crossover")
   return data1 + data2
 
 
 @atheris.instrument_func
-def test_one_input(data):
+def test_one_input(data: bytes):
   if data == b"AA":
     raise ("Solved!")
 

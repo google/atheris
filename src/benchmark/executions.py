@@ -16,6 +16,7 @@
 
 import atheris
 import contextlib
+from typing import Any, Callable, Iterator, List, Tuple, TypeVar
 
 # Use new atheris instrumentation only if on new atheris
 if "instrument_func" in dir(atheris):
@@ -23,15 +24,16 @@ if "instrument_func" in dir(atheris):
   instrument_imports = atheris.instrument_imports
   instrument_all = atheris.instrument_all
 else:
+  T = TypeVar("T")
 
-  def instrument_func(x):
+  def instrument_func(x: Callable[..., T]) -> Callable[..., T]:
     return x
 
   def instrument_all():
     pass
 
   @contextlib.contextmanager
-  def instrument_imports(*args, **kwargs):
+  def instrument_imports(*args: Any, **kwargs: Any) -> Iterator[None]:
     yield None
 
 
@@ -46,14 +48,14 @@ with instrument_imports():
   import io
 
 
-def _set_nonblocking(fd):
+def _set_nonblocking(fd: int):
   """Set the specified fd to a nonblocking mode."""
   oflags = fcntl.fcntl(fd, fcntl.F_GETFL)
   nflags = oflags | os.O_NONBLOCK
   fcntl.fcntl(fd, fcntl.F_SETFL, nflags)
 
 
-def _benchmark_child(test_one_input, num_runs, pipe, args, inst_all):
+def _benchmark_child(test_one_input: Callable[[bytes], None], num_runs: int, pipe: Tuple[int, int], args: List[str], inst_all: bool):
   os.close(pipe[0])
   os.dup2(pipe[1], 1)
   os.dup2(pipe[1], 2)
@@ -64,7 +66,7 @@ def _benchmark_child(test_one_input, num_runs, pipe, args, inst_all):
   counter = [0]
   start = time.time()
 
-  def wrapped_test_one_input(data):
+  def wrapped_test_one_input(data: bytes):
     counter[0] += 1
     if counter[0] == num_runs:
       print(f"\nbenchmark_duration={time.time() - start}")
@@ -76,11 +78,11 @@ def _benchmark_child(test_one_input, num_runs, pipe, args, inst_all):
   assert False  # Does not return
 
 
-def run_benchmark(test_one_input,
-                  num_runs,
-                  timeout=10,
-                  inst_all=False,
-                  args=[]):
+def run_benchmark(test_one_input: Callable[[bytes], None],
+                  num_runs: int,
+                  timeout: float = 10,
+                  inst_all: bool = False,
+                  args: List[str] = []):
   """Fuzz test_one_input() in a subprocess.
 
   This forks a child, and in the child, runs atheris.Setup(test_one_input) and
@@ -140,7 +142,7 @@ def run_benchmark(test_one_input,
 
 
 @instrument_func
-def low_cyclomatic(data):
+def low_cyclomatic(data: bytes):
   x = 0
   x = 1
   x = 2
@@ -244,7 +246,7 @@ def low_cyclomatic(data):
 
 
 @instrument_func
-def high_cyclomatic(data):
+def high_cyclomatic(data: bytes):
   for c in data:
     if c == 0:
       c = 38
@@ -760,7 +762,7 @@ def high_cyclomatic(data):
       c = 7
 
 
-def json_fuzz(data):
+def json_fuzz(data: bytes):
   try:
     json.loads(data.decode("utf-8", "surrogatepass"))
   except Exception as e:
@@ -768,7 +770,7 @@ def json_fuzz(data):
 
 
 @instrument_func
-def zip_fuzz(data):
+def zip_fuzz(data: bytes):
   try:
     with io.BytesIO(data) as f:
       pz = zipfile.ZipFile(f)
