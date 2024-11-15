@@ -40,8 +40,8 @@ std::function<py::bytes(py::bytes data, size_t max_size, unsigned int seed)>&
         py::bytes data, size_t max_size,
         unsigned int seed)>([](py::bytes data, size_t max_size,
                                unsigned int seed) -> py::bytes {
-          // This function should never be called.
-          abort();
+      // This function should never be called.
+      abort();
     });
 }  // namespace
 
