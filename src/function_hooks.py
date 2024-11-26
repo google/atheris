@@ -362,7 +362,7 @@ def _hook_str(*args, **kwargs) -> bool:
 
   if not args or len(args) < 2:
     logging.error("_hook_str call was not patched in properly")
-    return None
+    return None  # pytype: disable=bad-return-type
 
   s = args[0]
   str_method: str = args[1]
