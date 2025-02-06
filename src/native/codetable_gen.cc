@@ -31,9 +31,18 @@
 
 namespace atheris {
 
+#if PY_MINOR_VERSION >= 12
+uint8_t opcode_caches[MAX_PSEUDO_OPCODE];
+#else
 uint8_t opcode_caches[256];
+#endif
+
 static bool dummy_initializer = []() {
+#if PY_MINOR_VERSION >= 12
+  memset(opcode_caches, 0, MAX_PSEUDO_OPCODE);
+#else
   memset(opcode_caches, 0, 256);
+#endif
   opcode_caches[BINARY_SUBSCR] = 4;
   opcode_caches[STORE_SUBSCR] = 1;
   opcode_caches[UNPACK_SEQUENCE] = 1;
@@ -42,8 +51,12 @@ static bool dummy_initializer = []() {
   opcode_caches[COMPARE_OP] = 2;
   opcode_caches[LOAD_GLOBAL] = 5;
   opcode_caches[BINARY_OP] = 1;
+#if PY_MINOR_VERSION < 12
   opcode_caches[LOAD_METHOD] = 10;
+#endif
+#if PY_MINOR_VERSION == 11
   opcode_caches[PRECALL] = 1;
+#endif
   opcode_caches[CALL] = 4;
   return true;
 }();

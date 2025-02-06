@@ -28,6 +28,7 @@ from typing import Any, Callable, Iterator, List, Optional, Tuple, TypeVar, Unio
 
 from . import utils
 from .native import _reserve_counter  # type: ignore[attr-defined]
+from .version_dependent import adjust_arg
 from .version_dependent import add_bytes_to_jump_arg
 from .version_dependent import args_terminator
 from .version_dependent import cache_count
@@ -41,6 +42,7 @@ from .version_dependent import generate_exceptiontable
 from .version_dependent import get_code_object
 from .version_dependent import get_instructions
 from .version_dependent import get_lnotab
+from .version_dependent import get_name
 from .version_dependent import HAVE_ABS_REFERENCE
 from .version_dependent import HAVE_REL_REFERENCE
 from .version_dependent import jump_arg_bytes
@@ -368,6 +370,7 @@ class Instrumentor:
       elif arg is not None:
         assert offset is not None
         combined_arg = 0
+        # TODO(b/392603034): this issue was fixed in 3.10, simplify this code.
         # https://bugs.python.org/issue45757 can cause .arg to be None
         if instruction.arg is not None:
           combined_arg = (arg << 8) | instruction.arg  # type: ignore[operator]
@@ -441,11 +444,7 @@ class Instrumentor:
 
   def _get_name(self, name: str) -> int:
     """Returns an offset to `name` in co_names, appending if necessary."""
-    try:
-      return self._names.index(name)
-    except ValueError:
-      self._names.append(name)
-      return len(self._names) - 1
+    return get_name(self._names, name)
 
   def _get_const(self, constant: Union[int, str, types.ModuleType]) -> int:
     """Returns the index of `constant` in self.consts, inserting if needed."""
@@ -920,9 +919,11 @@ class Instrumentor:
     Returns:
       Whether the current method should be patched
     """
+    # TODO Move to version_dependent.py
+    oparg = adjust_arg(instr.arg)
     if not (
         instr.mnemonic in ("LOAD_ATTR", "LOAD_METHOD")
-        and self._names[instr.arg] in ("startswith", "endswith")
+        and self._names[oparg] in ("startswith", "endswith")
     ):
       return False
 
