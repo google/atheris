@@ -319,12 +319,13 @@ class Instrumentor:
   Note that Instrumentor only supports insertions, not deletions.
   """
 
-  def __init__(self, code: types.CodeType):
+  def __init__(self, code: types.CodeType, debug: bool = False):
     self._cfg: collections.OrderedDict = collections.OrderedDict()
     self.consts = list(code.co_consts)
     self._names = list(code.co_names)
     self.num_counters = 0
     self._code = code
+    self._debug = debug
 
     self._build_cfg()
     self._check_state()
@@ -1107,9 +1108,14 @@ class Instrumentor:
         traced_methods = [m for m in traced_methods if m < stack_size]
 
     self._handle_size_changes()
+    
+  def _print_edges(self) -> None:
+    """Prints edges."""
+    print("edges", self._cfg.keys())
 
   def _print_disassembly(self) -> None:
     """Prints disassembly."""
+    self._print_edges()
     print(f"Disassembly of {self._code.co_filename}:{self._code.co_name}")
     for basic_block in self._cfg.values():
       print(" -bb-")
@@ -1127,7 +1133,8 @@ class Instrumentor:
 
 def patch_code(code: types.CodeType,
                trace_dataflow: bool,
-               nested: bool = False) -> types.CodeType:
+               nested: bool = False,
+               debug: bool = False) -> types.CodeType:
   """Returns code, patched with Atheris instrumentation.
 
   Args:
@@ -1135,8 +1142,9 @@ def patch_code(code: types.CodeType,
     trace_dataflow: Whether to trace dataflow or not.
     nested: If False, reserve counters, and patch modules. Recursive calls to
       this function are considered nested.
+    debug: If True, print disassembly.
   """
-  inst = Instrumentor(code)
+  inst = Instrumentor(code, debug=debug)
 
   # If this code object has already been instrumented, skip it
   for const in inst.consts:
