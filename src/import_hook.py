@@ -18,14 +18,22 @@ The instrument() function temporarily installs an import hook
 (AtherisMetaPathFinder) in sys.meta_path that employs a custom loader
 (AtherisSourceFileLoader, AtherisSourcelessFileLoader).
 """
-# _frozen_importlib is a special Py Interpreter library, disable import-error.
-import _frozen_importlib  # type: ignore[import]
-import _frozen_importlib_external  # type: ignore[import]
+
 from importlib import abc
 from importlib import machinery
 import sys
 import types
-from typing import Set, Optional, Sequence, Type, Union, Any
+from typing import Any, Optional, Sequence, Set
+
+try:
+  import _frozen_importlib
+except ImportError:
+  _frozen_importlib = None
+try:
+  import _frozen_importlib_external
+except ImportError:
+  _frozen_importlib_external = None
+
 from .instrument_bytecode import patch_code
 
 _warned_experimental = False

@@ -57,6 +57,7 @@ class CustomCrossoverTests(unittest.TestCase):
         setup_kwargs={
             "custom_crossover": noop_crossover
         },
+        timeout=20,
         expected_output=b"Hello from crossover")
 
 
