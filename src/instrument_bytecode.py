@@ -39,12 +39,14 @@ from .version_dependent import CONDITIONAL_JUMPS
 from .version_dependent import ENDS_FUNCTION
 from .version_dependent import ExceptionTableEntry
 from .version_dependent import generate_exceptiontable
+from .version_dependent import get_cache_offset
 from .version_dependent import get_code_object
 from .version_dependent import get_instructions
 from .version_dependent import get_lnotab
 from .version_dependent import get_name
 from .version_dependent import HAVE_ABS_REFERENCE
 from .version_dependent import HAVE_REL_REFERENCE
+from .version_dependent import INSERT_AFTER_INSTRS
 from .version_dependent import jump_arg_bytes
 from .version_dependent import parse_exceptiontable
 from .version_dependent import REL_REFERENCE_IS_INVERTED
@@ -98,6 +100,7 @@ class Instruction:
       arg: int = 0,
       min_size: int = 0,
       positions=None,
+      cache_offset: int = 0,
   ):
     self.lineno = lineno
     self.offset = offset
@@ -106,12 +109,14 @@ class Instruction:
     self.arg = arg
     self._min_size = min_size
     self.positions = positions
+    self.cache_offset = cache_offset
 
     if self.mnemonic in HAVE_REL_REFERENCE:
       self._is_relative: Optional[bool] = True
       self.reference: Optional[int] = (
           self.offset
           + self.get_size()
+          + self.cache_offset
           + jump_arg_bytes(self.arg) * rel_reference_scale(self.mnemonic)
       )
     elif self.mnemonic in HAVE_ABS_REFERENCE:
@@ -246,6 +251,7 @@ class Instruction:
         assert (
             self.offset
             + self.get_size()
+            + self.cache_offset
             + jump_arg_bytes(self.arg) * rel_reference_scale(self.mnemonic)
             == self.reference
         )
@@ -319,13 +325,12 @@ class Instrumentor:
   Note that Instrumentor only supports insertions, not deletions.
   """
 
-  def __init__(self, code: types.CodeType, debug: bool = False):
+  def __init__(self, code: types.CodeType):
     self._cfg: collections.OrderedDict = collections.OrderedDict()
     self.consts = list(code.co_consts)
     self._names = list(code.co_names)
     self.num_counters = 0
     self._code = code
-    self._debug = debug
 
     self._build_cfg()
     self._check_state()
@@ -353,7 +358,8 @@ class Instrumentor:
 
     self.exception_table = parse_exceptiontable(self._code)
 
-    for instruction in get_instructions(self._code):
+    instructions = list(get_instructions(self._code))
+    for i, instruction in enumerate(instructions):
       if instruction.starts_line is not None:
         lineno = instruction.starts_line
 
@@ -383,6 +389,7 @@ class Instrumentor:
                 combined_arg,
                 min_size=length,
                 positions=getattr(instruction, "positions", None),
+                cache_offset=get_cache_offset(i, instructions),
             )
         )
         arg = None
@@ -397,6 +404,7 @@ class Instrumentor:
                 instruction.opcode,
                 instruction.arg or 0,
                 positions=getattr(instruction, "positions", None),
+                cache_offset=get_cache_offset(i, instructions),
             )
         )
 
@@ -808,7 +816,15 @@ class Instrumentor:
 
         already_instrumented.add(bb.id)
         source_instr = []
-        offset = bb.instructions[0].offset
+        instrumentation_offset = 0
+        while instrumentation_offset < len(bb.instructions) and bb.instructions[instrumentation_offset].mnemonic in INSERT_AFTER_INSTRS:
+          instrumentation_offset += 1
+        if instrumentation_offset < len(bb.instructions):
+          offset = bb.instructions[instrumentation_offset].offset
+          lineno = bb.instructions[instrumentation_offset].lineno
+        else:
+          offset = bb.instructions[instrumentation_offset - 1].offset + 2
+          lineno = bb.instructions[instrumentation_offset - 1].lineno
 
         for source_bb in self._cfg.values():
           if bb.id in source_bb.edges and source_bb.instructions[
@@ -816,11 +832,13 @@ class Instrumentor:
             source_instr.append(source_bb.instructions[-1])
 
         total_size, to_insert = self._generate_trace_branch_invocation(
-            bb.instructions[0].lineno, offset)
+            lineno, offset)
 
         self._adjust(offset, total_size, *source_instr)
 
-        bb.instructions = to_insert + bb.instructions
+        bb.instructions = (
+            bb.instructions[:instrumentation_offset] + to_insert + bb.instructions[instrumentation_offset:]
+        )
 
     self._handle_size_changes()
 
@@ -1108,7 +1126,7 @@ class Instrumentor:
         traced_methods = [m for m in traced_methods if m < stack_size]
 
     self._handle_size_changes()
-    
+
   def _print_edges(self) -> None:
     """Prints edges."""
     print("edges", self._cfg.keys())
@@ -1133,8 +1151,7 @@ class Instrumentor:
 
 def patch_code(code: types.CodeType,
                trace_dataflow: bool,
-               nested: bool = False,
-               debug: bool = False) -> types.CodeType:
+               nested: bool = False) -> types.CodeType:
   """Returns code, patched with Atheris instrumentation.
 
   Args:
@@ -1142,9 +1159,8 @@ def patch_code(code: types.CodeType,
     trace_dataflow: Whether to trace dataflow or not.
     nested: If False, reserve counters, and patch modules. Recursive calls to
       this function are considered nested.
-    debug: If True, print disassembly.
   """
-  inst = Instrumentor(code, debug=debug)
+  inst = Instrumentor(code)
 
   # If this code object has already been instrumented, skip it
   for const in inst.consts:

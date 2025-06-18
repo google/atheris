@@ -27,6 +27,7 @@ Currently supported python versions are:
     - 3.9
     - 3.10
     - 3.11
+    - 3.12-ish
 """
 
 import sys
@@ -574,3 +575,23 @@ else:
 
   def adjust_arg(arg: int):
     return arg >> 1
+
+if (3, 12) <= PYTHON_VERSION:
+  INSERT_AFTER_INSTRS = ("CACHE", "END_FOR")
+else:
+  INSERT_AFTER_INSTRS = tuple()
+
+if (3, 12) <= PYTHON_VERSION:
+  def get_cache_offset(i: int, instructions: List[dis.Instruction]) -> int:
+    cache_offset = 0
+    while i + 1 < len(instructions):
+      next_instruction = instructions[i + 1]
+      if next_instruction is None or next_instruction.opname != "CACHE":
+        break
+      cache_offset += 2
+      i += 1
+    return cache_offset
+else:
+  def get_cache_offset(i: int, instructions: List[dis.Instruction]) -> int:
+    return 0
+
