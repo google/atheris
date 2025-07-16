@@ -78,6 +78,9 @@ void prefuzz_trace_branch(uint64_t idx) {
 NO_SANITIZE
 py::handle prefuzz_trace_cmp(py::handle left, py::handle right, int opid,
                              uint64_t idx, bool left_is_const) {
+  #if PY_MAJOR_VERSION > 3 || (PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION >= 12)
+  opid >>= 4;
+#endif
   // We don't care about tracing before fuzzing starts, but _trace_cmp actually
   // *replaces* the comparison, so just do a compare.
   PyObject* ret = PyObject_RichCompare(left.ptr(), right.ptr(), opid);

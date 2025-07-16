@@ -14,6 +14,7 @@
 // limitations under the License.
 
 #include "tracer.h"
+#include <stdio.h>
 
 #include <Python.h>
 #include <frameobject.h>
@@ -150,6 +151,9 @@ PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid,
     TraceCompareUnicode(left, right, pc);
   }
 
+  #if PY_MAJOR_VERSION > 3 || (PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION >= 12)
+  opid >>= 4;
+#endif
   return PyObject_RichCompare(left, right, opid);
 }
 

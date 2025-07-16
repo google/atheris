@@ -168,7 +168,15 @@ def rel_reference_scale(opname):
 
 ### Compare ops ###
 
+CMP_OP_SHIFT_AMOUNT = 0
+if PYTHON_VERSION >= (3, 12):
+  CMP_OP_SHIFT_AMOUNT = 4
 REVERSE_CMP_OP = [4, 5, 2, 3, 0, 1]
+
+# In Python 3.12, the cmp opcodes are reversed, but the algorithm should work
+# for all future offsets.
+if PYTHON_VERSION >= (3, 12):
+  REVERSE_CMP_OP = [i << CMP_OP_SHIFT_AMOUNT for i in REVERSE_CMP_OP]
 
 ### CodeTypes ###
 
@@ -516,7 +524,7 @@ elif PYTHON_VERSION >= (3, 11):
   # Rotate the top width_n instructions, shift_n times.
   def rot_n(width_n: int, shift_n: int = 1):
     ret = []
-    for j in range(shift_n):
+    for _ in range(shift_n):
       for i in range(width_n, 1, -1):
         ret.append([dis.opmap["SWAP"], i])
     return ret

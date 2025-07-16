@@ -28,13 +28,14 @@ from typing import Any, Callable, Iterator, List, Optional, Tuple, TypeVar, Unio
 
 from . import utils
 from .native import _reserve_counter  # type: ignore[attr-defined]
-from .version_dependent import adjust_arg
 from .version_dependent import add_bytes_to_jump_arg
+from .version_dependent import adjust_arg
 from .version_dependent import args_terminator
 from .version_dependent import cache_count
 from .version_dependent import caches
 from .version_dependent import call
 from .version_dependent import CALLABLE_STACK_ENTRIES
+from .version_dependent import CMP_OP_SHIFT_AMOUNT
 from .version_dependent import CONDITIONAL_JUMPS
 from .version_dependent import ENDS_FUNCTION
 from .version_dependent import ExceptionTableEntry
@@ -662,7 +663,7 @@ class Instrumentor:
     const_op = None
 
     if switch:
-      const_op = self._get_const(REVERSE_CMP_OP[op])
+      const_op = self._get_const(REVERSE_CMP_OP[op >> CMP_OP_SHIFT_AMOUNT])
     else:
       const_op = self._get_const(op)
 
@@ -857,6 +858,7 @@ class Instrumentor:
     must always be given as obj1 to _trace_cmp().
 
     The bytecode that gets inserted looks like this:
+      PUSH_NULL
       LOAD_CONST     atheris
       LOAD_ATTR      _trace_cmp
       ROT_THREE                   ; move atheris._trace_cmp below the two
@@ -873,7 +875,9 @@ class Instrumentor:
       for c, instr in enumerate(basic_block.instructions):
         if instr.mnemonic == "LOAD_CONST":
           seen_consts.append(stack_size)
-        elif instr.mnemonic == "COMPARE_OP" and instr.arg <= 5:
+        elif instr.mnemonic == "COMPARE_OP" and (
+            instr.arg >> CMP_OP_SHIFT_AMOUNT
+        ) < len(dis.cmp_op):
           # If the instruction has CACHEs afterward, we'll need to NOP them too.
           instr_caches = []
           for i in range(c + 1, c + 1 + cache_count(instr.mnemonic)):

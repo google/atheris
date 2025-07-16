@@ -53,6 +53,9 @@ void _trace_branch(uint64_t idx) {}
 NO_SANITIZE
 py::handle _trace_cmp(py::handle left, py::handle right, int opid, uint64_t idx,
                       bool left_is_const) {
+  #if PY_MAJOR_VERSION > 3 || (PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION >= 12)
+  opid >>= 4;
+#endif
   PyObject* ret = PyObject_RichCompare(left.ptr(), right.ptr(), opid);
 
   if (ret == nullptr) {
