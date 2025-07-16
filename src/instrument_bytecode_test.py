@@ -179,6 +179,102 @@ class InstrumentBytecodeTest(unittest.TestCase):
     self.mock_trace_cmp.assert_called()
     self.mock_trace_branch.assert_called()
 
+  def test_instrument_elif(self):
+    def function_with_elif(a):
+      if a == 1:
+        return 10
+      elif a == 2:
+        return 20
+      else:
+        return 30
+
+    self.mock_trace_cmp.side_effect = (
+        lambda obj1, obj2, op, counter, is_const: {
+            "==": obj1 == obj2,
+        }[
+            instrument_bytecode.dis.cmp_op[
+                op >> version_dependent.CMP_OP_SHIFT_AMOUNT
+            ]
+        ]
+    )
+
+    original_code = function_with_elif.__code__
+    patched_code = instrument_bytecode.patch_code(
+        original_code, trace_dataflow=True
+    )
+    patched_function = types.FunctionType(patched_code, globals())
+    print("DERP DERP DERP patched_code: ")
+    import dis
+    dis.dis(patched_code)
+
+    with self.subTest("if branch"):
+      self.assertEqual(patched_function(1), 10)
+      self.mock_trace_cmp.assert_called()
+      self.mock_trace_branch.assert_called()
+      self.mock_trace_cmp.reset_mock()
+      self.mock_trace_branch.reset_mock()
+
+    with self.subTest("elif branch"):
+      self.assertEqual(patched_function(2), 20)
+      self.mock_trace_cmp.assert_called()
+      self.mock_trace_branch.assert_called()
+      self.mock_trace_cmp.reset_mock()
+      self.mock_trace_branch.reset_mock()
+
+    with self.subTest("else branch"):
+      self.assertEqual(patched_function(3), 30)
+      self.mock_trace_cmp.assert_called()
+      self.mock_trace_branch.assert_called()
+
+  def test_instrument_for_loop(self):
+    def function_with_for_loop(items):
+      result = []
+      for i in items:
+        result.append(i)
+      return result
+
+    original_code = function_with_for_loop.__code__
+    patched_code = instrument_bytecode.patch_code(
+        original_code, trace_dataflow=False)
+    patched_function = types.FunctionType(patched_code, globals())
+
+    with self.subTest("empty list"):
+      self.assertEqual(patched_function([]), [])
+      self.mock_trace_branch.assert_called()
+      self.mock_trace_branch.reset_mock()
+
+    with self.subTest("non-empty list"):
+      self.assertEqual(patched_function([1, 2, 3]), [1, 2, 3])
+      self.mock_trace_branch.assert_called()
+
+  def test_instrument_while_loop(self):
+    def function_with_while_loop(count):
+      i = 0
+      while i < count:
+        i += 1
+      return i
+
+    self.mock_trace_cmp.side_effect = lambda obj1, obj2, op, counter, is_const: {
+        "<": obj1 < obj2,
+    }[instrument_bytecode.dis.cmp_op[op >> version_dependent.CMP_OP_SHIFT_AMOUNT]]
+
+    original_code = function_with_while_loop.__code__
+    patched_code = instrument_bytecode.patch_code(
+        original_code, trace_dataflow=True)
+    patched_function = types.FunctionType(patched_code, globals())
+
+    with self.subTest("zero iterations"):
+      self.assertEqual(patched_function(0), 0)
+      self.mock_trace_cmp.assert_called()
+      self.mock_trace_branch.assert_called()
+      self.mock_trace_cmp.reset_mock()
+      self.mock_trace_branch.reset_mock()
+
+    with self.subTest("multiple iterations"):
+      self.assertEqual(patched_function(3), 3)
+      self.mock_trace_cmp.assert_called()
+      self.mock_trace_branch.assert_called()
+
 
 if __name__ == "__main__":
   unittest.main()
