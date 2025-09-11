@@ -294,7 +294,6 @@ warning_copts = [
   "-Wno-unused-function",
   "-Wno-unused-private-field",
   "-Wno-user-defined-warnings",
-  #"-Wthread-safety-beta",
   #"-Wctad-maybe-unsupported",
   #"-Wfloat-overflow-conversion",
   #"-Wfloat-zero-conversion",
