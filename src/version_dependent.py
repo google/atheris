@@ -112,6 +112,16 @@ HAVE_REL_REFERENCE = [
     "POP_JUMP_BACKWARD_IF_NONE",
 ]
 
+if PYTHON_VERSION >= (3, 12):
+  CONDITIONAL_JUMPS.extend([
+      "POP_JUMP_IF_NONE",
+      "POP_JUMP_IF_NOT_NONE",
+  ])
+  HAVE_REL_REFERENCE.extend([
+      "POP_JUMP_IF_NONE",
+      "POP_JUMP_IF_NOT_NONE",
+  ])
+
 HAVE_ABS_REFERENCE = [
     # common
     "JUMP_ABSOLUTE",
