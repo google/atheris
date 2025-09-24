@@ -147,8 +147,8 @@ py::bytes UnicodeToUtf8(py::handle unicode) {
   PyObject *type, *value, *traceback;
   PyErr_Fetch(&type, &value, &traceback);
 
-  // Fast path: just call Python's built-in function
-  PyObject* obj = PyUnicode_AsUTF8String(unicode.ptr());
+  PyObject* obj =
+      PyUnicode_AsEncodedString(unicode.ptr(), "utf-8", "surrogatepass");
 
   if (obj) {
     PyErr_Restore(type, value, traceback);
@@ -157,12 +157,47 @@ py::bytes UnicodeToUtf8(py::handle unicode) {
     return ret;
   }
 
-  PyErr_Clear();
-  PyErr_Restore(type, value, traceback);
+  // If surrogatepass didn't work, try surrogateescape instead.
+  obj = PyUnicode_AsEncodedString(unicode.ptr(), "utf-8", "surrogateescape");
 
-  // Slow path: go via Python.
-  py::object new_obj = unicode.attr("encode").call("utf-8", "surrogatepass");
-  return py::cast<py::bytes>(new_obj);
+  if (obj) {
+    PyErr_Restore(type, value, traceback);
+    auto ret = py::cast<py::bytes>(obj);
+    Py_DECREF(obj);
+    return ret;
+  }
+
+  // Try one final time with "ignore".
+  // This code shouldn't actually be reachable, but not 100% confident on that.
+
+  // One-time log warning about this case if it's ever hit.
+  static bool hit_ignore = [&]() {
+    py::error_already_set ex;
+    PrintPythonException(ex, std::cerr);
+    std::cerr << "Atheris internal: UnicodeToUtf8: Failed to convert unicode "
+                 "to utf-8 using surrogatepass or surrogateescape"
+              << std::endl;
+    return true;
+  }();
+  (void)hit_ignore;
+
+  PyErr_Clear();
+
+  obj = PyUnicode_AsEncodedString(unicode.ptr(), "utf-8", "ignore");
+
+  if (obj) {
+    PyErr_Restore(type, value, traceback);
+    auto ret = py::cast<py::bytes>(obj);
+    Py_DECREF(obj);
+    return ret;
+  }
+
+    std::cerr << "Atheris internal: UnicodeToUtf8: Failed to convert unicode "
+               "to utf-8 using any method, inluding 'ignore'."
+            << std::endl;
+  PyErr_Clear();
+  exit(1);
+  return py::bytes();
 }
 
 extern "C" __attribute__((__visibility__("default"))) void
