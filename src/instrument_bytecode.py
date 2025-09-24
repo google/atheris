@@ -1009,7 +1009,7 @@ class Instrumentor:
       replaced
     """
     method_stack_position = None
-    if instr.mnemonic in ("PRECALL", "CALL_METHOD", "CALL_FUNCTION"):
+    if instr.mnemonic in ("PRECALL", "CALL_METHOD", "CALL_FUNCTION", "CALL"):
       method_stack_position = stack_size - instr.arg - num_new_args_inserted - 1
     elif instr.mnemonic == "CALL_FUNCTION_KW":
       method_stack_position = stack_size - instr.arg - num_new_args_inserted - 2
@@ -1075,7 +1075,7 @@ class Instrumentor:
             true_stack_position = stack_size + callable_extra_stack_effect
             traced_methods.append(true_stack_position)
 
-            str_method = self._names[instr.arg]
+            str_method = self._names[adjust_arg(instr.arg)]
 
             total_size, to_insert = self._generate_hook_str_invocation(
                 str_method, instr.lineno, offset
