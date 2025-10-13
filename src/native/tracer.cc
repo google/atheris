@@ -14,16 +14,18 @@
 // limitations under the License.
 
 #include "tracer.h"
-#include <stdio.h>
 
 #include <Python.h>
 #include <frameobject.h>
 #include <opcode.h>
 #include <pystate.h>
+#include <stdio.h>
 
 #include <cstddef>
 #include <deque>
 #include <iostream>
+#include <limits>
+#include <string_view>
 #include <unordered_map>
 
 #include "macros.h"
@@ -71,6 +73,73 @@ int NoSanitizeMemcmp(const void* left, const void* right, size_t n) {
   return differ;
 }
 
+// Given an index into a string/bytes/list/etc, resolves any negative indices
+// or past-the-end indices into an index in the range [0, length]
+// using the same technique as Python array slicing.
+Py_ssize_t ResolveIndex(Py_ssize_t index, Py_ssize_t length) {
+  if (index < 0) {
+    index = length + index;
+  }
+  if (index < 0) {
+    index = 0;
+  }
+  if (index > length) {
+    index = length;
+  }
+  return index;
+}
+
+PyObject* UnicodeSubstring(PyObject* self, Py_ssize_t start, Py_ssize_t end) {
+  if (!PyUnicode_Check(self)) {
+    PyErr_SetString(PyExc_TypeError, "Expected a Unicode object");
+    return nullptr;
+  }
+
+  Py_ssize_t length = PyUnicode_GET_LENGTH(self);
+
+  start = ResolveIndex(start, length);
+  end = ResolveIndex(end, length);
+
+  return PyUnicode_Substring(self, start, end);
+}
+
+std::string_view BytesSubstring(std::string_view self, int64_t start,
+                                int64_t end) {
+  Py_ssize_t length = self.size();
+
+  Py_ssize_t rstart = ResolveIndex(start, length);
+  Py_ssize_t rend = ResolveIndex(end, length);
+
+  if (rend <= rstart) return std::string_view();
+
+  return std::string_view(self.data() + rstart, rend - rstart);
+}
+
+NO_SANITIZE
+void TraceCompareBytes(PyObject* left, PyObject* right, void* pc) {
+  uint64_t left_size = PyBytes_Size(left);
+  uint64_t right_size = PyBytes_Size(right);
+  __sanitizer_cov_trace_cmp8(left_size, right_size);
+  if (left_size == right_size) {
+    const void* left_bytes = PyBytes_AsString(left);
+    const void* right_bytes = PyBytes_AsString(right);
+    int differ = NoSanitizeMemcmp(left_bytes, right_bytes, left_size);
+    __sanitizer_weak_hook_memcmp(pc, left_bytes, right_bytes, left_size,
+                                 differ);
+  }
+}
+
+NO_SANITIZE
+void TraceCompareBytes(std::string_view left, std::string_view right,
+                       void* pc) {
+  __sanitizer_cov_trace_cmp8(left.size(), right.size());
+  if (left.size() == right.size()) {
+    int differ = NoSanitizeMemcmp(left.data(), right.data(), left.size());
+    __sanitizer_weak_hook_memcmp(pc, left.data(), right.data(), left.size(),
+                                 differ);
+  }
+}
+
 // This function produces a memcmp event for comparing unicode strings. This
 // converts the strings to utf-8 before comparison when possible, which produces
 // significantly better results even though there's an encoding step every time.
@@ -82,16 +151,7 @@ void TraceCompareUnicode(PyObject* left, PyObject* right, void* pc) {
   py::bytes left_utf8 = UnicodeToUtf8(left);
   py::bytes right_utf8 = UnicodeToUtf8(right);
 
-  uint64_t left_size = PyBytes_Size(left_utf8.ptr());
-  uint64_t right_size = PyBytes_Size(right_utf8.ptr());
-  __sanitizer_cov_trace_cmp8(left_size, right_size);
-  if (left_size == right_size) {
-    const void* left_bytes = PyBytes_AsString(left_utf8.ptr());
-    const void* right_bytes = PyBytes_AsString(right_utf8.ptr());
-    int differ = NoSanitizeMemcmp(left_bytes, right_bytes, left_size);
-    __sanitizer_weak_hook_memcmp(pc, left_bytes, right_bytes, left_size,
-                                 differ);
-  }
+  return TraceCompareBytes(left_utf8.ptr(), right_utf8.ptr(), pc);
 }
 
 NO_SANITIZE
@@ -137,16 +197,7 @@ PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid,
     // If comparing bytes, report a memcmp. Report that we're comparing the
     // size, and then if that passes, compare the contents ourselves and report
     // the results.
-    uint64_t left_size = PyBytes_Size(left);
-    uint64_t right_size = PyBytes_Size(right);
-    __sanitizer_cov_trace_cmp8(left_size, right_size);
-    if (left_size == right_size) {
-      const void* left_bytes = PyBytes_AsString(left);
-      const void* right_bytes = PyBytes_AsString(right);
-      int differ = NoSanitizeMemcmp(left_bytes, right_bytes, left_size);
-      __sanitizer_weak_hook_memcmp(pc, left_bytes, right_bytes, left_size,
-                                   differ);
-    }
+    TraceCompareBytes(left, right, pc);
   } else if (PyUnicode_Check(left) && PyUnicode_Check(right)) {
     TraceCompareUnicode(left, right, pc);
   }
@@ -155,6 +206,55 @@ PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid,
   opid >>= 4;
 #endif
   return PyObject_RichCompare(left, right, opid);
+}
+
+// Record a StartsWith call.
+NO_SANITIZE
+void TraceWith(PyObject* self, PyObject* prefix, int64_t start, int64_t end,
+               bool is_endswith /*false is startswith*/) {
+  if (PyUnicode_Check(self)) {
+    if (!PyUnicode_Check(prefix)) return;
+    PyUnicode_READY(self);
+    PyUnicode_READY(prefix);
+
+    Py_ssize_t prefix_size = PyUnicode_GET_LENGTH(prefix);
+
+    PyObject* self_substr = UnicodeSubstring(self, start, end);
+    PyObject* self_section;
+    if (is_endswith) {
+      self_section = UnicodeSubstring(self_substr, -prefix_size,
+                                      std::numeric_limits<int64_t>::max());
+    } else {
+      self_section = UnicodeSubstring(self_substr, 0, prefix_size);
+    }
+    TraceCompareUnicode(self_section, prefix,
+                        reinterpret_cast<void*>(py::hash(prefix)));
+    Py_DECREF(self_section);
+    Py_DECREF(self_substr);
+  }
+
+  if (PyBytes_Check(self)) {
+    if (!PyBytes_Check(prefix)) return;
+
+    Py_ssize_t prefix_size = PyBytes_Size(prefix);
+    std::string_view prefix_data =
+        std::string_view(PyBytes_AS_STRING(prefix), prefix_size);
+    Py_ssize_t self_size = PyBytes_Size(self);
+    std::string_view self_data =
+        std::string_view(PyBytes_AS_STRING(self), self_size);
+
+    std::string_view self_substr = BytesSubstring(self_data, start, end);
+    std::string_view self_section;
+    if (is_endswith) {
+      self_section = BytesSubstring(self_substr, -prefix_size,
+                                    std::numeric_limits<int64_t>::max());
+    } else {
+      self_section = BytesSubstring(self_substr, 0, prefix_size);
+    }
+    TraceCompareBytes(self_section, prefix_data,
+                      reinterpret_cast<void*>(py::hash(prefix)));
+    return;
+  }
 }
 
 }  // namespace atheris

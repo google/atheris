@@ -18,6 +18,15 @@ import re
 import sys
 import typing
 from typing import Any, AnyStr, Callable, Dict, Iterator, List, Match, Optional, Pattern, Set, Tuple, Union
+
+if sys.version_info >= (3, 12):
+  from .native import hook_str_module
+else:
+
+  def hook_str_module() -> None:
+    pass
+
+
 try:
   import re._parser as sre_parse  # type: ignore[import]
 except ImportError:
@@ -245,6 +254,7 @@ class EnabledHooks:
         hook_re_module()
         self._enabled_hooks.add(hook)
       elif hook == "str":
+        hook_str_module()
         self._enabled_hooks.add(hook)
 
   def __contains__(self, hook: str) -> bool:

@@ -74,6 +74,15 @@ int global_counter = 0;
 NO_SANITIZE
 int _reserve_counter() { return global_counter++; }
 
+NO_SANITIZE
+void hook_str_module() {}
+
+NO_SANITIZE
+void unhook_str_module() {}
+
+NO_SANITIZE
+bool libfuzzer_is_loaded() { return false; }
+
 std::vector<std::string> Setup(
     const std::vector<std::string>& args,
     const std::function<void(pybind11::bytes data)>& test_one_input,
@@ -149,8 +158,12 @@ PYBIND11_MODULE(native, m) {
   m.def("_trace_cmp", &_trace_cmp, py::return_value_policy::move);
   m.def("_reserve_counter", &_reserve_counter);
   m.def("_trace_regex_match", &_trace_regex_match);
+#if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 11
   m.def("_generate_codetable", &GenerateCodetable);
   m.def("_generate_exceptiontable", &GenerateExceptiontable);
+#endif
+  m.def("hook_str_module", &hook_str_module);
+  m.def("unhook_str_module", &unhook_str_module);
 
   py::class_<FuzzedDataProvider>(m, "FuzzedDataProvider")
       .def(py::init<py::bytes>())
