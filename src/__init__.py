@@ -14,15 +14,22 @@
 # limitations under the License.
 """Atheris is a coverage-guided Python fuzzing engine."""
 
+import sys
 from typing import List
 
 from .function_hooks import _hook_str
 from .function_hooks import enabled_hooks
 from .function_hooks import gen_match
 from .import_hook import instrument_imports
-from .instrument_bytecode import instrument_all
-from .instrument_bytecode import instrument_func
-from .instrument_bytecode import patch_code
+
+if sys.version_info >= (3, 12):
+  from .clean_instrument_bytecode import instrument_all
+  from .clean_instrument_bytecode import instrument_func
+  from .clean_instrument_bytecode import patch_code
+else:
+  from .instrument_bytecode import instrument_all
+  from .instrument_bytecode import instrument_func
+  from .instrument_bytecode import patch_code
 # MyPy cannot find native code.
 from .native import _reserve_counter  # type: ignore[import]
 from .native import _trace_branch  # type: ignore[import]

@@ -251,8 +251,8 @@ static int write_location_info_entry(struct assembler* a, struct instr* i,
   return 1;
 }
 
-static int assemble_emit_location(struct assembler* a, struct instr* i) {
-  int isize = instr_size(i);
+static int assemble_emit_location(struct assembler* a, struct instr* i,
+                                  int isize) {
   while (isize > 8) {
     if (!write_location_info_entry(a, i, 8)) {
       return 0;
@@ -271,7 +271,8 @@ T cast_if_not_none(py::handle h, T deflt) {
 instr ToNativeInstr(py::handle py_instruction) {
   struct instr native_instruction;
   native_instruction.i_opcode = py_instruction.attr("opcode").cast<int>();
-  native_instruction.i_oparg = py_instruction.attr("arg").cast<int>();
+  native_instruction.i_oparg =
+      cast_if_not_none<int>(py_instruction.attr("arg"), 0);
 
   py::handle py_location = py_instruction.attr("positions");
   if (py_location.is_none()) {
@@ -306,8 +307,12 @@ py::bytes GenerateCodetable(py::object original_code,
       continue;
     }
     instr native_instruction = ToNativeInstr(py_instruction);
-
-    if (!assemble_emit_location(&assembler, &native_instruction)) {
+#if PY_MINOR_VERSION < 12
+    int isize = instr_size(i);
+#else
+    int isize = py_instruction.attr("length").cast<int>();
+#endif
+    if (!assemble_emit_location(&assembler, &native_instruction, isize)) {
       std::cerr << "Failed to assemble" << std::endl;
       break;
     }
@@ -396,7 +401,14 @@ py::bytes GenerateExceptiontable(
     handler.b_preserve_lasti = table_entries.attr("lasti").cast<int>();
     if (handler.b_preserve_lasti) handler.b_startdepth += 1;
     int start = table_entries.attr("start_offset").cast<int>() / 2;
-    int end = table_entries.attr("end_offset").cast<int>() / 2 + 1;
+    int end = table_entries.attr("end_offset").cast<int>() / 2;
+    /*The improved clean_instrument_bytecode.py for 3.12+ uses Python's
+      native exception table format (inclusive, exclusive]; the old impl
+      used [inclusive, inclusive] and therefore adjusted the end offset.
+      */
+#if PY_MINOR_VERSION < 12
+    end += 1;
+#endif
 
     if (!assemble_emit_exception_table_entry(&assembler, start, end,
                                              &handler)) {

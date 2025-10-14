@@ -34,7 +34,10 @@ try:
 except ImportError:
   _frozen_importlib_external = None
 
-from .instrument_bytecode import patch_code
+if sys.version_info >= (3, 12):
+  from .clean_instrument_bytecode import patch_code
+else:
+  from .instrument_bytecode import patch_code
 
 _warned_experimental = False
 

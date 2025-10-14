@@ -259,6 +259,10 @@ else:
     return arg + size
 
 
+def offset_delta_to_jump_arg(offset_delta: int):
+  return add_bytes_to_jump_arg(0, offset_delta)
+
+
 ### Lnotab/linetable handling ###
 
 # In Python 3.10 lnotab was deprecated, context:
@@ -445,7 +449,13 @@ elif (3, 11) <= PYTHON_VERSION:
         while True:
           start = parse_varint(iterator) * 2
           length = parse_varint(iterator) * 2
-          end = start + length - 2  # Present as inclusive, not exclusive
+          # The improved clean_instrument_bytecode.py for 3.12+ uses Python's
+          # native exception table format (inclusive, exclusive]; the old impl
+          # used [inclusive, inclusive] and therefore adjusted the end offset.
+          if PYTHON_VERSION >= (3, 12):
+            end = start + length
+          else:
+            end = start + length - 2
           target = parse_varint(iterator) * 2
           dl = parse_varint(iterator)
           depth = dl >> 1
@@ -612,4 +622,3 @@ if (3, 12) <= PYTHON_VERSION:
 else:
   def get_cache_offset(i: int, instructions: List[dis.Instruction]) -> int:
     return 0
-
