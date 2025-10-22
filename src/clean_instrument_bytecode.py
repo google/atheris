@@ -25,7 +25,6 @@ import types
 from typing import Any, Callable, List, Set, TypeVar, Union
 
 from . import utils
-from .native import _reserve_counter  # type: ignore[attr-defined]
 from .version_dependent import args_terminator
 from .version_dependent import cache_count
 from .version_dependent import call
@@ -496,7 +495,10 @@ class Instrumentor:
     return len(self.consts) - 1
 
   def _get_counter(self) -> int:
-    counter = _reserve_counter()
+    # Atheris must be imported here to avoid a circular dependency.
+    import atheris  # pylint: disable=g-import-not-at-top
+
+    counter = atheris._reserve_counter()
     return self._get_const(counter)
 
   def _generate_trace_branch_invocation(

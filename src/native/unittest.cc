@@ -30,6 +30,7 @@
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
 #include "security/fuzzing/blaze/unittest_engine_no_main.h"
+#include "third_party/pybind11/include/pybind11/pybind11.h"
 #include "util.h"
 
 namespace atheris {
@@ -82,6 +83,9 @@ void unhook_str_module() {}
 
 NO_SANITIZE
 bool libfuzzer_is_loaded() { return false; }
+
+NO_SANITIZE
+std::string build_mode() { return "unittest"; }
 
 std::vector<std::string> Setup(
     const std::vector<std::string>& args,
@@ -164,6 +168,8 @@ PYBIND11_MODULE(native, m) {
 #endif
   m.def("hook_str_module", &hook_str_module);
   m.def("unhook_str_module", &unhook_str_module);
+  m.def("UpdateCounterArrays", []() {});
+  m.def("build_mode", &build_mode);
 
   py::class_<FuzzedDataProvider>(m, "FuzzedDataProvider")
       .def(py::init<py::bytes>())

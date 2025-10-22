@@ -128,11 +128,9 @@ bool OnFirstTestOneInput() {
   return true;
 }
 
+// Initialize 8bit-counter and PC arrays when needed.
 NO_SANITIZE
-int TestOneInput(const uint8_t* data, size_t size) {
-  static bool dummy = OnFirstTestOneInput();
-  (void)dummy;
-  RefreshTimeout();
+void UpdateCounterArrays() {
   const auto alloc = AllocateCountersAndPcs();
   if (alloc.counters_start && alloc.counters_end) {
     __sanitizer_cov_8bit_counters_init(alloc.counters_start,
@@ -141,6 +139,15 @@ int TestOneInput(const uint8_t* data, size_t size) {
   if (alloc.pctable_start && alloc.pctable_end) {
     __sanitizer_cov_pcs_init(alloc.pctable_start, alloc.pctable_end);
   }
+}
+
+NO_SANITIZE
+int TestOneInput(const uint8_t* data, size_t size) {
+  static bool dummy = OnFirstTestOneInput();
+  (void)dummy;
+  RefreshTimeout();
+
+  UpdateCounterArrays();
 
   try {
     test_one_input_global(py::bytes(reinterpret_cast<const char*>(data), size));
@@ -250,6 +257,8 @@ PYBIND11_MODULE(ATHERIS_MODULE_NAME, m) {
   m.def("_reserve_counters", ReserveCounters);
   m.def("_trace_cmp", &_trace_cmp, py::return_value_policy::move);
   m.def("_trace_regex_match", &TraceRegexMatch);
+  // Exposed for testing.
+  m.def("UpdateCounterArrays", &UpdateCounterArrays);
 
   m.def("Mutate", &Mutate);
 }

@@ -1,3 +1,4 @@
+import dis
 import importlib
 import sys
 import types
@@ -6,8 +7,6 @@ from unittest import mock
 
 # Mock the native extension, since it's not available in this test.
 # This needs to be done before importing atheris.
-mock_native = mock.MagicMock()
-sys.modules["atheris.native"] = mock_native
 import atheris
 
 if sys.version_info >= (3, 12):
@@ -15,56 +14,20 @@ if sys.version_info >= (3, 12):
 else:
   from atheris.src import instrument_bytecode
 from atheris.src import version_dependent
+from atheris.src.mock_libfuzzer import mockutils
 
 
-class InstrumentBytecodeTest(unittest.TestCase):
-
+class InstrumentBytecodeTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
   def setUp(self):
-    # Reset the counter for each test
-    mock_native._reserve_counter.side_effect = range(1000)
+    super(InstrumentBytecodeTest, self).setUp()
 
-    # When the instrumented code is created, it captures the atheris module.
-    # We need to ensure that when the instrumented code is executed, our
-    # mocks are in place on that captured module object.
-    # The easiest way to do this is to patch the module directly.
-    self.mock_trace_branch = mock.MagicMock()
-    self.mock_trace_cmp = mock.MagicMock()
-    self.mock_hook_str = mock.MagicMock()
+    self.original_trace_cmp = atheris._trace_cmp
+    self.mock_trace_cmp = mock.MagicMock(wraps=self.original_trace_cmp)
+    atheris._trace_cmp = self.mock_trace_cmp
 
-    # The instrumentor will add the real atheris module to the code object's
-    # constants. When that code is executed, it will reference that module.
-    # To intercept the calls, we need to patch the methods on the actual
-    # atheris module.
-    self.patches = [
-        mock.patch.object(atheris, "_trace_branch", self.mock_trace_branch),
-        mock.patch.object(atheris, "_trace_cmp", self.mock_trace_cmp),
-        mock.patch.object(atheris, "_hook_str", self.mock_hook_str),
-    ]
-    for p in self.patches:
-      p.start()
-    self.addCleanup(lambda: [p.stop() for p in self.patches])
-
-    def mock_trace_cmp_side_effect(obj1, obj2, op, counter, is_const):
-      del counter, is_const
-      op = instrument_bytecode.dis.cmp_op[
-          op >> version_dependent.CMP_OP_SHIFT_AMOUNT
-      ]
-      if op == ">":
-        return obj1 > obj2
-      elif op == "<":
-        return obj1 < obj2
-      elif op == "==":
-        return obj1 == obj2
-      elif op == "!=":
-        return obj1 != obj2
-      elif op == "<=":
-        return obj1 <= obj2
-      elif op == ">=":
-        return obj1 >= obj2
-      else:
-        raise ValueError(f"Unsupported op: {op}")
-
-    self.mock_trace_cmp.side_effect = mock_trace_cmp_side_effect
+  def tearDown(self):
+    atheris._trace_cmp = self.original_trace_cmp
+    super(InstrumentBytecodeTest, self).tearDown()
 
   def test_instrument_simple_function_no_dataflow(self):
     def simple_function(a, b):
@@ -77,6 +40,7 @@ class InstrumentBytecodeTest(unittest.TestCase):
     patched_code = instrument_bytecode.patch_code(
         original_code, trace_dataflow=False
     )
+    mockutils.UpdateCounterArrays()
 
     self.assertNotEqual(original_code, patched_code)
     self.assertIn("__ATHERIS_INSTRUMENTED__", patched_code.co_consts)
@@ -85,15 +49,15 @@ class InstrumentBytecodeTest(unittest.TestCase):
 
     result = patched_function(5, 3)
     self.assertEqual(result, 5)
-    self.mock_trace_branch.assert_called()
-    self.mock_trace_cmp.assert_not_called()
-
-    self.mock_trace_branch.reset_mock()
+    self.assertCountersAre([1, 1])
+    self.mock_cmp.assert_not_called()
+    self.mock_const_cmp.assert_not_called()
 
     result = patched_function(3, 5)
     self.assertEqual(result, 5)
-    self.mock_trace_branch.assert_called()
-    self.mock_trace_cmp.assert_not_called()
+    self.assertCountersAre([2, 1, 1])
+    self.mock_cmp.assert_not_called()
+    self.mock_const_cmp.assert_not_called()
 
   def test_instrument_simple_function_with_dataflow(self):
     def simple_function(a, b):
@@ -106,6 +70,7 @@ class InstrumentBytecodeTest(unittest.TestCase):
     patched_code = instrument_bytecode.patch_code(
         original_code, trace_dataflow=True
     )
+    mockutils.UpdateCounterArrays()
 
     self.assertNotEqual(original_code, patched_code)
     self.assertIn("__ATHERIS_INSTRUMENTED__", patched_code.co_consts)
@@ -115,10 +80,12 @@ class InstrumentBytecodeTest(unittest.TestCase):
     with self.subTest("first_branch"):
       result = patched_function(5, 3)
       self.assertEqual(result, 5)
+      self.assertCountersAre([1, 1])
       self.mock_trace_cmp.assert_called_once()
       # op for '>' is 4
       self.assertEqual(self.mock_trace_cmp.call_args[0][0], 5)
       self.assertEqual(self.mock_trace_cmp.call_args[0][1], 3)
+      self.assertEqual(self.mock_cmp.call_args[0], (5, 3))
       self.assertEqual(
           instrument_bytecode.dis.cmp_op[
               self.mock_trace_cmp.call_args[0][2]
@@ -127,17 +94,18 @@ class InstrumentBytecodeTest(unittest.TestCase):
           ">",
       )
       self.assertEqual(self.mock_trace_cmp.call_args[0][4], False)  # is_const
-      self.mock_trace_branch.assert_called()
 
       self.mock_trace_cmp.reset_mock()
-      self.mock_trace_branch.reset_mock()
+      self.mock_const_cmp.reset_mock()
 
     with self.subTest("second_branch"):
       result = patched_function(3, 5)
+      self.assertCountersAre([2, 1, 1])
       self.assertEqual(result, 5)
       self.mock_trace_cmp.assert_called_once()
       self.assertEqual(self.mock_trace_cmp.call_args[0][0], 3)
       self.assertEqual(self.mock_trace_cmp.call_args[0][1], 5)
+      self.assertEqual(self.mock_cmp.call_args[0], (3, 5))
       self.assertEqual(
           instrument_bytecode.dis.cmp_op[
               self.mock_trace_cmp.call_args[0][2]
@@ -146,10 +114,8 @@ class InstrumentBytecodeTest(unittest.TestCase):
           ">",
       )
       self.assertEqual(self.mock_trace_cmp.call_args[0][4], False)  # is_const
-      self.mock_trace_branch.assert_called()
 
   def test_instrument_const_compare(self):
-
     def const_compare(a):
       if 5 < a:
         return True
@@ -160,6 +126,7 @@ class InstrumentBytecodeTest(unittest.TestCase):
         original_code, trace_control_flow=False, trace_dataflow=True
     )
     patched_function = types.FunctionType(patched_code, globals())
+    mockutils.UpdateCounterArrays()
 
     with self.subTest("true_branch"):
       self.assertTrue(patched_function(10))
@@ -167,8 +134,11 @@ class InstrumentBytecodeTest(unittest.TestCase):
       self.assertEqual(self.mock_trace_cmp.call_args[0][0], 5)
       self.assertEqual(self.mock_trace_cmp.call_args[0][1], 10)
       self.assertEqual(self.mock_trace_cmp.call_args[0][4], True)  # is_const
+      self.mock_const_cmp.assert_called_once()
+      self.assertEqual(self.mock_const_cmp.call_args[0], (5, 10))
 
     self.mock_trace_cmp.reset_mock()
+    self.mock_const_cmp.reset_mock()
 
     with self.subTest("false_branch"):
       self.assertFalse(patched_function(3))
@@ -176,9 +146,10 @@ class InstrumentBytecodeTest(unittest.TestCase):
       self.assertEqual(self.mock_trace_cmp.call_args[0][0], 5)
       self.assertEqual(self.mock_trace_cmp.call_args[0][1], 3)
       self.assertEqual(self.mock_trace_cmp.call_args[0][4], True)  # is_const
+      self.mock_const_cmp.assert_called_once()
+      self.assertEqual(self.mock_const_cmp.call_args[0], (5, 3))
 
   def test_instrument_reverse_const_compare(self):
-
     def const_compare(a):
       if a > 5:
         return True
@@ -189,6 +160,7 @@ class InstrumentBytecodeTest(unittest.TestCase):
         original_code, trace_control_flow=False, trace_dataflow=True
     )
     patched_function = types.FunctionType(patched_code, globals())
+    mockutils.UpdateCounterArrays()
 
     with self.subTest("true_branch"):
       self.assertTrue(patched_function(10))
@@ -196,8 +168,11 @@ class InstrumentBytecodeTest(unittest.TestCase):
       self.assertEqual(self.mock_trace_cmp.call_args[0][0], 5)
       self.assertEqual(self.mock_trace_cmp.call_args[0][1], 10)
       self.assertEqual(self.mock_trace_cmp.call_args[0][4], True)  # is_const
+      self.mock_const_cmp.assert_called_once()
+      self.assertEqual(self.mock_const_cmp.call_args[0], (5, 10))
 
     self.mock_trace_cmp.reset_mock()
+    self.mock_const_cmp.reset_mock()
 
     with self.subTest("false_branch"):
       self.assertFalse(patched_function(3))
@@ -205,18 +180,90 @@ class InstrumentBytecodeTest(unittest.TestCase):
       self.assertEqual(self.mock_trace_cmp.call_args[0][0], 5)
       self.assertEqual(self.mock_trace_cmp.call_args[0][1], 3)
       self.assertEqual(self.mock_trace_cmp.call_args[0][4], True)  # is_const
+      self.mock_const_cmp.assert_called_once()
+      self.assertEqual(self.mock_const_cmp.call_args[0], (5, 3))
 
     @instrument_bytecode.instrument_func
     def to_be_instrumented(a, b):
       if a > b:
         return a
       return b
+    mockutils.UpdateCounterArrays()
 
-    self.assertIn("__ATHERIS_INSTRUMENTED__", to_be_instrumented.__code__.co_consts)
+    self.assertIn(
+        "__ATHERIS_INSTRUMENTED__", to_be_instrumented.__code__.co_consts
+    )
 
     self.assertEqual(to_be_instrumented(5, 3), 5)
     self.mock_trace_cmp.assert_called()
-    self.mock_trace_branch.assert_called()
+
+  def test_instrument_strcmp(self):
+    def str_cmp(a, b):
+      if a == b:
+        return "equal"
+      return "notequal"
+
+    original_code = str_cmp.__code__
+    patched_code = instrument_bytecode.patch_code(
+        original_code, trace_dataflow=True
+    )
+    patched_function = types.FunctionType(patched_code, globals())
+    mockutils.UpdateCounterArrays()
+
+    self.assertIn("__ATHERIS_INSTRUMENTED__", patched_code.co_consts)
+
+    def test_impl(left: str | bytes, right: str | bytes):
+      if isinstance(left, str):
+        left_bytes = left.encode("utf-8")
+        right_bytes = right.encode("utf-8")
+      else:
+        left_bytes = left
+        right_bytes = right
+
+      expected_result = "equal" if left_bytes == right_bytes else "notequal"
+
+      self.assertEqual(patched_function(left, right), expected_result)
+
+      # Atheris should first perform a numeric comparison on string length
+      self.mock_cmp.assert_called()
+      self.assertEqual(
+          self.mock_cmp.call_args[0], (len(left_bytes), len(right_bytes))
+      )
+
+      if len(left_bytes) != len(right_bytes):
+        self.mock_memcmp.assert_not_called()
+        return
+
+      # If the string lengths matched, it should now perform a full comparison
+      # of the string bytes.
+      self.mock_memcmp.assert_called()
+
+      actual_left = self.mock_memcmp.call_args[0][1]
+      actual_right = self.mock_memcmp.call_args[0][2]
+      actual_n = self.mock_memcmp.call_args[0][3]
+      actual_result = self.mock_memcmp.call_args[0][4]
+
+      self.assertEqual(left_bytes, actual_left)
+      self.assertEqual(right_bytes, actual_right)
+      self.assertEqual(len(left), actual_n)
+      if left_bytes == right_bytes:
+        self.assertEqual(actual_result, 0)
+      elif left_bytes > right_bytes:
+        self.assertGreater(actual_result, 0)
+      else:
+        self.assertLess(actual_result, 0)
+
+      self.mock_cmp.reset_mock()
+      self.mock_memcmp.reset_mock()
+      self.mock_trace_cmp.reset_mock()
+      self.mock_memcmp.reset_mock()
+
+    test_impl("foo", "foo")
+    test_impl("foo", "bar")
+    test_impl("bar", "foo")
+    test_impl(b"foo", b"foo")
+    test_impl(b"foo", b"bar")
+    test_impl(b"one", b"four")
 
   def test_instrument_elif(self):
     def function_with_elif(a):
@@ -232,25 +279,31 @@ class InstrumentBytecodeTest(unittest.TestCase):
         original_code, trace_dataflow=True
     )
     patched_function = types.FunctionType(patched_code, globals())
+    mockutils.UpdateCounterArrays()
 
     with self.subTest("if branch"):
       self.assertEqual(patched_function(1), 10)
+      # Entry-point and first branch taken.
+      self.assertCountersAre([1, 1])
       self.mock_trace_cmp.assert_called()
-      self.mock_trace_branch.assert_called()
       self.mock_trace_cmp.reset_mock()
-      self.mock_trace_branch.reset_mock()
 
     with self.subTest("elif branch"):
       self.assertEqual(patched_function(2), 20)
+      # Entry-point taken again (2); 2nd branch taken (1),
+      # then the first sub-branch (1); plus the original (1) from the first
+      # branch still there..
+      self.assertCountersAre([2, 1, 1, 1])
       self.mock_trace_cmp.assert_called()
-      self.mock_trace_branch.assert_called()
       self.mock_trace_cmp.reset_mock()
-      self.mock_trace_branch.reset_mock()
 
     with self.subTest("else branch"):
       self.assertEqual(patched_function(3), 30)
+      # Entry-point taken again (3); 2nd branch taken again (2);
+      # then the 2nd sub-branch (1); plus the original (1) from the first
+      # branch and (1) from the 2nd sub-branch still there.
+      self.assertCountersAre([3, 2, 1, 1, 1])
       self.mock_trace_cmp.assert_called()
-      self.mock_trace_branch.assert_called()
 
   def test_instrument_for_loop(self):
     def function_with_for_loop(items):
@@ -264,15 +317,19 @@ class InstrumentBytecodeTest(unittest.TestCase):
         original_code, trace_dataflow=False
     )
     patched_function = types.FunctionType(patched_code, globals())
+    mockutils.UpdateCounterArrays()
 
     with self.subTest("empty list"):
       self.assertEqual(patched_function([]), [])
-      self.mock_trace_branch.assert_called()
-      self.mock_trace_branch.reset_mock()
+      # Entry-point (1), for-loop conditional (1), return block (1).
+      self.assertCountersAre([1, 1, 1])
 
     with self.subTest("non-empty list"):
+      mockutils.clear_8bit_counters()
       self.assertEqual(patched_function([1, 2, 3]), [1, 2, 3])
-      self.mock_trace_branch.assert_called()
+      # Entry-point (1), for-loop conditional (4), for-loop body (3),
+      # return block (1).
+      self.assertCountersAre([1, 4, 3, 1])
 
   def test_instrument_while_loop(self):
     def function_with_while_loop(count):
@@ -286,18 +343,18 @@ class InstrumentBytecodeTest(unittest.TestCase):
         original_code, trace_dataflow=True
     )
     patched_function = types.FunctionType(patched_code, globals())
+    mockutils.UpdateCounterArrays()
 
     with self.subTest("zero iterations"):
       self.assertEqual(patched_function(0), 0)
+      self.assertIn(1, mockutils.get_8bit_counters())
       self.mock_trace_cmp.assert_called()
-      self.mock_trace_branch.assert_called()
       self.mock_trace_cmp.reset_mock()
-      self.mock_trace_branch.reset_mock()
 
     with self.subTest("multiple iterations"):
       self.assertEqual(patched_function(3), 3)
+      self.assertIn(3, mockutils.get_8bit_counters())
       self.mock_trace_cmp.assert_called()
-      self.mock_trace_branch.assert_called()
 
   def test_extended_arg(self):
     """Tests that we can handle the insertion of new EXTENDED_ARG instructions."""
@@ -563,24 +620,35 @@ class InstrumentBytecodeTest(unittest.TestCase):
       return y
 
     original_code = near_extended_arg.__code__
+
+    # Ensure that the original code does not contain any EXTENDED_ARG
+    # instructions.
+    for inst in original_code.co_code:
+      self.assertNotEqual(dis.opname[inst], "EXTENDED_ARG")
+
     patched_code = instrument_bytecode.patch_code(
         original_code, trace_dataflow=True
     )
     patched_function = types.FunctionType(patched_code, globals())
+    mockutils.UpdateCounterArrays()
 
-    self.mock_trace_branch.reset_mock()
+    # Ensure that the patched code contains EXTENDED_ARG instructions.
+    for inst in patched_code.co_code:
+      if dis.opname[inst] == "EXTENDED_ARG":
+        break
+    else:
+      self.fail("No EXTENDED_ARG instructions found in patched code.")
+
+    mockutils.clear_8bit_counters()
     self.assertEqual(patched_function(1, 2), 2)
-    self.assertEqual(self.mock_trace_branch.call_count, 2)
-    first_args = list(self.mock_trace_branch.call_args_list)
+    first_counters = mockutils.get_8bit_counters()
 
-    self.mock_trace_branch.reset_mock()
+    mockutils.clear_8bit_counters()
     self.assertEqual(patched_function(3, 1), 3)
-    self.assertEqual(self.mock_trace_branch.call_count, 2)
-    second_args = list(self.mock_trace_branch.call_args_list)
+    second_counters = mockutils.get_8bit_counters()
 
     # Assert that we detected different branches being taken
-    self.assertEqual(first_args[0], second_args[0])
-    self.assertNotEqual(first_args[1], second_args[1])
+    self.assertNotEqual(first_counters, second_counters)
 
   def test_exception(self):
     def raise_exception():
@@ -853,7 +921,8 @@ class InstrumentationTest(unittest.TestCase):
         # Some modules might not be available or raise errors on import.
         pass
     instrument_bytecode.instrument_all()
+    mockutils.UpdateCounterArrays()
 
 
 if __name__ == "__main__":
-  unittest.main()
+  mockutils.main()

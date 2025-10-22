@@ -93,6 +93,24 @@ py::handle prefuzz_trace_cmp(py::handle left, py::handle right, int opid,
 }
 
 NO_SANITIZE
+std::optional<int64_t> to_int64(PyObject* obj) {
+  PyObject *type, *value, *traceback;
+  PyErr_Fetch(&type, &value, &traceback);
+
+  int64_t result = PyLong_AsLongLong(obj);
+
+  if (PyErr_Occurred()) {
+    PyErr_Clear();
+    // Restore the original error state.
+    PyErr_Restore(type, value, traceback);
+    return std::nullopt;
+  } else {
+    PyErr_Restore(type, value, traceback);
+    return result;
+  }
+}
+
+NO_SANITIZE
 void prefuzz_trace_regex_match(std::string pattern_match, py::handle object) {}
 
 extern "C" {
@@ -112,19 +130,19 @@ static PyObject* hooked_withfunc(PyObject* self, PyObject* args,
 
   PyObject* prefix = PyTuple_GetItem(args, 0);
 
-  if (PyTuple_Size(args) > 1) {
-    start = PyLong_AsLongLong(PyTuple_GetItem(args, 1));
-    if (start == -1) {
-      PyErr_Clear();
+  if (PyTuple_Size(args) > 1 && !Py_IsNone(PyTuple_GetItem(args, 1))) {
+    std::optional<int64_t> opt_start = to_int64(PyTuple_GetItem(args, 1));
+    if (!opt_start) {
       return original(self, args);
     }
+    start = *opt_start;
   }
-  if (PyTuple_Size(args) > 2) {
-    end = PyLong_AsLongLong(PyTuple_GetItem(args, 2));
-    if (end == -1) {
-      PyErr_Clear();
+  if (PyTuple_Size(args) > 2 && !Py_IsNone(PyTuple_GetItem(args, 2))) {
+    std::optional<int64_t> opt_end = to_int64(PyTuple_GetItem(args, 2));
+    if (!opt_end) {
       return original(self, args);
     }
+    end = *opt_end;
   }
   TraceWith(self, prefix, start, end, is_endswith);
 
@@ -386,6 +404,7 @@ void Fuzz() {
   atheris.attr("_trace_regex_match") = core.attr("_trace_regex_match");
   atheris.attr("_trace_branch") = core.attr("_trace_branch");
   atheris.attr("_reserve_counter") = core.attr("_reserve_counter");
+  atheris.attr("UpdateCounterArrays") = core.attr("UpdateCounterArrays");
 
   core.attr("start_fuzzing")(args_global, test_one_input_global);
 }
@@ -406,6 +425,9 @@ PYBIND11_MODULE(native, m) {
 #endif
   m.def("hook_str_module", &hook_str_module);
   m.def("unhook_str_module", &unhook_str_module);
+
+  m.def("UpdateCounterArrays", []() {});
+  m.def("build_mode", &build_mode);
 
   py::class_<FuzzedDataProvider>(m, "FuzzedDataProvider")
       .def(py::init<py::bytes>())

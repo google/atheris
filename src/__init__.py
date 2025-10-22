@@ -36,10 +36,12 @@ from .native import _trace_branch  # type: ignore[import]
 from .native import _trace_cmp  # type: ignore[import]
 from .native import _trace_regex_match  # type: ignore[import]
 from .native import ALL_REMAINING  # type: ignore[import]
+from .native import build_mode  # type: ignore[import]
 from .native import Fuzz  # type: ignore[import]
 from .native import FuzzedDataProvider  # type: ignore[import]
 from .native import Mutate  # type: ignore[import]
 from .native import Setup  # type: ignore[import]
+from .native import UpdateCounterArrays  # type: ignore[import]
 from .utils import path
 
 
