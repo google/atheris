@@ -201,9 +201,10 @@ PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid,
   } else if (PyUnicode_Check(left) && PyUnicode_Check(right)) {
     TraceCompareUnicode(left, right, pc);
   }
-
-  #if PY_MAJOR_VERSION > 3 || (PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION >= 12)
+#if PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION == 12
   opid >>= 4;
+#elif PY_MAJOR_VERSION > 3 || (PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION >= 13)
+  opid >>= 5;
 #endif
   return PyObject_RichCompare(left, right, opid);
 }

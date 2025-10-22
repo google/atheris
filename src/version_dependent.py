@@ -38,7 +38,7 @@ from typing import List
 
 PYTHON_VERSION = sys.version_info[:2]
 
-if PYTHON_VERSION < (3, 6) or PYTHON_VERSION > (3, 12):
+if PYTHON_VERSION < (3, 6) or PYTHON_VERSION > (3, 13):
   raise RuntimeError(
       "You are fuzzing on an unsupported python version: "
       + f"{PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.12 are "
@@ -179,7 +179,9 @@ def rel_reference_scale(opname):
 ### Compare ops ###
 
 CMP_OP_SHIFT_AMOUNT = 0
-if PYTHON_VERSION >= (3, 12):
+if PYTHON_VERSION >= (3, 13):
+  CMP_OP_SHIFT_AMOUNT = 5
+elif PYTHON_VERSION >= (3, 12):
   CMP_OP_SHIFT_AMOUNT = 4
 REVERSE_CMP_OP = [4, 5, 2, 3, 0, 1]
 
@@ -187,6 +189,20 @@ REVERSE_CMP_OP = [4, 5, 2, 3, 0, 1]
 # for all future offsets.
 if PYTHON_VERSION >= (3, 12):
   REVERSE_CMP_OP = [i << CMP_OP_SHIFT_AMOUNT for i in REVERSE_CMP_OP]
+
+if PYTHON_VERSION >= (3, 13):
+
+  def requires_bool_coersion(cmp_arg: int) -> bool:
+    """Returns True if the comparison result must be cast to bool."""
+    return bool(cmp_arg & 0b10000)
+
+else:
+
+  def requires_bool_coersion(cmp_arg: int) -> bool:
+    """Returns True if the comparison result must be cast to bool."""
+    del cmp_arg
+    return False
+
 
 ### CodeTypes ###
 
@@ -515,7 +531,10 @@ if (3, 6) <= PYTHON_VERSION <= (3, 10):
     return [(dis.opmap["ROT_N"], width_n)]
 
   # 3.11+ needs a null terminator for the argument list, but 3.10- does not.
-  def args_terminator():
+  def args_terminator_before_callable():
+    return []
+
+  def args_terminator_after_callable():
     return []
 
   # In 3.10-, all you need to call a function is CALL_FUNCTION.
@@ -526,16 +545,12 @@ if (3, 6) <= PYTHON_VERSION <= (3, 10):
   # the callable itself.
   CALLABLE_STACK_ENTRIES = 1
 
+  def cache_info(instruction):
+    del instruction
+    return None
+
 
 elif PYTHON_VERSION >= (3, 11):
-
-  # The number of CACHE instructions that must go after the given instr.
-  def cache_count(op):
-    if isinstance(op, str):
-      op = dis.opmap[op]
-
-    return opcode._inline_cache_entries[op]  # pytype: disable=module-attr  # py311-upgrade
-
   # Generate a list of CACHE instructions for the given instr.
   def caches(op):
     cc = cache_count(op)
@@ -549,10 +564,43 @@ elif PYTHON_VERSION >= (3, 11):
         ret.append([dis.opmap["SWAP"], i])
     return ret
 
-  # Calling a free function in 3.11 requires a null terminator for the
-  # args list on the stack.
-  def args_terminator():
-    return [(dis.opmap["PUSH_NULL"], 0)]
+  # Calling a free function in 3.11+ requires a null terminator for the
+  # args list on the stack. The position changes for 3.13+.
+
+  if PYTHON_VERSION >= (3, 13):
+
+    def cache_count(op: str | int):
+      if isinstance(op, int):
+        op = dis.opname[op]
+      return opcode._inline_cache_entries.get(op, 0)
+
+    def args_terminator_before_callable():
+      return []
+
+    def args_terminator_after_callable():
+      return [(dis.opmap["PUSH_NULL"], 0)]
+
+    def cache_info(instruction):
+      return instruction.cache_info
+
+  else:
+
+    def cache_count(op: str | int):
+      if isinstance(op, str):
+        op = dis.opmap[op]
+      return opcode._inline_cache_entries[op]
+
+    def args_terminator_before_callable():
+      return [(dis.opmap["PUSH_NULL"], 0)]
+
+    def args_terminator_after_callable():
+      return []
+
+    def cache_info(instruction):
+      return None
+
+    def args_terminator():
+      return args_terminator_after_callable()
 
   # 3.11 requires a PRECALL instruction prior to every CALL instruction.
   def call(argc: int):
@@ -604,10 +652,34 @@ else:
   def adjust_arg(arg: int):
     return arg >> 1
 
-if (3, 12) <= PYTHON_VERSION:
-  INSERT_AFTER_INSTRS = ("CACHE", "END_FOR")
-else:
-  INSERT_AFTER_INSTRS = tuple()
+
+# Some instructions cannot be prefixed with instrumentation, because a jump
+# instruction might require the destination to be a particular instruction.
+# When that occurs, we insert instrumentation after the instruction instead.
+# This dictionary maps the instruction to the number of instructions to skip.
+INSERT_AFTER_INSTRS = {}
+
+if PYTHON_VERSION >= (3, 12):
+  INSERT_AFTER_INSTRS["CACHE"] = 1
+  INSERT_AFTER_INSTRS["END_FOR"] = 1
+if PYTHON_VERSION >= (3, 13):
+  # The documentation says:
+  #
+  ## FOR_ITER(delta): ...If the iterator indicates it is exhausted then the byte
+  ##                  code counter is incremented by delta.
+  ## END_FOR: Removes the top-of-stack item. Equivalent to POP_TOP.
+  #
+  # THESE STATEMENTS ARE LIES.
+  #
+  # CPython exclusively generates bytecode where FOR_ITER jumps to an END_FOR
+  # then POP_TOP sequence (that is, it pops 2 items after the jump). Because of
+  # that, FOR_ITER actually implements the two-item pop ITSELF, and jumps PAST
+  # the first two instructions after its jump delta.
+  # If we tried instrumenting the END_FOR or its following POP_TOP, then the
+  # FOR_ITER instruction would jump over the first two instructions of our own
+  # instrumentation.
+  INSERT_AFTER_INSTRS["END_FOR"] = 2
+
 
 if (3, 12) <= PYTHON_VERSION:
   def get_cache_offset(i: int, instructions: List[dis.Instruction]) -> int:

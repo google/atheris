@@ -904,6 +904,31 @@ class InstrumentBytecodeTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
       self.assertEqual(computed_op, ">=")
       self.mock_trace_cmp.reset_mock()
 
+  def instructions_before_resume(self):
+    class SuperClazz:
+
+      def setUp(self):  # pylint: disable=g-missing-super-call
+        self.buf = None
+        pass
+
+    class Clazz(SuperClazz):
+
+      def setUp(self):
+        super().setUp()
+
+        x = lambda hint: self.buf
+        del x
+
+    # Verify that the first instruction is not a RESUME instruction,
+    # otherwise this test is unhelpful.
+    instrs = version_dependent.get_instructions(Clazz.setUp.__code__)
+    self.assertNotEqual(list(instrs)[0].opname, "RESUME")
+
+    instrument_bytecode.instrument_func(Clazz.setUp)
+
+    instance = Clazz()
+    instance.setUp()
+
 
 class InstrumentationTest(unittest.TestCase):
   """Tests that do not use mock, calling the real atheris instrumentation."""
@@ -915,6 +940,9 @@ class InstrumentationTest(unittest.TestCase):
       if module == "antigravity":
         # this module opens an interactive console when imported.
         continue
+      if "_ios_support" in module:
+        # this module is not available on all platforms.
+        continue
       try:
         importlib.import_module(module)
       except (ImportError, ModuleNotFoundError):
@@ -925,4 +953,4 @@ class InstrumentationTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
-  mockutils.main()
+  mockutils.main(verbosity=2)

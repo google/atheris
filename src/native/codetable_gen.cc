@@ -31,18 +31,10 @@
 
 namespace atheris {
 
-#if PY_MINOR_VERSION >= 12
-uint8_t opcode_caches[MAX_PSEUDO_OPCODE];
-#else
+#if PY_MINOR_VERSION < 12
 uint8_t opcode_caches[256];
-#endif
-
 static bool dummy_initializer = []() {
-#if PY_MINOR_VERSION >= 12
-  memset(opcode_caches, 0, MAX_PSEUDO_OPCODE);
-#else
   memset(opcode_caches, 0, 256);
-#endif
   opcode_caches[BINARY_SUBSCR] = 4;
   opcode_caches[STORE_SUBSCR] = 1;
   opcode_caches[UNPACK_SEQUENCE] = 1;
@@ -51,15 +43,14 @@ static bool dummy_initializer = []() {
   opcode_caches[COMPARE_OP] = 2;
   opcode_caches[LOAD_GLOBAL] = 5;
   opcode_caches[BINARY_OP] = 1;
-#if PY_MINOR_VERSION < 12
   opcode_caches[LOAD_METHOD] = 10;
-#endif
 #if PY_MINOR_VERSION == 11
   opcode_caches[PRECALL] = 1;
 #endif
   opcode_caches[CALL] = 4;
   return true;
 }();
+#endif
 
 typedef enum _PyCodeLocationInfoKind {
   /* short forms are 0 to 9 */
@@ -124,16 +115,15 @@ struct assembler {
   int a_except_table_off;   /* offset into exception table */
 };
 
+#if PY_MINOR_VERSION < 12
 static int instr_size(struct instr* instruction) {
   int opcode = instruction->i_opcode;
-#if PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION == 12
-  assert(!IS_PSEUDO_OPCODE(opcode));
-  #endif
   int oparg = HAS_ARG(opcode) ? instruction->i_oparg : 0;
   int extended_args = (0xFFFFFF < oparg) + (0xFFFF < oparg) + (0xFF < oparg);
   int caches = opcode_caches[opcode];
   return extended_args + 1 + caches;
 }
+#endif
 
 static void write_location_byte(struct assembler* a, int val) {
   PyBytes_AS_STRING(a->a_linetable)[a->a_location_off] = val & 255;

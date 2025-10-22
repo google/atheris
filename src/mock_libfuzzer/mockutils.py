@@ -91,5 +91,7 @@ def main(*args, **kwargs):
       # Avoid atheris' exception failure case
       os._exit(e.code)  # pylint: disable=protected-access
 
-  atheris.Setup(sys.argv, run_tests)
+  atheris.Setup(
+      sys.argv[0:1] + ["-timeout=999999999"] + sys.argv[1:], run_tests
+  )
   atheris.Fuzz()

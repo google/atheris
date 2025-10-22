@@ -25,8 +25,10 @@ import types
 from typing import Any, Callable, List, Set, TypeVar, Union
 
 from . import utils
-from .version_dependent import args_terminator
+from .version_dependent import args_terminator_after_callable
+from .version_dependent import args_terminator_before_callable
 from .version_dependent import cache_count
+from .version_dependent import cache_info
 from .version_dependent import call
 from .version_dependent import CALLABLE_STACK_ENTRIES
 from .version_dependent import CMP_OP_SHIFT_AMOUNT
@@ -45,6 +47,7 @@ from .version_dependent import jump_arg_bytes
 from .version_dependent import offset_delta_to_jump_arg
 from .version_dependent import parse_exceptiontable
 from .version_dependent import rel_reference_scale
+from .version_dependent import requires_bool_coersion
 from .version_dependent import REVERSE_CMP_OP
 from .version_dependent import rot_n
 
@@ -97,6 +100,8 @@ class Instruction:
   exceptiontable_referers: List["ReferenceExceptionTableEntry"] = (
       dataclasses.field(default_factory=list)
   )
+  # This instruction appears before the first function RESUME.
+  before_resume: bool = False
 
   # used for __repr__ to allow the instruction to know its own index
   full_instruction_list: List["Instruction"] = dataclasses.field(
@@ -355,11 +360,13 @@ class Instrumentor:
     arg = 0
     offset = None
     instruction_length = 0
+    before_resume = True
 
     instructions = list(get_instructions(self._code))
     for instruction in instructions:
       # If we encountered a CACHE instruction, we actually just increase the
       # length of the previous instruction.
+      # Not present in 3.13+.
       if instruction.opname == "CACHE":
         debug_instr_sizes[self.instructions[-1]] += 1
         continue
@@ -368,6 +375,11 @@ class Instrumentor:
         offset = instruction.offset
 
       instruction_length += 1
+
+      ci = cache_info(instruction)
+      if ci is not None:
+        for info in ci:
+          instruction_length += info[1]
 
       if instruction.opname == "EXTENDED_ARG":
         arg |= instruction.arg  # type: ignore[operator]
@@ -386,9 +398,13 @@ class Instrumentor:
           arg=arg,
           reference=None,
           full_instruction_list=self.instructions,
+          before_resume=before_resume,
       )
 
       assert instr.mnemonic == instruction.opname
+      if instruction.opname == "RESUME" and instruction.arg == 0:
+        assert before_resume
+        before_resume = False
 
       self.instructions.append(instr)
       instructions_by_offset[offset] = instr
@@ -509,7 +525,7 @@ class Instrumentor:
     const_atheris = self._get_const(sys.modules[_TARGET_MODULE])
     name_cov = self._get_name(_COVERAGE_FUNCTION)
 
-    for op, arg in args_terminator():
+    for op, arg in args_terminator_before_callable():
       to_insert.append(_generate_instruction(op, arg, copyfrom_instruction))
 
     to_insert.append(
@@ -518,6 +534,10 @@ class Instrumentor:
     to_insert.append(
         _generate_instruction("LOAD_ATTR", name_cov, copyfrom_instruction)
     )
+
+    for op, arg in args_terminator_after_callable():
+      to_insert.append(_generate_instruction(op, arg, copyfrom_instruction))
+
     to_insert.append(
         _generate_instruction(
             "LOAD_CONST", self._get_counter(), copyfrom_instruction
@@ -534,7 +554,10 @@ class Instrumentor:
     return to_insert
 
   def _generate_cmp_invocation(
-      self, cmp_arg: int, copyfrom_instruction: Instruction
+      self,
+      cmp_arg: int,
+      copyfrom_instruction: Instruction,
+      coerce_to_bool: bool,
   ):
     """Builds the bytecode that calls atheris._trace_cmp().
 
@@ -552,6 +575,7 @@ class Instrumentor:
     Args:
       cmp_arg: The comparison operation.
       copyfrom_instruction: Metadata like positions is copied from this.
+      coerce_to_bool: If set, insert an instruction to cast the result to bool.
 
     Returns:
       The instructions to insert.
@@ -564,7 +588,7 @@ class Instrumentor:
     const_counter = self._get_counter()
     const_false = self._get_const(False)
 
-    for op, arg in args_terminator():
+    for op, arg in args_terminator_before_callable():
       to_insert.append(_generate_instruction(op, arg, copyfrom_instruction))
 
     to_insert.append(
@@ -573,6 +597,9 @@ class Instrumentor:
     to_insert.append(
         _generate_instruction("LOAD_ATTR", name_cmp, copyfrom_instruction)
     )
+
+    for op, arg in args_terminator_after_callable():
+      to_insert.append(_generate_instruction(op, arg, copyfrom_instruction))
 
     for op, arg in rot_n(2 + CALLABLE_STACK_ENTRIES, CALLABLE_STACK_ENTRIES):
       to_insert.append(_generate_instruction(op, arg, copyfrom_instruction))
@@ -590,10 +617,19 @@ class Instrumentor:
     for op, arg in call(5):
       to_insert.append(_generate_instruction(op, arg, copyfrom_instruction))
 
+    if coerce_to_bool:
+      to_insert.append(
+          _generate_instruction("TO_BOOL", None, copyfrom_instruction)
+      )
+
     return to_insert
 
   def _generate_const_cmp_invocation(
-      self, cmp_arg: int, copyfrom_instruction: Instruction, switch: bool
+      self,
+      cmp_arg: int,
+      copyfrom_instruction: Instruction,
+      switch: bool,
+      coerce_to_bool: bool,
   ):
     """Builds the bytecode that calls atheris._trace_cmp().
 
@@ -633,7 +669,7 @@ class Instrumentor:
     else:
       const_op = self._get_const(cmp_arg)
 
-    for op, arg in args_terminator():
+    for op, arg in args_terminator_before_callable():
       to_insert.append(_generate_instruction(op, arg, copyfrom_instruction))
 
     to_insert.append(
@@ -642,6 +678,9 @@ class Instrumentor:
     to_insert.append(
         _generate_instruction("LOAD_ATTR", name_cmp, copyfrom_instruction)
     )
+
+    for op, arg in args_terminator_after_callable():
+      to_insert.append(_generate_instruction(op, arg, copyfrom_instruction))
 
     for op, arg in rot_n(2 + CALLABLE_STACK_ENTRIES, CALLABLE_STACK_ENTRIES):
       to_insert.append(_generate_instruction(op, arg, copyfrom_instruction))
@@ -664,6 +703,11 @@ class Instrumentor:
 
     for op, arg in call(5):
       to_insert.append(_generate_instruction(op, arg, copyfrom_instruction))
+
+    if coerce_to_bool:
+      to_insert.append(
+          _generate_instruction("TO_BOOL", None, copyfrom_instruction)
+      )
 
     return to_insert
 
@@ -713,18 +757,21 @@ class Instrumentor:
       # the JUMP_BACKWARD jumps to instrumentation before the FOR_ITER, but
       # because the FOR_ITER is a conditional jump, instrumentation is also
       # added after it, so every loop iteration triggers twice.
-      while self.instructions[index].mnemonic in INSERT_AFTER_INSTRS:
-        index += 1
+      while (
+          self.instructions[index].before_resume
+          or self.instructions[index].mnemonic in INSERT_AFTER_INSTRS
+      ):
+        if self.instructions[index].before_resume:
+          index += 1
+        else:
+          index += INSERT_AFTER_INSTRS[self.instructions[index].mnemonic]
         if index >= len(self.instructions):
           return
+
       locations_to_instrument.add(self.instructions[index])
 
-    for i, first_instruction in enumerate(self.instructions):
-      if first_instruction.mnemonic not in ("RESUME", "GEN_START"):
-        queue_for_instrumentation(i)
-        break
-    else:
-      return
+    # Queue the first instruction.
+    queue_for_instrumentation(0)
 
     # Then, find any jump destination or instruction following a
     # conditional jump. These are the starts of basic blocks.
@@ -769,6 +816,8 @@ class Instrumentor:
       elif instr.mnemonic == "COMPARE_OP" and (
           instr.arg >> CMP_OP_SHIFT_AMOUNT
       ) < len(dis.cmp_op):
+        requires_coersion: bool = requires_bool_coersion(instr.arg)
+
         # Determine the two values on the top of the stack before COMPARE_OP
         consts_on_stack = [
             c for c in seen_consts if stack_size - 2 <= c < stack_size
@@ -779,12 +828,14 @@ class Instrumentor:
         if not (tos_is_constant and tos1_is_constant):
           # Both items are non-constants
           if (not tos_is_constant) and (not tos1_is_constant):
-            to_insert = self._generate_cmp_invocation(instr.arg, instr)
+            to_insert = self._generate_cmp_invocation(
+                instr.arg, instr, requires_coersion
+            )
 
           # One item is constant, one is non-constant
           else:
             to_insert = self._generate_const_cmp_invocation(
-                instr.arg, instr, tos_is_constant
+                instr.arg, instr, tos_is_constant, requires_coersion
             )
 
           self._insert_at(to_insert, instr)
@@ -919,6 +970,9 @@ T = TypeVar("T")
 
 def instrument_func(func: Callable[..., T]) -> Callable[..., T]:
   """Add Atheris instrumentation to a specific function."""
+  if isinstance(func, types.MethodType):
+    return instrument_func(func.__func__)
+
   func.__code__ = patch_code(func.__code__, True, True)
 
   return func
