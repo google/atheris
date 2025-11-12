@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "third_party/py/atheris/src/mock_libfuzzer/mock_libfuzzer_lib.h"
+#include "mock_libfuzzer_lib.h"
 
 #include <cstddef>
 #include <cstdint>

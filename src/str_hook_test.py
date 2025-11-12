@@ -28,11 +28,11 @@ from unittest import mock
 import atheris
 
 if sys.version_info >= (3, 12):
-  from atheris.src import clean_instrument_bytecode as instrument_bytecode
+  from atheris import clean_instrument_bytecode as instrument_bytecode
 else:
-  from atheris.src import instrument_bytecode
-from atheris.src import version_dependent
-from atheris.src.mock_libfuzzer import mockutils
+  from atheris import instrument_bytecode
+from atheris import version_dependent
+from atheris.mock_libfuzzer import mockutils
 
 
 atheris.enabled_hooks.add("str")

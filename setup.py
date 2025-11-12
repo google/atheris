@@ -157,6 +157,18 @@ ext_modules = [
         language="c++",
     ),
     Extension(
+        "atheris.mock_libfuzzer.mock_libfuzzer",
+        sorted([
+            "src/mock_libfuzzer/mock_libfuzzer_lib.cc",
+            "src/mock_libfuzzer/mock_libfuzzer.cc",
+        ]),
+        include_dirs=[
+            # Path to pybind11 headers
+            PybindIncludeGetter(),
+        ],
+        language="c++",
+    ),
+    Extension(
         "atheris.custom_crossover",
         sorted([
             "src/native/custom_crossover.cc",
@@ -203,23 +215,24 @@ def has_flag(compiler, flagname):
 
 
 def cpp_flag(compiler):
-  """Return the highest-supported -std=c++[11/14/17] compiler flag."""
+  """Return the highest-supported -std=c++[17/20/23] compiler flag."""
   if os.getenv("FORCE_MIN_VERSION"):
     # Use for testing, to make sure Atheris supports C++11
-    flags = ["-std=c++11"]
+    flags = ["-std=c++17"]
   elif os.getenv("FORCE_VERSION"):
     flags = ["-std=c++" + os.getenv("FORCE_VERSION")]
   else:
     flags = [
-        #"-std=c++17",  C++17 disabled unless explicitly requested, to work
-        # around https://github.com/pybind/pybind11/issues/1818
-        "-std=c++14",
-        "-std=c++11"
+        "-std=c++23",
+        "-std=c++20",
+        "-std=c++17",
     ]
 
   for flag in flags:
     if has_flag(compiler, flag):
       return flag
+
+  flags.append("-fsized_deallocation")
 
   raise RuntimeError("Unsupported compiler -- at least C++11 support "
                      "is needed!")
@@ -383,6 +396,8 @@ class BuildExt(build_ext):
         ext.extra_link_args = l_opts + [libfuzzer]
       else:
         ext.extra_link_args = l_opts
+      if ext.name == "atheris.mock_libfuzzer.mock_libfuzzer":
+        ext.extra_compile_args += ["-DMOCK_LIBFUZZER"]
     build_ext.build_extensions(self)
 
     try:
@@ -449,8 +464,8 @@ setup(
     description="A coverage-guided fuzzer for Python and Python extensions.",
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
-    packages=["atheris"],
-    package_dir={"atheris": "src"},
+    packages=["atheris", "atheris.mock_libfuzzer"],
+    package_dir={"atheris": "src", "atheris.mock_libfuzzer": "src/mock_libfuzzer"},
     py_modules=["atheris_no_libfuzzer"],
     ext_modules=ext_modules,
     setup_requires=["pybind11>=2.5.0"],

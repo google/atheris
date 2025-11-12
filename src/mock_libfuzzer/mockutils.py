@@ -18,12 +18,18 @@ This provides a mixin that sets up mock LLVM sanitizer functions, and associated
 utilities. When using this, call mockutils.main() instead of unittest.main().
 """
 
+import ctypes
 import os
 import sys
 import unittest
 from unittest import mock
 import atheris
-from atheris.src.mock_libfuzzer import mock_libfuzzer
+
+flags = sys.getdlopenflags()
+sys.setdlopenflags(flags | ctypes.RTLD_GLOBAL)
+from atheris.mock_libfuzzer import mock_libfuzzer
+
+sys.setdlopenflags(flags)
 
 
 class MockLibFuzzerMixin(unittest.TestCase):
@@ -79,10 +85,6 @@ def UpdateCounterArrays():
 
 def main(*args, **kwargs):
   """Use this instead of unittest.main() to enable Atheris instrumentation."""
-  if atheris.build_mode() != "mock_libfuzzer":
-    raise ValueError(
-        "Atheris must be built with mock_libfuzzer to run this test."
-    )
 
   def run_tests(_):
     try:
@@ -92,6 +94,7 @@ def main(*args, **kwargs):
       os._exit(e.code)  # pylint: disable=protected-access
 
   atheris.Setup(
-      sys.argv[0:1] + ["-timeout=999999999"] + sys.argv[1:], run_tests
+      sys.argv[0:1] + ["-timeout=999999999"] + sys.argv[1:], run_tests,
+      internal_libfuzzer=False,
   )
   atheris.Fuzz()
