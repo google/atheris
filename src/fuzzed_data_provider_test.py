@@ -21,8 +21,23 @@ import atheris
 
 import unittest
 
-def to_bytes(n, length):
-  return n.to_bytes(length, "little")
+
+if sys.version_info[0] >= 3:
+  codepoint = chr
+
+  def to_bytes(n, length):
+    return n.to_bytes(length, "little")
+
+else:
+  # functionality from python3's chr() function is called unichr() in python2
+  codepoint = unichr  # noqa: F821
+
+  # functionality from python3's int.to_bytes()
+  def to_bytes(n, length):
+    h = "%x" % n
+    s = ("0" * (len(h) % 2) + h).zfill(length * 2).decode("hex")
+    return s[::-1]
+
 
 ASCII_BYTEMARK = to_bytes(1, length=1)
 UTF16_BYTEMARK = to_bytes(2, length=1)
@@ -231,13 +246,13 @@ class FuzzedDataProviderTest(unittest.TestCase):
         self.assertLessEqual(result, one)
 
   def testIntList1(self):
-    arr = b""
+    arr = bytearray()
     for _ in range(0, 1000):
       arr += to_bytes(random.randint(0, 255), 1)
-    fdp = atheris.FuzzedDataProvider(arr)
+    fdp = atheris.FuzzedDataProvider(bytes(arr))
 
-    lst = fdp.ConsumeIntList(4321, 1)
-    self.assertEqual(len(lst), 4321)
+    l = fdp.ConsumeIntList(4321, 1)  # noqa: E741
+    self.assertEqual(len(l), 4321)
     for i in range(0, 1000):
       if arr[i] < 0:
         arr[i] += 256
@@ -257,8 +272,8 @@ class FuzzedDataProviderTest(unittest.TestCase):
       arr += to_bytes(random.randint(0, 2**72 - 1), 9)
     fdp = atheris.FuzzedDataProvider(arr)
 
-    lst = fdp.ConsumeIntList(4321, 9)
-    self.assertEqual(len(lst), 4321)
+    l = fdp.ConsumeIntList(4321, 9)  # noqa: E741
+    self.assertEqual(len(l), 4321)
 
     for i in range(0, 1000):
       self.assertGreaterEqual(lst[i], -2**71)
@@ -341,42 +356,42 @@ class FuzzedDataProviderTest(unittest.TestCase):
       self.assertLess(val, 1.79769313e+308)
 
   def testPickValueInList1(self):
-    lst = [3, 3]
+    l = [3, 3]  # noqa: E741
 
     arr = to_bytes(random.getrandbits(1024), int(1024 / 8))
     arr = to_bytes(1234, 8) + arr
 
     fdp = atheris.FuzzedDataProvider(arr)
     for _ in range(0, int(1024 / 8)):
-      self.assertEqual(fdp.PickValueInList(lst), 3)
+      self.assertEqual(fdp.PickValueInList(l), 3)
     self.assertEqual(fdp.ConsumeIntInRange(0, 2**64 - 1), 1234)
 
-    self.assertEqual(fdp.PickValueInList(lst), 3)
+    self.assertEqual(fdp.PickValueInList(l), 3)
 
   def testPickValueInList7(self):
-    lst = [4, 17, 52, 12, 8, 71, 2]
+    l = [4, 17, 52, 12, 8, 71, 2]  # noqa: E741
     s = set()
 
     arr = to_bytes(random.getrandbits(1024 * 1024), int(1024 * 1024 / 8))
     fdp = atheris.FuzzedDataProvider(arr)
 
     for _ in range(0, int(1024 * 1024 / 8)):
-      s.add(fdp.PickValueInList(lst))
+      s.add(fdp.PickValueInList(l))
 
-    self.assertEqual(s, set(lst))
-    self.assertEqual(fdp.PickValueInList(lst), 4)
+    self.assertEqual(s, set(l))
+    self.assertEqual(fdp.PickValueInList(l), 4)
 
   def testPickValueInListShort(self):
-    lst = []
+    l = []  # noqa: E741
     for i in range(1, 10001):
-      lst.append(i * 13)
+      l.append(i * 13)
 
     arr = to_bytes(random.getrandbits(1024 * 1024), int(1024 * 1024 / 8))
     fdp = atheris.FuzzedDataProvider(arr)
 
     all_returned = set()
     for i in range(0, 10000):
-      val = fdp.PickValueInList(lst)
+      val = fdp.PickValueInList(l)
       self.assertEqual(val % 13, 0)
       all_returned.add(val)
 

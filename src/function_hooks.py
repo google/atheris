@@ -26,7 +26,6 @@ else:
   def hook_str_module() -> None:
     pass
 
-
 try:
   import re._parser as sre_parse  # type: ignore[import]
 except ImportError:

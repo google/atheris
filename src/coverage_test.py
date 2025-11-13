@@ -21,7 +21,7 @@ from unittest import mock
 import atheris
 
 with atheris.instrument_imports():
-  import coverage_test_helper
+  import coverage_test_helper  # pytype: disable=import-error
 
 # Enable RegEx instrumentation.
 atheris.enabled_hooks.add("RegEx")
@@ -96,9 +96,8 @@ class CoverageTest(unittest.TestCase):
     coverage_test_helper.while_loop(1)
     trace_branch_mock.assert_called()
 
-  def testRegex(
-      self, trace_branch_mock, trace_cmp_mock, trace_regex_match_mock
-  ):
+  def testRegex(self, trace_branch_mock, trace_cmp_mock,
+                trace_regex_match_mock):
     trace_branch_mock.reset_mock()
     trace_branch_mock.assert_not_called()
     trace_regex_match_mock.assert_not_called()

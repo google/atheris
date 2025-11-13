@@ -169,7 +169,7 @@ elif PYTHON_VERSION <= (3, 11):
 # Returns -1 for instructions that have backward relative references
 # (e.g. JUMP_BACKWARD, an instruction that uses a positive number to
 # indicate a negative jump)
-def rel_reference_scale(opname):
+def rel_reference_scale(opname: str) -> int:
   assert opname in HAVE_REL_REFERENCE
   if opname in REL_REFERENCE_IS_INVERTED:
     return -1
@@ -376,8 +376,8 @@ elif (3, 10) <= PYTHON_VERSION <= (3, 10):
     return bytes(lnotab)
 
 
-elif (3, 11) <= PYTHON_VERSION:
-  from .native import _generate_codetable
+elif (3, 11) <= PYTHON_VERSION <= (3, 11):
+  from .native import _generate_codetable  # pytype: disable=import-error
   def get_lnotab(code, listing):
     ret = _generate_codetable(code, listing)
     return ret
@@ -393,12 +393,12 @@ class ExceptionTableEntry:
     self.depth = depth
     self.lasti = lasti
 
-  def __repr__(self):
+  def __repr__(self) -> str:
     return (
         f"(start_offset={self.start_offset} end_offset={self.end_offset} target={self.target} depth={self.depth} lasti={self.lasti})"
     )
 
-  def __str__(self):
+  def __str__(self) -> str:
     return self.__repr__()
 
   def __eq__(self, other):
@@ -416,10 +416,10 @@ class ExceptionTable:
   def __init__(self, entries: List[ExceptionTableEntry]):
     self.entries = entries
 
-  def __repr__(self):
+  def __repr__(self) -> str:
     return "\n".join([repr(x) for x in self.entries])
 
-  def __str__(self):
+  def __str__(self) -> str:
     return "\n".join([repr(x) for x in self.entries])
 
   def __eq__(self, other):
@@ -438,13 +438,14 @@ if PYTHON_VERSION < (3, 11):
   def parse_exceptiontable(code):
     return ExceptionTable([])
 
-elif (3, 11) <= PYTHON_VERSION:
-  from .native import _generate_exceptiontable
 
-  def generate_exceptiontable(original_code, exception_table_entries):
+if (3, 11) <= PYTHON_VERSION <= (3, 11):
+  from .native import _generate_exceptiontable  # pytype: disable=import-error
+
+  def generate_exceptiontable(original_code, exception_table_entries):  # noqa: F811
     return _generate_exceptiontable(original_code, exception_table_entries)
 
-  def parse_exceptiontable(co_exceptiontable):
+  def parse_exceptiontable(co_exceptiontable):  # noqa: F811
     if isinstance(co_exceptiontable, types.CodeType):
       return parse_exceptiontable(co_exceptiontable.co_exceptiontable)
 
@@ -548,7 +549,6 @@ if (3, 6) <= PYTHON_VERSION <= (3, 10):
   def cache_info(instruction):
     del instruction
     return None
-
 
 elif PYTHON_VERSION >= (3, 11):
   # Generate a list of CACHE instructions for the given instr.
