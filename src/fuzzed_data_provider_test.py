@@ -256,15 +256,15 @@ class FuzzedDataProviderTest(unittest.TestCase):
     for i in range(0, 1000):
       if arr[i] < 0:
         arr[i] += 256
-      if lst[i] < 0:
-        lst[i] += 256
+      if l[i] < 0:
+        l[i] += 256
       if sys.version_info[0] >= 3:
-        self.assertEqual(arr[i], lst[i])
+        self.assertEqual(arr[i], l[i])
       else:
-        self.assertEqual(ord(arr[i]), lst[i])
+        self.assertEqual(ord(arr[i]), l[i])
 
     for i in range(1000, 4321):
-      self.assertEqual(lst[i], 0)
+      self.assertEqual(l[i], 0)
 
   def testIntList9(self):
     arr = b""
@@ -276,11 +276,11 @@ class FuzzedDataProviderTest(unittest.TestCase):
     self.assertEqual(len(l), 4321)
 
     for i in range(0, 1000):
-      self.assertGreaterEqual(lst[i], -2**71)
-      self.assertLessEqual(lst[i], 2**71 - 1)
+      self.assertGreaterEqual(l[i], -2**71)
+      self.assertLessEqual(l[i], 2**71 - 1)
 
     for i in range(1000, 4321):
-      self.assertEqual(lst[i], 0)
+      self.assertEqual(l[i], 0)
 
   def testNonInfiniteFloat(self):
     arr = []

@@ -33,7 +33,6 @@
 #include "pybind11/functional.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
-#include "tracer.h"
 #include "util.h"
 
 namespace atheris {
@@ -95,163 +94,7 @@ py::handle prefuzz_trace_cmp(py::handle left, py::handle right, int opid,
 }
 
 NO_SANITIZE
-std::optional<int64_t> to_int64(PyObject* obj) {
-  PyObject *type, *value, *traceback;
-  PyErr_Fetch(&type, &value, &traceback);
-
-  int64_t result = PyLong_AsLongLong(obj);
-
-  if (PyErr_Occurred()) {
-    PyErr_Clear();
-    // Restore the original error state.
-    PyErr_Restore(type, value, traceback);
-    return std::nullopt;
-  } else {
-    PyErr_Restore(type, value, traceback);
-    return result;
-  }
-}
-
-NO_SANITIZE
 void prefuzz_trace_regex_match(std::string pattern_match, py::handle object) {}
-
-extern "C" {
-PyCFunction original_unicode_startswith = nullptr;
-PyCFunction original_unicode_endswith = nullptr;
-PyCFunction original_bytes_startswith = nullptr;
-PyCFunction original_bytes_endswith = nullptr;
-
-NO_SANITIZE
-static PyObject* hooked_withfunc(PyObject* self, PyObject* args,
-                                 PyCFunction original, bool is_endswith) {
-  int64_t start = 0;
-  int64_t end = std::numeric_limits<int64_t>::max();
-  if (args == nullptr || !PyTuple_Check(args)) {
-    return original(self, args);
-  }
-
-  PyObject* prefix = PyTuple_GetItem(args, 0);
-
-  if (PyTuple_Size(args) > 1 && !Py_IsNone(PyTuple_GetItem(args, 1))) {
-    std::optional<int64_t> opt_start = to_int64(PyTuple_GetItem(args, 1));
-    if (!opt_start) {
-      return original(self, args);
-    }
-    start = *opt_start;
-  }
-  if (PyTuple_Size(args) > 2 && !Py_IsNone(PyTuple_GetItem(args, 2))) {
-    std::optional<int64_t> opt_end = to_int64(PyTuple_GetItem(args, 2));
-    if (!opt_end) {
-      return original(self, args);
-    }
-    end = *opt_end;
-  }
-  TraceWith(self, prefix, start, end, is_endswith);
-
-  return original(self, args);
-}
-
-static PyObject* hooked_unicode_startswith(PyObject* self, PyObject* args) {
-  return hooked_withfunc(self, args, original_unicode_startswith, false);
-}
-
-static PyObject* hooked_unicode_endswith(PyObject* self, PyObject* args) {
-  return hooked_withfunc(self, args, original_unicode_endswith, true);
-}
-
-static PyObject* hooked_bytes_startswith(PyObject* self, PyObject* args) {
-  return hooked_withfunc(self, args, original_bytes_startswith, false);
-}
-
-static PyObject* hooked_bytes_endswith(PyObject* self, PyObject* args) {
-  return hooked_withfunc(self, args, original_bytes_endswith, true);
-}
-}
-
-NO_SANITIZE
-void hook_str_module() {
-  if (original_unicode_startswith != nullptr) {
-    return;
-  }
-
-  PyObject* tmp_str = PyUnicode_FromString("foo");
-  PyMethodDef* tp_methods = tmp_str->ob_type->tp_methods;
-  while (tp_methods->ml_name) {
-    if (tp_methods->ml_name == std::string_view("startswith")) {
-      original_unicode_startswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = hooked_unicode_startswith;
-      std::cerr << "[INFO] Hooked str.startswith" << std::endl;
-    }
-    if (tp_methods->ml_name == std::string_view("endswith")) {
-      original_unicode_endswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = hooked_unicode_endswith;
-      std::cerr << "[INFO] Hooked str.endswith" << std::endl;
-    }
-    tp_methods++;
-  }
-  Py_DECREF(tmp_str);
-
-  PyObject* tmp_bytes = PyBytes_FromString("foo");
-  tp_methods = tmp_bytes->ob_type->tp_methods;
-  while (tp_methods->ml_name) {
-    if (tp_methods->ml_name == std::string_view("startswith")) {
-      original_bytes_startswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = hooked_bytes_startswith;
-      std::cerr << "[INFO] Hooked bytes.startswith" << std::endl;
-    }
-    if (tp_methods->ml_name == std::string_view("endswith")) {
-      original_bytes_endswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = hooked_bytes_endswith;
-      std::cerr << "[INFO] Hooked bytes.endswith" << std::endl;
-    }
-    tp_methods++;
-  }
-  Py_DECREF(tmp_bytes);
-}
-
-void unhook_str_module() {
-  PyObject* tmp_str = PyUnicode_FromString("foo");
-  PyMethodDef* tp_methods = tmp_str->ob_type->tp_methods;
-  while (tp_methods->ml_name) {
-    if (original_unicode_startswith != nullptr &&
-        tp_methods->ml_name == std::string_view("startswith")) {
-      original_unicode_startswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = original_unicode_startswith;
-      original_unicode_startswith = nullptr;
-      std::cerr << "[INFO] Unhooked str.startswith" << std::endl;
-    }
-    if (original_unicode_endswith != nullptr &&
-        tp_methods->ml_name == std::string_view("endswith")) {
-      original_unicode_endswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = original_unicode_endswith;
-      original_unicode_endswith = nullptr;
-      std::cerr << "[INFO] Unhooked str.endswith" << std::endl;
-    }
-    tp_methods++;
-  }
-  Py_DECREF(tmp_str);
-
-  PyObject* tmp_bytes = PyBytes_FromString("foo");
-  tp_methods = tmp_bytes->ob_type->tp_methods;
-  while (tp_methods->ml_name) {
-    if (original_bytes_startswith != nullptr &&
-        tp_methods->ml_name == std::string_view("startswith")) {
-      original_bytes_startswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = original_bytes_startswith;
-      original_bytes_startswith = nullptr;
-      std::cerr << "[INFO] Unhooked bytes.startswith" << std::endl;
-    }
-    if (original_bytes_endswith != nullptr &&
-        tp_methods->ml_name == std::string_view("endswith")) {
-      original_bytes_endswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = hooked_bytes_endswith;
-      original_bytes_endswith = nullptr;
-      std::cerr << "[INFO] Unhooked bytes.endswith" << std::endl;
-    }
-    tp_methods++;
-  }
-  Py_DECREF(tmp_bytes);
-}
 
 NO_SANITIZE
 std::vector<std::string> Setup(
@@ -340,6 +183,11 @@ py::module LoadCoreModule() {
 }
 
 NO_SANITIZE
+std::string build_mode() {
+  return "libfuzzer";
+}
+
+NO_SANITIZE
 py::module LoadExternalFunctionsModule(const std::string& module_name) {
   // Changing dlopenflags so external functions like LLVMFuzzerCustomMutator are
   // in the global scope.
@@ -361,6 +209,16 @@ py::bytes Mutate(py::bytes data, size_t max_size) {
 
 int pending_counters = 0;
 int ReservePendingCounter() { return ++pending_counters; }
+
+bool pending_hook_str_module = false;
+void hook_str_module() {
+  std::cerr << "[INFO] Queued startswith/endswith hooking." << std::endl;
+  pending_hook_str_module = true;
+}
+void unhook_str_module() {
+  std::cerr << "[INFO] Unqueued startswith/endswith hooking." << std::endl;
+  pending_hook_str_module = false;
+}
 
 NO_SANITIZE
 void Fuzz() {
@@ -401,11 +259,18 @@ void Fuzz() {
   }
   pending_counters = 0;
 
+  if (pending_hook_str_module) {
+    core.attr("hook_str_module")();
+    pending_hook_str_module = false;
+  }
+
   atheris.attr("Mutate") = core.attr("Mutate");
   atheris.attr("_trace_cmp") = core.attr("_trace_cmp");
   atheris.attr("_trace_regex_match") = core.attr("_trace_regex_match");
   atheris.attr("_trace_branch") = core.attr("_trace_branch");
   atheris.attr("_reserve_counter") = core.attr("_reserve_counter");
+  atheris.attr("hook_str_module") = core.attr("hook_str_module");
+  atheris.attr("unhook_str_module") = core.attr("unhook_str_module");
   atheris.attr("UpdateCounterArrays") = core.attr("UpdateCounterArrays");
 
   core.attr("start_fuzzing")(args_global, test_one_input_global);

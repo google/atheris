@@ -26,7 +26,9 @@
 #include <exception>
 #include <functional>
 #include <iostream>
+#include <optional>
 #include <sstream>
+#include <string_view>
 
 #include "counters.h"
 #include "macros.h"
@@ -38,6 +40,24 @@
 #include "util.h"
 
 using UserCb = int (*)(const uint8_t* Data, size_t Size);
+
+NO_SANITIZE
+std::optional<int64_t> to_int64(PyObject* obj) {
+  PyObject *type, *value, *traceback;
+  PyErr_Fetch(&type, &value, &traceback);
+
+  int64_t result = PyLong_AsLongLong(obj);
+
+  if (PyErr_Occurred()) {
+    PyErr_Clear();
+    // Restore the original error state.
+    PyErr_Restore(type, value, traceback);
+    return std::nullopt;
+  } else {
+    PyErr_Restore(type, value, traceback);
+    return result;
+  }
+}
 
 extern "C" {
 int LLVMFuzzerRunDriver(int* argc, char*** argv,
@@ -139,6 +159,144 @@ void UpdateCounterArrays() {
   if (alloc.pctable_start && alloc.pctable_end) {
     __sanitizer_cov_pcs_init(alloc.pctable_start, alloc.pctable_end);
   }
+}
+
+extern "C" {
+PyCFunction original_unicode_startswith = nullptr;
+PyCFunction original_unicode_endswith = nullptr;
+PyCFunction original_bytes_startswith = nullptr;
+PyCFunction original_bytes_endswith = nullptr;
+
+NO_SANITIZE
+static PyObject* hooked_withfunc(PyObject* self, PyObject* args,
+                                 PyCFunction original, bool is_endswith) {
+  int64_t start = 0;
+  int64_t end = std::numeric_limits<int64_t>::max();
+  if (args == nullptr || !PyTuple_Check(args)) {
+    return original(self, args);
+  }
+
+  PyObject* prefix = PyTuple_GetItem(args, 0);
+
+  if (PyTuple_Size(args) > 1 && !Py_IsNone(PyTuple_GetItem(args, 1))) {
+    std::optional<int64_t> opt_start = to_int64(PyTuple_GetItem(args, 1));
+    if (!opt_start) {
+      return original(self, args);
+    }
+    start = *opt_start;
+  }
+  if (PyTuple_Size(args) > 2 && !Py_IsNone(PyTuple_GetItem(args, 2))) {
+    std::optional<int64_t> opt_end = to_int64(PyTuple_GetItem(args, 2));
+    if (!opt_end) {
+      return original(self, args);
+    }
+    end = *opt_end;
+  }
+  TraceWith(self, prefix, start, end, is_endswith);
+
+  return original(self, args);
+}
+
+static PyObject* hooked_unicode_startswith(PyObject* self, PyObject* args) {
+  return hooked_withfunc(self, args, original_unicode_startswith, false);
+}
+
+static PyObject* hooked_unicode_endswith(PyObject* self, PyObject* args) {
+  return hooked_withfunc(self, args, original_unicode_endswith, true);
+}
+
+static PyObject* hooked_bytes_startswith(PyObject* self, PyObject* args) {
+  return hooked_withfunc(self, args, original_bytes_startswith, false);
+}
+
+static PyObject* hooked_bytes_endswith(PyObject* self, PyObject* args) {
+  return hooked_withfunc(self, args, original_bytes_endswith, true);
+}
+}  // extern "C"
+
+NO_SANITIZE
+void hook_str_module() {
+  if (original_unicode_startswith != nullptr) {
+    return;
+  }
+
+  PyObject* tmp_str = PyUnicode_FromString("foo");
+  PyMethodDef* tp_methods = tmp_str->ob_type->tp_methods;
+  while (tp_methods->ml_name) {
+    if (tp_methods->ml_name == std::string_view("startswith")) {
+      original_unicode_startswith = tp_methods->ml_meth;
+      tp_methods->ml_meth = hooked_unicode_startswith;
+      std::cerr << "[INFO] Hooked str.startswith" << std::endl;
+    }
+    if (tp_methods->ml_name == std::string_view("endswith")) {
+      original_unicode_endswith = tp_methods->ml_meth;
+      tp_methods->ml_meth = hooked_unicode_endswith;
+      std::cerr << "[INFO] Hooked str.endswith" << std::endl;
+    }
+    tp_methods++;
+  }
+  Py_DECREF(tmp_str);
+
+  PyObject* tmp_bytes = PyBytes_FromString("foo");
+  tp_methods = tmp_bytes->ob_type->tp_methods;
+  while (tp_methods->ml_name) {
+    if (tp_methods->ml_name == std::string_view("startswith")) {
+      original_bytes_startswith = tp_methods->ml_meth;
+      tp_methods->ml_meth = hooked_bytes_startswith;
+      std::cerr << "[INFO] Hooked bytes.startswith" << std::endl;
+    }
+    if (tp_methods->ml_name == std::string_view("endswith")) {
+      original_bytes_endswith = tp_methods->ml_meth;
+      tp_methods->ml_meth = hooked_bytes_endswith;
+      std::cerr << "[INFO] Hooked bytes.endswith" << std::endl;
+    }
+    tp_methods++;
+  }
+  Py_DECREF(tmp_bytes);
+}
+
+void unhook_str_module() {
+  PyObject* tmp_str = PyUnicode_FromString("foo");
+  PyMethodDef* tp_methods = tmp_str->ob_type->tp_methods;
+  while (tp_methods->ml_name) {
+    if (original_unicode_startswith != nullptr &&
+        tp_methods->ml_name == std::string_view("startswith")) {
+      original_unicode_startswith = tp_methods->ml_meth;
+      tp_methods->ml_meth = original_unicode_startswith;
+      original_unicode_startswith = nullptr;
+      std::cerr << "[INFO] Unhooked str.startswith" << std::endl;
+    }
+    if (original_unicode_endswith != nullptr &&
+        tp_methods->ml_name == std::string_view("endswith")) {
+      original_unicode_endswith = tp_methods->ml_meth;
+      tp_methods->ml_meth = original_unicode_endswith;
+      original_unicode_endswith = nullptr;
+      std::cerr << "[INFO] Unhooked str.endswith" << std::endl;
+    }
+    tp_methods++;
+  }
+  Py_DECREF(tmp_str);
+
+  PyObject* tmp_bytes = PyBytes_FromString("foo");
+  tp_methods = tmp_bytes->ob_type->tp_methods;
+  while (tp_methods->ml_name) {
+    if (original_bytes_startswith != nullptr &&
+        tp_methods->ml_name == std::string_view("startswith")) {
+      original_bytes_startswith = tp_methods->ml_meth;
+      tp_methods->ml_meth = original_bytes_startswith;
+      original_bytes_startswith = nullptr;
+      std::cerr << "[INFO] Unhooked bytes.startswith" << std::endl;
+    }
+    if (original_bytes_endswith != nullptr &&
+        tp_methods->ml_name == std::string_view("endswith")) {
+      original_bytes_endswith = tp_methods->ml_meth;
+      tp_methods->ml_meth = hooked_bytes_endswith;
+      original_bytes_endswith = nullptr;
+      std::cerr << "[INFO] Unhooked bytes.endswith" << std::endl;
+    }
+    tp_methods++;
+  }
+  Py_DECREF(tmp_bytes);
 }
 
 NO_SANITIZE
@@ -257,6 +415,8 @@ PYBIND11_MODULE(ATHERIS_MODULE_NAME, m) {
   m.def("_reserve_counters", ReserveCounters);
   m.def("_trace_cmp", &_trace_cmp, py::return_value_policy::move);
   m.def("_trace_regex_match", &TraceRegexMatch);
+  m.def("hook_str_module", &hook_str_module);
+  m.def("unhook_str_module", &unhook_str_module);
   // Exposed for testing.
   m.def("UpdateCounterArrays", &UpdateCounterArrays);
 

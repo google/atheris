@@ -10,11 +10,11 @@ from unittest import mock
 import atheris
 
 if sys.version_info >= (3, 12):
-  from atheris.src import clean_instrument_bytecode as instrument_bytecode
+  from atheris import clean_instrument_bytecode as instrument_bytecode
 else:
-  from atheris.src import instrument_bytecode
-from atheris.src import version_dependent
-from atheris.src.mock_libfuzzer import mockutils
+  from atheris import instrument_bytecode
+from atheris import version_dependent
+from atheris.mock_libfuzzer import mockutils
 
 
 class InstrumentBytecodeTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
@@ -928,28 +928,6 @@ class InstrumentBytecodeTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
 
     instance = Clazz()
     instance.setUp()
-
-
-class InstrumentationTest(unittest.TestCase):
-  """Tests that do not use mock, calling the real atheris instrumentation."""
-
-  def test_instrument_all(self):
-    """Import every module in the stdlib and instrument them all."""
-
-    for module in sys.stdlib_module_names:
-      if module == "antigravity":
-        # this module opens an interactive console when imported.
-        continue
-      if "_ios_support" in module:
-        # this module is not available on all platforms.
-        continue
-      try:
-        importlib.import_module(module)
-      except (ImportError, ModuleNotFoundError):
-        # Some modules might not be available or raise errors on import.
-        pass
-    instrument_bytecode.instrument_all()
-    mockutils.UpdateCounterArrays()
 
 
 if __name__ == "__main__":

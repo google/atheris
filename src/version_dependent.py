@@ -370,13 +370,14 @@ elif (3, 10) <= PYTHON_VERSION <= (3, 10):
         lnotab.extend([254, ldelta])
         ldelta = -128 % 256 if instr.lineno < 0 else 0
         bdelta -= 254
+
       lnotab.extend([bdelta, ldelta])
       prev_lineno = instr.lineno
 
     return bytes(lnotab)
 
 
-elif (3, 11) <= PYTHON_VERSION <= (3, 11):
+elif (3, 11) <= PYTHON_VERSION:
   from .native import _generate_codetable  # pytype: disable=import-error
   def get_lnotab(code, listing):
     ret = _generate_codetable(code, listing)
@@ -439,7 +440,7 @@ if PYTHON_VERSION < (3, 11):
     return ExceptionTable([])
 
 
-if (3, 11) <= PYTHON_VERSION <= (3, 11):
+if (3, 11) <= PYTHON_VERSION:
   from .native import _generate_exceptiontable  # pytype: disable=import-error
 
   def generate_exceptiontable(original_code, exception_table_entries):  # noqa: F811
@@ -609,6 +610,7 @@ elif PYTHON_VERSION >= (3, 11):
       ret.append((dis.opmap["PRECALL"], argc))
     ret.append((dis.opmap["CALL"], argc))
     return ret
+
 
   # A call pops 2 items off the stack in addition to the args: the callable
   # itself, and a null terminator.
