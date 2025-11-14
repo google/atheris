@@ -162,6 +162,9 @@ void UpdateCounterArrays() {
 }
 
 extern "C" {
+
+#if PY_MINOR_VERSION < 13
+
 PyCFunction original_unicode_startswith = nullptr;
 PyCFunction original_unicode_endswith = nullptr;
 PyCFunction original_bytes_startswith = nullptr;
@@ -210,8 +213,68 @@ static PyObject* hooked_bytes_startswith(PyObject* self, PyObject* args) {
 }
 
 static PyObject* hooked_bytes_endswith(PyObject* self, PyObject* args) {
+  std::cerr << "hooked_bytes_endswith" << std::endl;
   return hooked_withfunc(self, args, original_bytes_endswith, true);
 }
+
+#else  // 3.13 or greater changed the calling convention
+
+PyCFunctionFast original_unicode_startswith = nullptr;
+PyCFunctionFast original_unicode_endswith = nullptr;
+PyCFunctionFast original_bytes_startswith = nullptr;
+PyCFunctionFast original_bytes_endswith = nullptr;
+
+static PyObject* hooked_withfunc(PyObject* self, PyObject** args,
+                                 Py_ssize_t nargs, PyCFunctionFast original,
+                                 bool is_endswith) {
+  int64_t start = 0;
+  int64_t end = std::numeric_limits<int64_t>::max();
+  if (args == nullptr || nargs < 1) {
+    return original(self, args, nargs);
+  }
+
+  PyObject* prefix = args[0];
+
+  if (nargs > 1 && !Py_IsNone(args[1])) {
+    std::optional<int64_t> opt_start = to_int64(args[1]);
+    if (!opt_start) {
+      return original(self, args, nargs);
+    }
+    start = *opt_start;
+  }
+  if (nargs > 2 && !Py_IsNone(args[2])) {
+    std::optional<int64_t> opt_end = to_int64(args[2]);
+    if (!opt_end) {
+      return original(self, args, nargs);
+    }
+    end = *opt_end;
+  }
+  TraceWith(self, prefix, start, end, is_endswith);
+
+  return original(self, args, nargs);
+}
+
+static PyObject* hooked_unicode_startswith(PyObject* self, PyObject** args,
+                                           Py_ssize_t nargs) {
+  return hooked_withfunc(self, args, nargs, original_unicode_startswith, false);
+}
+
+static PyObject* hooked_unicode_endswith(PyObject* self, PyObject** args,
+                                         Py_ssize_t nargs) {
+  return hooked_withfunc(self, args, nargs, original_unicode_endswith, true);
+}
+
+static PyObject* hooked_bytes_startswith(PyObject* self, PyObject** args,
+                                         Py_ssize_t nargs) {
+  return hooked_withfunc(self, args, nargs, original_bytes_startswith, false);
+}
+
+static PyObject* hooked_bytes_endswith(PyObject* self, PyObject** args,
+                                       Py_ssize_t nargs) {
+  return hooked_withfunc(self, args, nargs, original_bytes_endswith, true);
+}
+#endif
+
 }  // extern "C"
 
 NO_SANITIZE
@@ -224,13 +287,19 @@ void hook_str_module() {
   PyMethodDef* tp_methods = tmp_str->ob_type->tp_methods;
   while (tp_methods->ml_name) {
     if (tp_methods->ml_name == std::string_view("startswith")) {
-      original_unicode_startswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = hooked_unicode_startswith;
+      original_unicode_startswith =
+          reinterpret_cast<decltype(original_unicode_startswith)>(
+              tp_methods->ml_meth);
+      tp_methods->ml_meth = reinterpret_cast<decltype(tp_methods->ml_meth)>(
+          hooked_unicode_startswith);
       std::cerr << "[INFO] Hooked str.startswith" << std::endl;
     }
     if (tp_methods->ml_name == std::string_view("endswith")) {
-      original_unicode_endswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = hooked_unicode_endswith;
+      original_unicode_endswith =
+          reinterpret_cast<decltype(original_unicode_endswith)>(
+              tp_methods->ml_meth);
+      tp_methods->ml_meth = reinterpret_cast<decltype(tp_methods->ml_meth)>(
+          hooked_unicode_endswith);
       std::cerr << "[INFO] Hooked str.endswith" << std::endl;
     }
     tp_methods++;
@@ -241,13 +310,19 @@ void hook_str_module() {
   tp_methods = tmp_bytes->ob_type->tp_methods;
   while (tp_methods->ml_name) {
     if (tp_methods->ml_name == std::string_view("startswith")) {
-      original_bytes_startswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = hooked_bytes_startswith;
+      original_bytes_startswith =
+          reinterpret_cast<decltype(original_bytes_startswith)>(
+              tp_methods->ml_meth);
+      tp_methods->ml_meth = reinterpret_cast<decltype(tp_methods->ml_meth)>(
+          hooked_bytes_startswith);
       std::cerr << "[INFO] Hooked bytes.startswith" << std::endl;
     }
     if (tp_methods->ml_name == std::string_view("endswith")) {
-      original_bytes_endswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = hooked_bytes_endswith;
+      original_bytes_endswith =
+          reinterpret_cast<decltype(original_bytes_endswith)>(
+              tp_methods->ml_meth);
+      tp_methods->ml_meth = reinterpret_cast<decltype(tp_methods->ml_meth)>(
+          hooked_bytes_endswith);
       std::cerr << "[INFO] Hooked bytes.endswith" << std::endl;
     }
     tp_methods++;
@@ -261,15 +336,15 @@ void unhook_str_module() {
   while (tp_methods->ml_name) {
     if (original_unicode_startswith != nullptr &&
         tp_methods->ml_name == std::string_view("startswith")) {
-      original_unicode_startswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = original_unicode_startswith;
+      tp_methods->ml_meth = reinterpret_cast<decltype(tp_methods->ml_meth)>(
+          original_unicode_startswith);
       original_unicode_startswith = nullptr;
       std::cerr << "[INFO] Unhooked str.startswith" << std::endl;
     }
     if (original_unicode_endswith != nullptr &&
         tp_methods->ml_name == std::string_view("endswith")) {
-      original_unicode_endswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = original_unicode_endswith;
+      tp_methods->ml_meth = reinterpret_cast<decltype(tp_methods->ml_meth)>(
+          original_unicode_endswith);
       original_unicode_endswith = nullptr;
       std::cerr << "[INFO] Unhooked str.endswith" << std::endl;
     }
@@ -282,15 +357,15 @@ void unhook_str_module() {
   while (tp_methods->ml_name) {
     if (original_bytes_startswith != nullptr &&
         tp_methods->ml_name == std::string_view("startswith")) {
-      original_bytes_startswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = original_bytes_startswith;
+      tp_methods->ml_meth = reinterpret_cast<decltype(tp_methods->ml_meth)>(
+          original_bytes_startswith);
       original_bytes_startswith = nullptr;
       std::cerr << "[INFO] Unhooked bytes.startswith" << std::endl;
     }
     if (original_bytes_endswith != nullptr &&
         tp_methods->ml_name == std::string_view("endswith")) {
-      original_bytes_endswith = tp_methods->ml_meth;
-      tp_methods->ml_meth = hooked_bytes_endswith;
+      tp_methods->ml_meth = reinterpret_cast<decltype(tp_methods->ml_meth)>(
+          original_bytes_endswith);
       original_bytes_endswith = nullptr;
       std::cerr << "[INFO] Unhooked bytes.endswith" << std::endl;
     }
