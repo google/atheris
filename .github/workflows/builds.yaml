@@ -16,10 +16,10 @@ jobs:
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
         cache: 'pip'
     - name: Install dependencies
-      run: pip3 install asn1crypto atheris pytype ruff
+      run: pip3 install setuptools asn1crypto atheris pytype ruff
     - name: Run ruff checks
       run: ruff check src
     - name: Run pytype checks
@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.12", "3.13"]
     needs: [ruff]
     steps:
     - uses: actions/checkout@v4
@@ -52,7 +52,5 @@ jobs:
         cache: 'pip'
     - name: Install dependencies
       run: pip3 install PyInstaller
-    - name: Build
-      run: pip3 install .
-    - name: Run tests
-      run: cd src; python -m unittest discover . -p '*_test.py'
+    - name: Build Atheris & run tests
+      run: PYTHON=python ./run_tests.sh
