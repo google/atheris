@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Runs coverage_test with PyInstaller to ensure coverage still functions."""
+"""Runs instrument_bytecode_test with PyInstaller to ensure coverage works."""
 
 import os
 import subprocess
@@ -23,13 +23,22 @@ import unittest
 class PyInstallerCoverageTest(unittest.TestCase):
 
   def test_build_and_run(self):
-    coverage_test = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "coverage_test.py")
+    instrument_bytecode_test = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        "instrument_bytecode_test.py",
+    )
     subprocess.check_call([
-        sys.executable, "-m", "PyInstaller", "--distpath", "/tmp/pyinstaller",
-        "--onefile", "--name", "coverage_test.pkg", coverage_test
+        sys.executable,
+        "-m",
+        "PyInstaller",
+        "--distpath",
+        "/tmp/pyinstaller",
+        "--onefile",
+        "--name",
+        "instrument_bytecode_test.pkg",
+        instrument_bytecode_test,
     ])
-    subprocess.check_call(["/tmp/pyinstaller/coverage_test.pkg"])
+    subprocess.check_call(["/tmp/pyinstaller/instrument_bytecode_test.pkg"])
 
 
 if __name__ == "__main__":

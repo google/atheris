@@ -12,26 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import dis
-import importlib
-import os
-import sys
-import types
-from typing import Callable
+
 import unittest
-from unittest import mock
 
-# Mock the native extension, since it's not available in this test.
-# This needs to be done before importing atheris.
-# mock_native = mock.MagicMock()
-# sys.modules["atheris.native"] = mock_native
+# Mock libfuzzer.
 import atheris
-
-if sys.version_info >= (3, 12):
-  from atheris import clean_instrument_bytecode as instrument_bytecode
-else:
-  from atheris import instrument_bytecode
-from atheris import version_dependent
 from atheris.mock_libfuzzer import mockutils
 
 
@@ -164,6 +149,36 @@ class StrHookTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
     """abcdef[0:-3] == abc."""
     self.impl(STARTSWITH, "abcdef", "abcd", False, 0, -3)
 
+  def test_str_startswith_tuple(self):
+    """Tests str.startswith when the needle is a tuple of possible needles."""
+    self.mock_memcmp.reset_mock()
+    result = "foobar".startswith(("abc", "foo", "123"))
+    self.assertTrue(result)
+    args = self.mock_memcmp.call_args_list
+    self.assertEqual(len(args), 3, args)
+
+    self.assertEqual(args[0].args[1], b"foo")
+    self.assertEqual(args[1].args[1], b"foo")
+    self.assertEqual(args[2].args[1], b"foo")
+
+    other_args = [arg.args[2] for arg in args]
+    self.assertCountEqual(other_args, [b"abc", b"foo", b"123"])
+
+  def test_str_not_startswith_tuple(self):
+    """Tests !str.startswith when the needle is a tuple of possible needles."""
+    self.mock_memcmp.reset_mock()
+    result = "foobar".startswith(("abc", "xyz", "123"))
+    self.assertFalse(result)
+    args = self.mock_memcmp.call_args_list
+    self.assertEqual(len(args), 3, args)
+
+    self.assertEqual(args[0].args[1], b"foo")
+    self.assertEqual(args[1].args[1], b"foo")
+    self.assertEqual(args[2].args[1], b"foo")
+
+    other_args = [arg.args[2] for arg in args]
+    self.assertCountEqual(other_args, [b"abc", b"xyz", b"123"])
+
   def test_str_endswith(self):
     """Basic endswith."""
     self.impl(ENDSWITH, "abcdef", "def", True)
@@ -184,6 +199,21 @@ class StrHookTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
     """abcdef[4:-1] == e."""
     self.impl(ENDSWITH, "abcdef", "de", False, 4, -1)
 
+  def test_str_endswith_tuple(self):
+    """Tests str.endswith when the needle is a tuple of possible needles."""
+    self.mock_memcmp.reset_mock()
+    result = "foobar".endswith(("def", "bar", "456"))
+    self.assertTrue(result)
+    args = self.mock_memcmp.call_args_list
+    self.assertEqual(len(args), 3, args)
+
+    self.assertEqual(args[0].args[1], b"bar")
+    self.assertEqual(args[1].args[1], b"bar")
+    self.assertEqual(args[2].args[1], b"bar")
+
+    other_args = [arg.args[2] for arg in args]
+    self.assertCountEqual(other_args, [b"def", b"bar", b"456"])
+
   def test_str_startswith_reverse_indices_f(self):
     """Reversed indices always produce a false result."""
     self.impl(ENDSWITH, "aaaaaa", "a", False, 4, 1)
@@ -199,6 +229,21 @@ class StrHookTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
   def test_bytes_startswith_reversed_f(self):
     """Basic bytes startswith False case."""
     self.impl(STARTSWITH, b"abc", b"abcd", False)
+
+  def test_bytes_startswith_tuple(self):
+    """Tests bytes.startswith when the needle is a tuple of possible needles."""
+    self.mock_memcmp.reset_mock()
+    result = b"foobar".startswith((b"abc", b"foo", b"123"))
+    self.assertTrue(result)
+    args = self.mock_memcmp.call_args_list
+    self.assertEqual(len(args), 3, args)
+
+    self.assertEqual(args[0].args[1], b"foo")
+    self.assertEqual(args[1].args[1], b"foo")
+    self.assertEqual(args[2].args[1], b"foo")
+
+    other_args = [arg.args[2] for arg in args]
+    self.assertCountEqual(other_args, [b"abc", b"foo", b"123"])
 
   def test_bytes_endswith_equal(self):
     """Basic bytes endswith when strings are equal."""
@@ -219,6 +264,21 @@ class StrHookTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
   def test_bytes_invalid_unicode(self):
     """Tests that bytes are still fine with invalid unicode."""
     self.impl(ENDSWITH, b"\xff\x01\xff", b"\x01\xff", True, 1)
+
+  def test_bytes_endswith_tuple(self):
+    """Tests bytes.endswith when the needle is a tuple of possible needles."""
+    self.mock_memcmp.reset_mock()
+    result = b"foobar".endswith((b"def", b"bar", b"456"))
+    self.assertTrue(result)
+    args = self.mock_memcmp.call_args_list
+    self.assertEqual(len(args), 3, args)
+
+    self.assertEqual(args[0].args[1], b"bar")
+    self.assertEqual(args[1].args[1], b"bar")
+    self.assertEqual(args[2].args[1], b"bar")
+
+    other_args = [arg.args[2] for arg in args]
+    self.assertCountEqual(other_args, [b"def", b"bar", b"456"])
 
   def test_error(self):
     """Tests that errors do not cause Atheris to crash."""

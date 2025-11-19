@@ -37,6 +37,7 @@ except ImportError:
 # than having a whole-file ignore, or interrupting every line of every statement
 # below with an ignore, we will make aliases and ignore here.
 _ANY = sre_parse.ANY  # type: ignore[attr-defined]
+_AT = sre_parse.AT  # type: ignore[attr-defined]
 _ASSERT = sre_parse.ASSERT  # type: ignore[attr-defined]
 _ASSERT_NOT = sre_parse.ASSERT_NOT  # type: ignore[attr-defined]
 _BRANCH = sre_parse.BRANCH  # type: ignore[attr-defined]
@@ -175,7 +176,7 @@ def gen_match_recursive(ops: Any,
       ch = ""
       if category == _CATEGORY_DIGIT:
         ch = "0"
-      if category == _CATEGORY_NOT_DIGIT:
+      elif category == _CATEGORY_NOT_DIGIT:
         ch = "a"
       elif category == _CATEGORY_SPACE:
         ch = " "
@@ -186,10 +187,15 @@ def gen_match_recursive(ops: Any,
       elif category == _CATEGORY_NOT_WORD:
         ch = " "
       else:
-        sys.stderr.write("WARNING: Unsupported RegEx category, " +
-                         "cannot instrument RegEx!\n")
+        sys.stderr.write(
+            f"WARNING: Unsupported RegEx category {category}, "
+            + "cannot instrument RegEx!\n"
+        )
 
       literals += to_correct_type(ch, return_type)
+
+    elif tup[0] == _AT:
+      pass
 
     else:
       sys.stderr.write(f"WARNING: Encountered non-handled RegEx op: {tup[0]}" +

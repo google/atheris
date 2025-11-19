@@ -904,7 +904,7 @@ class InstrumentBytecodeTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
       self.assertEqual(computed_op, ">=")
       self.mock_trace_cmp.reset_mock()
 
-  def instructions_before_resume(self):
+  def test_instructions_before_resume(self):
     class SuperClazz:
 
       def setUp(self):  # pylint: disable=g-missing-super-call
@@ -928,6 +928,21 @@ class InstrumentBytecodeTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
 
     instance = Clazz()
     instance.setUp()
+
+  def test_idempotent_instrument(self):
+    @atheris.instrument_func
+    @atheris.instrument_func
+    @atheris.instrument_func
+    def func(x, y):
+      return x * y
+
+    consts = func.__code__.co_consts
+    self.assertEqual(consts.count("__ATHERIS_INSTRUMENTED__"), 1)
+
+    mockutils.UpdateCounterArrays()
+    mockutils.clear_8bit_counters()
+    self.assertEqual(func(2, 3), 6)
+    self.assertCountersAre([1])
 
 
 if __name__ == "__main__":

@@ -213,6 +213,15 @@ PyObject* TraceCompareOp(void* pc, PyObject* left, PyObject* right, int opid,
 NO_SANITIZE
 void TraceWith(PyObject* self, PyObject* prefix, int64_t start, int64_t end,
                bool is_endswith /*false is startswith*/) {
+  if (PyTuple_Check(prefix)) {
+    Py_ssize_t size = PyTuple_Size(prefix);
+    for (Py_ssize_t i = 0; i < size; ++i) {
+      PyObject* item = PyTuple_GET_ITEM(prefix, i);
+      TraceWith(self, item, start, end, is_endswith);
+    }
+    return;
+  }
+
   if (PyUnicode_Check(self)) {
     if (!PyUnicode_Check(prefix)) return;
     PyUnicode_READY(self);
