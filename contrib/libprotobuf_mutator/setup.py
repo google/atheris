@@ -15,12 +15,23 @@ import setuptools.command.build_ext
 class BuildExtCommand(setuptools.command.build_ext.build_ext):
   """Build C++ extensions and public protos with Bazel."""
 
+  def python_lib_path(self):
+    """Retrieve the PYTHON_LIB_PATH."""
+    ospath = os.__file__
+    return os.path.dirname(os.path.dirname(ospath))
+
   def python_bin_path_args(self):
-    return ["--define", f"PYTHON_BIN_PATH='{sys.executable}'"]
+    return [
+        "--define",
+        f"PYTHON_BIN_PATH='{sys.executable}'",
+        "--define",
+        f"PYTHON_LIB_PATH='{self.python_lib_path()}'",
+    ]
 
   def env(self):
     ret = os.environ.copy()
     ret["PYTHON_BIN_PATH"] = sys.executable
+    ret["PYTHON_LIB_PATH"] = self.python_lib_path()
     return ret
 
   def finalize_options(self):
@@ -39,12 +50,22 @@ class BuildExtCommand(setuptools.command.build_ext.build_ext):
     ext = self.extensions[0]
     ext_full_path = self.get_ext_fullpath(ext.name)
     subprocess.check_call(
-        self._bazel_cmd + ["build"] + self.python_bin_path_args() +
-        ["-c", "opt", "--cxxopt=-std=c++17", "//:_mutator.so"],
+        self._bazel_cmd
+        + ["build"]
+        + self.python_bin_path_args()
+        + [
+            "-c",
+            "opt",
+            "--cxxopt=-std=c++17",
+            "--copt=-include",
+            "--copt=stdint.h",
+            "//:_mutator.so",
+        ],
         # Bazel should be invoked in a directory containing bazel WORKSPACE
         # file, which is the root directory.
         cwd=os.path.dirname(os.path.realpath(__file__)),
-        env=self.env())
+        env=self.env(),
+    )
     built_ext_path = "bazel-bin/_mutator.so"
     os.makedirs(os.path.dirname(ext_full_path), exist_ok=True)
     print("Copying extension %s -> %s" % (
