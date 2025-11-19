@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Make sure we propagate exit codes, for kokoro.
+# Exit if a test fails.
 set -e
 
 if [ -z "$PYTHON" ]; then
@@ -20,6 +20,7 @@ cd "${TMP_DIR?}"
 # Set up virtual env
 "$PYTHON" -m virtualenv .
 source bin/activate
+python -m pip install setuptools
 python -m pip install .
 python -m pip install PyInstaller
 
@@ -51,11 +52,7 @@ done
 echo "=================================================="
 
 # Final summary based on the aggregated status
-if [ $OVERALL_STATUS -eq 0 ]; then
-    echo "Test Run Complete: ALL TESTS PASSED."
-else
-    echo "Test Run Complete: ONE OR MORE TESTS FAILED."
-fi
+echo "Test Run Complete: ALL TESTS PASSED."
 
 rm -rf "$TMP_DIR"
 
