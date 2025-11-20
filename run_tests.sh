@@ -19,13 +19,17 @@ cd "${TMP_DIR?}"
 
 # Set up virtual env
 "$PYTHON" -m virtualenv .
-source bin/activate
+source bin/activate  # After this, use `python` to get the venv, not $PYTHON
 python -m pip install setuptools
 python -m pip install .
+(cd contrib/libprotobuf_mutator && python -m pip install .)
 python -m pip install PyInstaller
+python -m pip install protobuf
 
 echo "--- Starting Python Test Suite ---"
 echo "Searching recursively for files matching *_test.py"
+
+cd src
 
 # Find files and safely iterate over them using null terminators (-print0)
 # and a 'while read' loop. This safely handles spaces in file names.
@@ -34,7 +38,7 @@ find . -name '*_test.py' -print0 | while IFS= read -r -d $'\0' file; do
     echo "Running test: $file"
 
     # Execute the Python script
-    "$PYTHON" "$file"
+    python "$file"
 
     # Capture the exit status of the python command
     TEST_STATUS=$?

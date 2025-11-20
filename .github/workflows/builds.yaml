@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13"]
     needs: [ruff]
     steps:
     - uses: actions/checkout@v4
@@ -50,7 +50,5 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
-    - name: Install dependencies
-      run: pip3 install PyInstaller
     - name: Build Atheris & run tests
       run: PYTHON=python ./run_tests.sh
