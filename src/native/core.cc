@@ -213,7 +213,6 @@ static PyObject* hooked_bytes_startswith(PyObject* self, PyObject* args) {
 }
 
 static PyObject* hooked_bytes_endswith(PyObject* self, PyObject* args) {
-  std::cerr << "hooked_bytes_endswith" << std::endl;
   return hooked_withfunc(self, args, original_bytes_endswith, true);
 }
 

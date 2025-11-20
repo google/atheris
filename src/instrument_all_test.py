@@ -9,10 +9,7 @@ from unittest import mock
 # This needs to be done before importing atheris.
 import atheris
 
-if sys.version_info >= (3, 12):
-  from atheris import clean_instrument_bytecode as instrument_bytecode
-else:
-  from atheris import instrument_bytecode
+from atheris import instrument_bytecode
 from atheris import version_dependent
 from atheris.mock_libfuzzer import mockutils
 

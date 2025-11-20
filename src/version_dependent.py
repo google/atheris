@@ -21,13 +21,9 @@ Accross Python versions there are variations in:
     - Construction of the lnotab
 
 Currently supported python versions are:
-    - 3.6
-    - 3.7
-    - 3.8
-    - 3.9
-    - 3.10
     - 3.11
-    - 3.12-ish
+    - 3.12
+    - 3.13
 """
 
 import sys
@@ -467,13 +463,7 @@ if (3, 11) <= PYTHON_VERSION:
         while True:
           start = parse_varint(iterator) * 2
           length = parse_varint(iterator) * 2
-          # The improved clean_instrument_bytecode.py for 3.12+ uses Python's
-          # native exception table format (inclusive, exclusive]; the old impl
-          # used [inclusive, inclusive] and therefore adjusted the end offset.
-          if PYTHON_VERSION >= (3, 12):
-            end = start + length
-          else:
-            end = start + length - 2
+          end = start + length
           target = parse_varint(iterator) * 2
           dl = parse_varint(iterator)
           depth = dl >> 1

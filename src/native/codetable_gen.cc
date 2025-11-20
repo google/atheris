@@ -298,7 +298,7 @@ py::bytes GenerateCodetable(py::object original_code,
     }
     instr native_instruction = ToNativeInstr(py_instruction);
 #if PY_MINOR_VERSION < 12
-    int isize = instr_size(i);
+    int isize = instr_size(&native_instruction);
 #else
     int isize = py_instruction.attr("length").cast<int>();
 #endif
@@ -392,13 +392,6 @@ py::bytes GenerateExceptiontable(
     if (handler.b_preserve_lasti) handler.b_startdepth += 1;
     int start = table_entries.attr("start_offset").cast<int>() / 2;
     int end = table_entries.attr("end_offset").cast<int>() / 2;
-    /*The improved clean_instrument_bytecode.py for 3.12+ uses Python's
-      native exception table format (inclusive, exclusive]; the old impl
-      used [inclusive, inclusive] and therefore adjusted the end offset.
-      */
-#if PY_MINOR_VERSION < 12
-    end += 1;
-#endif
 
     if (!assemble_emit_exception_table_entry(&assembler, start, end,
                                              &handler)) {
