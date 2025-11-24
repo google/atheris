@@ -137,14 +137,17 @@ class AtherisMetaPathFinder(abc.MetaPathFinder):
         # Use normal inheritance for the common cases. This may not be needed
         # (the dynamic case should work for everything), but keep this for as
         # long as that's experimental.
-        if isinstance(spec.loader, _frozen_importlib_external.SourceFileLoader):
+        if _frozen_importlib_external is not None and isinstance(
+            spec.loader, _frozen_importlib_external.SourceFileLoader
+        ):
           spec.loader = AtherisSourceFileLoader(spec.loader.name,
                                                 spec.loader.path,
                                                 self._trace_dataflow)
           return spec
 
-        elif isinstance(spec.loader,
-                        _frozen_importlib_external.SourcelessFileLoader):
+        elif _frozen_importlib_external is not None and isinstance(
+            spec.loader, _frozen_importlib_external.SourcelessFileLoader
+        ):
           spec.loader = AtherisSourcelessFileLoader(spec.loader.name,
                                                     spec.loader.path,
                                                     self._trace_dataflow)

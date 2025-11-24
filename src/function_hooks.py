@@ -19,7 +19,7 @@ import sys
 import typing
 from typing import Any, AnyStr, Callable, Dict, Iterator, List, Match, Optional, Pattern, Set, Tuple, Union
 
-from .native import hook_str_module
+from .native import hook_str_module  # type: ignore[import]
 
 try:
   import re._parser as sre_parse  # type: ignore[import]
@@ -55,12 +55,12 @@ _SUBPATTERN = sre_parse.SUBPATTERN  # type: ignore[attr-defined]
 def to_correct_type(
     to_convert: Union[str, bytes], return_type: Callable[[], AnyStr]
 ) -> Union[str, bytes]:
-  if return_type != str and return_type != bytes:
+  if return_type is not str and return_type is not bytes:
     raise TypeError(
         f"Expected `return_type` to be str or bytes, got {return_type}"
     )
-  if (isinstance(to_convert, bytes) and return_type == bytes) or (
-      isinstance(to_convert, str) and return_type == str
+  if (isinstance(to_convert, bytes) and return_type is bytes) or (
+      isinstance(to_convert, str) and return_type is str
   ):
     return to_convert
   elif isinstance(to_convert, bytes):
@@ -83,9 +83,9 @@ def gen_match_recursive(ops: Any,
   for tup in ops:
     if tup[0] == _LITERAL:
       val = tup[1]
-      if return_type == str:
+      if return_type is str:
         literals += chr(val)
-      elif return_type == bytes:
+      elif return_type is bytes:
         # Endianess does not matter because there's just a single byte.
         literals += val.to_bytes(1, "big")
       else:

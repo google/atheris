@@ -258,9 +258,8 @@ class Instruction:
               arg=b[i + 1],
               positions=self.positions,
               reference=None,
-              referers=None,
-              exceptiontable_referers=None,
-              full_instruction_list=None,
+              referers=[],
+              full_instruction_list=[],
           )
       )
     return ret

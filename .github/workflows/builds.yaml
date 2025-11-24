@@ -19,7 +19,9 @@ jobs:
         python-version: '3.12'
         cache: 'pip'
     - name: Install dependencies
-      run: pip3 install setuptools asn1crypto atheris pytype ruff
+      run: pip3 install setuptools asn1crypto pytype ruff
+    - name: Install atheris
+      run: pip3 install . --no-build-isolation
     - name: Run ruff checks
       run: ruff check src
     - name: Run pytype checks

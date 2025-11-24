@@ -21,8 +21,8 @@ cd "${TMP_DIR?}"
 "$PYTHON" -m virtualenv .
 source bin/activate  # After this, use `python` to get the venv, not $PYTHON
 python -m pip install setuptools
-python -m pip install .
-(cd contrib/libprotobuf_mutator && python -m pip install .)
+python -m pip install . --no-build-isolation
+(cd contrib/libprotobuf_mutator && python -m pip install . --no-build-isolation)
 python -m pip install PyInstaller
 python -m pip install protobuf
 

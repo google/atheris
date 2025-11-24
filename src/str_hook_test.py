@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+from typing import SupportsIndex
 import unittest
 
 # Mock libfuzzer.
@@ -34,8 +35,8 @@ class StrHookTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
       haystack: str | bytes,
       needle: str | bytes,
       expected_result: bool,
-      start: int | None = None,
-      end: int | None = None,
+      start: SupportsIndex | None = None,
+      end: SupportsIndex | None = None,
   ):
     haystack_substr = haystack[start:end]
     if is_endswith:
@@ -51,7 +52,7 @@ class StrHookTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
 
     self.mock_memcmp.reset_mock()
     self.mock_cmp.reset_mock()
-    if is_endswith == False:
+    if not is_endswith:
       call_result = haystack.startswith(needle, start, end)
     else:
       call_result = haystack.endswith(needle, start, end)
@@ -283,7 +284,7 @@ class StrHookTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
   def test_error(self):
     """Tests that errors do not cause Atheris to crash."""
     with self.assertRaises(TypeError):
-      "abcdef".startswith(b"abc")
+      "abcdef".startswith(b"abc")  # type: ignore
 
   def test_int_index(self):
     """Tests that objects castable to int implicitly are handled correctly."""

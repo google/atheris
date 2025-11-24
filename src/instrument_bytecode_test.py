@@ -210,7 +210,12 @@ class InstrumentBytecodeTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
     self.assertIn("__ATHERIS_INSTRUMENTED__", patched_code.co_consts)
 
     def test_impl(left: str | bytes, right: str | bytes):
-      if isinstance(left, str):
+      if left.__class__ != right.__class__:
+        raise TypeError(
+            "Expected left and right to be of the same type; got"
+            f" left={left.__class__} but right={right.__class__}"
+        )
+      if isinstance(left, str) and isinstance(right, str):
         left_bytes = left.encode("utf-8")
         right_bytes = right.encode("utf-8")
       else:
@@ -756,7 +761,7 @@ class InstrumentBytecodeTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
 
       try:
         do_nothing()
-      except:  # pylint: disable=bare-except
+      except:  # pylint: disable=bare-except  # noqa: E722
         pass
 
       if ctr == termination:
@@ -913,7 +918,7 @@ class InstrumentBytecodeTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
       def setUp(self):
         super().setUp()
 
-        x = lambda hint: self.buf
+        x = lambda hint: self.buf  # noqa: E731  # type: ignore
         del x
 
     # Verify that the first instruction is not a RESUME instruction,

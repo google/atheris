@@ -563,7 +563,7 @@ elif PYTHON_VERSION >= (3, 11):
     def cache_count(op: str | int):
       if isinstance(op, int):
         op = dis.opname[op]
-      return opcode._inline_cache_entries.get(op, 0)
+      return opcode._inline_cache_entries.get(op, 0)  # pytype: disable=module-attr
 
     def args_terminator_before_callable():
       return []
@@ -579,7 +579,7 @@ elif PYTHON_VERSION >= (3, 11):
     def cache_count(op: str | int):
       if isinstance(op, str):
         op = dis.opmap[op]
-      return opcode._inline_cache_entries[op]
+      return opcode._inline_cache_entries[op]  # pytype: disable=module-attr
 
     def args_terminator_before_callable():
       return [(dis.opmap["PUSH_NULL"], 0)]
@@ -600,7 +600,6 @@ elif PYTHON_VERSION >= (3, 11):
       ret.append((dis.opmap["PRECALL"], argc))
     ret.append((dis.opmap["CALL"], argc))
     return ret
-
 
   # A call pops 2 items off the stack in addition to the args: the callable
   # itself, and a null terminator.

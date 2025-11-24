@@ -27,7 +27,7 @@ import atheris
 
 flags = sys.getdlopenflags()
 sys.setdlopenflags(flags | ctypes.RTLD_GLOBAL)
-from atheris.mock_libfuzzer import mock_libfuzzer
+from atheris.mock_libfuzzer import mock_libfuzzer  # noqa: E402
 
 sys.setdlopenflags(flags)
 
