@@ -37,6 +37,7 @@ RUN set -e -x -v; \
 	python3 -m pip install auditwheel;
 
 RUN set -e -x -v; \
+    /opt/python/cp311-cp311/bin/python3 -m pip install setuptools && \
     /opt/python/cp312-cp312/bin/python3 -m pip install setuptools && \
     /opt/python/cp313-cp313/bin/python3 -m pip install setuptools;
 
