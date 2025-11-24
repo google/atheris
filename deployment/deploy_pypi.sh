@@ -68,7 +68,7 @@ USER_SPECIFIED_PYPI="$1"
   fi
 
   TEST_OUTPUT="$(./run_tests.sh 2>&1)"
-  if [ "$(echo "${TEST_OUTPUT?}" | tail -n1)" != "OK" ]; then
+  if [ "$(echo "${TEST_OUTPUT?}" | tail -n1)" != "Test Run Complete: ALL TESTS PASSED." ]; then
     echo "tests failed :(. exiting"
     exit 1
   fi
