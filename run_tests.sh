@@ -20,7 +20,7 @@ cd "${TMP_DIR?}"
 # Set up virtual env
 "$PYTHON" -m virtualenv .
 source bin/activate  # After this, use `python` to get the venv, not $PYTHON
-python -m pip install setuptools
+python -m pip install setuptools pybind11
 python -m pip install . --no-build-isolation
 (cd contrib/libprotobuf_mutator && python -m pip install . --no-build-isolation)
 python -m pip install PyInstaller

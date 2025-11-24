@@ -138,7 +138,7 @@ class AtherisMetaPathFinder(abc.MetaPathFinder):
         # (the dynamic case should work for everything), but keep this for as
         # long as that's experimental.
         if _frozen_importlib_external is not None and isinstance(
-            spec.loader, _frozen_importlib_external.SourceFileLoader
+            spec.loader, _frozen_importlib_external.SourceFileLoader  # pytype: disable=attribute-error
         ):
           spec.loader = AtherisSourceFileLoader(spec.loader.name,
                                                 spec.loader.path,
@@ -146,7 +146,7 @@ class AtherisMetaPathFinder(abc.MetaPathFinder):
           return spec
 
         elif _frozen_importlib_external is not None and isinstance(
-            spec.loader, _frozen_importlib_external.SourcelessFileLoader
+            spec.loader, _frozen_importlib_external.SourcelessFileLoader  # pytype: disable=attribute-error
         ):
           spec.loader = AtherisSourcelessFileLoader(spec.loader.name,
                                                     spec.loader.path,
@@ -191,37 +191,38 @@ class AtherisMetaPathFinder(abc.MetaPathFinder):
     return machinery.PathFinder.invalidate_caches()
 
 
-class AtherisSourceFileLoader(_frozen_importlib_external.SourceFileLoader):
-  """Loads a source file, patching its bytecode with Atheris instrumentation."""
+if _frozen_importlib_external is not None:
+  class AtherisSourceFileLoader(_frozen_importlib_external.SourceFileLoader):
+    """Loads a source file, patching its bytecode with Atheris instrumentation."""
 
-  def __init__(self, name: str, path: str, trace_dataflow: bool):
-    super().__init__(name, path)
-    self._trace_dataflow = trace_dataflow
+    def __init__(self, name: str, path: str, trace_dataflow: bool):
+      super().__init__(name, path)
+      self._trace_dataflow = trace_dataflow
 
-  def get_code(self, fullname: str) -> Optional[types.CodeType]:
-    code = super().get_code(fullname)
+    def get_code(self, fullname: str) -> Optional[types.CodeType]:
+      code = super().get_code(fullname)
 
-    if code is None:
-      return None
-    else:
-      return patch_code(code, self._trace_dataflow)
+      if code is None:
+        return None
+      else:
+        return patch_code(code, self._trace_dataflow)
 
 
-class AtherisSourcelessFileLoader(
-    _frozen_importlib_external.SourcelessFileLoader):
-  """Loads a sourceless/bytecode file, patching it with Atheris instrumentation."""
+  class AtherisSourcelessFileLoader(
+      _frozen_importlib_external.SourcelessFileLoader):
+    """Loads a sourceless/bytecode file, patching it with Atheris instrumentation."""
 
-  def __init__(self, name: str, path: str, trace_dataflow: bool):
-    super().__init__(name, path)
-    self._trace_dataflow = trace_dataflow
+    def __init__(self, name: str, path: str, trace_dataflow: bool):
+      super().__init__(name, path)
+      self._trace_dataflow = trace_dataflow
 
-  def get_code(self, fullname: str) -> Optional[types.CodeType]:
-    code = super().get_code(fullname)
+    def get_code(self, fullname: str) -> Optional[types.CodeType]:
+      code = super().get_code(fullname)
 
-    if code is None:
-      return None
-    else:
-      return patch_code(code, self._trace_dataflow)
+      if code is None:
+        return None
+      else:
+        return patch_code(code, self._trace_dataflow)
 
 
 def make_dynamic_atheris_loader(loader: Any, trace_dataflow: bool) -> Any:
