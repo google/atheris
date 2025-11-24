@@ -52,5 +52,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
+    - name: Install virtualenv
+      run: pip3 install virtualenv
     - name: Build Atheris & run tests
       run: PYTHON=python ./run_tests.sh
