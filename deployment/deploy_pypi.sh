@@ -81,7 +81,7 @@ USER_SPECIFIED_PYPI="$1"
     TMP_DIR="$(mktemp -d)"
     TEST_PYPY_ATHERIS="$(download_from_test_pypi ${TMP_DIR?})"
     TEST_OUTPUT="$(./run_tests.sh "${TEST_PYPY_ATHERIS}" 2>&1)"
-    if [ "$(echo "${TEST_OUTPUT?}" | tail -n1)" != "OK" ]; then
+    if [ "$(echo "${TEST_OUTPUT?}" | tail -n1)" != "Test Run Complete: ALL TESTS PASSED." ]; then
       echo "tests failed :(. exiting"
       exit 1
     fi
