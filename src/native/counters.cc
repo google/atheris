@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <cstdint>
 
 #include "macros.h"
 
