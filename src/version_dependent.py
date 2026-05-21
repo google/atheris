@@ -24,6 +24,7 @@ Currently supported python versions are:
     - 3.11
     - 3.12
     - 3.13
+    - 3.14
 """
 
 import sys
@@ -34,10 +35,10 @@ from typing import List
 
 PYTHON_VERSION = sys.version_info[:2]
 
-if PYTHON_VERSION < (3, 6) or PYTHON_VERSION > (3, 13):
+if PYTHON_VERSION < (3, 6) or PYTHON_VERSION > (3, 14):
   raise RuntimeError(
       "You are fuzzing on an unsupported python version: "
-      + f"{PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.12 are "
+      + f"{PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.14 are "
       + "supported by atheris 2.0. Use atheris 1.0 for older python versions."
   )
 
@@ -117,6 +118,27 @@ if PYTHON_VERSION >= (3, 12):
       "POP_JUMP_IF_NONE",
       "POP_JUMP_IF_NOT_NONE",
   ])
+
+if PYTHON_VERSION >= (3, 14):
+  # 3.14 added non-popping conditional jumps `JUMP_IF_TRUE` / `JUMP_IF_FALSE`
+  # as relative-forward branches; the existing pop-then-jump pair stays.
+  CONDITIONAL_JUMPS.extend([
+      "JUMP_IF_FALSE",
+      "JUMP_IF_TRUE",
+  ])
+  HAVE_REL_REFERENCE.extend([
+      "JUMP_IF_FALSE",
+      "JUMP_IF_TRUE",
+  ])
+
+# Instructions that push a constant onto the stack. The constant-compare
+# instrumentation tracks which stack slots hold constants so it can pass the
+# constant value to `_trace_cmp` as `obj1`. 3.14 introduced `LOAD_SMALL_INT`
+# as a specialized constant-loader for small integers; before 3.14 all
+# constants flowed through `LOAD_CONST` so this list was implicit.
+CONST_LOADS = ["LOAD_CONST"]
+if PYTHON_VERSION >= (3, 14):
+  CONST_LOADS.append("LOAD_SMALL_INT")
 
 HAVE_ABS_REFERENCE = [
     # common

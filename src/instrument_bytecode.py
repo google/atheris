@@ -33,6 +33,7 @@ from .version_dependent import call
 from .version_dependent import CALLABLE_STACK_ENTRIES
 from .version_dependent import CMP_OP_SHIFT_AMOUNT
 from .version_dependent import CONDITIONAL_JUMPS
+from .version_dependent import CONST_LOADS
 from .version_dependent import ExceptionTable
 from .version_dependent import ExceptionTableEntry
 from .version_dependent import generate_exceptiontable
@@ -810,7 +811,7 @@ class Instrumentor:
     seen_consts = []
 
     for c, instr in enumerate(self.instructions):
-      if instr.mnemonic == "LOAD_CONST":
+      if instr.mnemonic in CONST_LOADS:
         seen_consts.append(stack_size)
       elif instr.mnemonic == "COMPARE_OP" and (
           instr.arg >> CMP_OP_SHIFT_AMOUNT

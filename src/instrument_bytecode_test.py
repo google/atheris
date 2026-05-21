@@ -617,16 +617,17 @@ class InstrumentBytecodeTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
         pass
         pass
         pass
-        pass
         return x
       return y
 
     original_code = near_extended_arg.__code__
 
     # Ensure that the original code does not contain any EXTENDED_ARG
-    # instructions.
-    for inst in original_code.co_code:
-      self.assertNotEqual(dis.opname[inst], "EXTENDED_ARG")
+    # instructions. `dis.get_instructions` decodes properly so argument
+    # bytes that happen to equal the EXTENDED_ARG opcode value are not
+    # mistaken for opcodes.
+    for instr in dis.get_instructions(original_code):
+      self.assertNotEqual(instr.opname, "EXTENDED_ARG")
 
     patched_code = instrument_bytecode.patch_code(
         original_code, trace_dataflow=True
@@ -635,8 +636,8 @@ class InstrumentBytecodeTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
     mockutils.UpdateCounterArrays()
 
     # Ensure that the patched code contains EXTENDED_ARG instructions.
-    for inst in patched_code.co_code:
-      if dis.opname[inst] == "EXTENDED_ARG":
+    for instr in dis.get_instructions(patched_code):
+      if instr.opname == "EXTENDED_ARG":
         break
     else:
       self.fail("No EXTENDED_ARG instructions found in patched code.")
