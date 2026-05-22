@@ -52,11 +52,9 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
-    - name: Install virtualenv
-      run: pip3 install virtualenv
     - name: Build Atheris & run tests
       run: PYTHON=python ./run_tests.sh
-  test-macos:
+  macos:
     runs-on: macos-latest
     strategy:
       matrix:
@@ -69,8 +67,6 @@ jobs:
         brew install llvm@${{ matrix.llvm-version }} python@${{ matrix.python-version }}
         echo "$(brew --prefix llvm@${{ matrix.llvm-version }})/bin" >> "$GITHUB_PATH"
         echo "$(brew --prefix python@${{ matrix.python-version }})/libexec/bin" >> "$GITHUB_PATH"
-    - name: Install build deps
-      run: python3 -m pip install virtualenv
     - name: Build Atheris & run tests
       env:
         CC: clang

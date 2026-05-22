@@ -18,7 +18,7 @@ cp -r . "${TMP_DIR?}"
 cd "${TMP_DIR?}"
 
 # Set up virtual env
-"$PYTHON" -m virtualenv .
+"$PYTHON" -m venv .
 source bin/activate  # After this, use `python` to get the venv, not $PYTHON
 python -m pip install setuptools pybind11
 python -m pip install . --no-build-isolation
