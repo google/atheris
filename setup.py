@@ -48,13 +48,24 @@ too_old_error = """Your libFuzzer version is too old; set either $CLANG_BIN to p
 
 no_libfuzzer_error = """Failed to find libFuzzer; set either $CLANG_BIN to point to your Clang binary, or $LIBFUZZER_LIB to point directly to your libFuzzer .a file. If needed, """ + clang_install_instructions
 
-if sys.platform == "darwin":
+IS_MACOS = sys.platform == "darwin"
+SHLIB_EXT = "dylib" if IS_MACOS else "so"
+
+if IS_MACOS:
   too_old_error = ("Your libFuzzer version is too old.\nPlease" +
                    clang_install_instructions + "Do not use Apple "
                    "Clang; Apple Clang does not come with libFuzzer.")
   no_libfuzzer_error = ("Failed to find libFuzzer; you may be building using "
                         "Apple Clang. Apple Clang does not come with "
                         "libFuzzer.\nPlease " + clang_install_instructions)
+
+
+def sanitizer_lib_path(libfuzzer_path, sanitizer):
+  if IS_MACOS:
+    macos_name = {"asan": "asan", "ubsan_standalone": "ubsan"}[sanitizer]
+    return libfuzzer_path.replace("fuzzer_no_main_osx.a",
+                                  "{}_osx_dynamic.dylib".format(macos_name))
+  return libfuzzer_path.replace(".fuzzer_no_main", "." + sanitizer)
 
 
 class PybindIncludeGetter(object):
@@ -349,7 +360,7 @@ class BuildExt(build_ext):
     orig_libfuzzer_name = os.path.basename(libfuzzer)
     version = check_libfuzzer_version(libfuzzer)
 
-    if sys.platform == "darwin" and version != "up-to-date":
+    if IS_MACOS and version != "up-to-date":
       raise RuntimeError(too_old_error)
 
     if version == "outdated-unrecoverable":
@@ -380,7 +391,7 @@ class BuildExt(build_ext):
     ]
     l_opts = []
 
-    if sys.platform == "darwin":
+    if IS_MACOS:
       darwin_opts = ["-stdlib=libc++", "-mmacosx-version-min=10.7"]
       c_opts += darwin_opts
       l_opts += darwin_opts
@@ -409,26 +420,27 @@ class BuildExt(build_ext):
       sys.stderr.write("\n")
 
     # Deploy versions of ASan and UBSan that have been merged with libFuzzer
-    asan_name = orig_libfuzzer.replace(".fuzzer_no_main", ".asan")
-    merged_asan_name = "asan_with_fuzzer.so"
+    asan_name = sanitizer_lib_path(orig_libfuzzer, "asan")
+    merged_asan_name = "asan_with_fuzzer." + SHLIB_EXT
     self.merge_deploy_libfuzzer_sanitizer(
         libfuzzer, asan_name, merged_asan_name,
         "asan_preinit.cc.o asan_preinit.cpp.o")
 
-    ubsan_name = orig_libfuzzer.replace(".fuzzer_no_main", ".ubsan_standalone")
-    merged_ubsan_name = "ubsan_with_fuzzer.so"
+    ubsan_name = sanitizer_lib_path(orig_libfuzzer, "ubsan_standalone")
+    merged_ubsan_name = "ubsan_with_fuzzer." + SHLIB_EXT
     self.merge_deploy_libfuzzer_sanitizer(
         libfuzzer, ubsan_name, merged_ubsan_name,
         "ubsan_init_standalone_preinit.cc.o ubsan_init_standalone_preinit.cpp.o"
     )
 
-    ubsanxx_name = orig_libfuzzer.replace(".fuzzer_no_main",
-                                          ".ubsan_standalone_cxx")
-    merged_ubsanxx_name = "ubsan_cxx_with_fuzzer.so"
-    self.merge_deploy_libfuzzer_sanitizer(
-        libfuzzer, ubsanxx_name, merged_ubsanxx_name,
-        "ubsan_init_standalone_preinit.cc.o ubsan_init_standalone_preinit.cpp.o"
-    )
+    if not IS_MACOS:
+      ubsanxx_name = orig_libfuzzer.replace(".fuzzer_no_main",
+                                            ".ubsan_standalone_cxx")
+      merged_ubsanxx_name = "ubsan_cxx_with_fuzzer.so"
+      self.merge_deploy_libfuzzer_sanitizer(
+          libfuzzer, ubsanxx_name, merged_ubsanxx_name,
+          "ubsan_init_standalone_preinit.cc.o ubsan_init_standalone_preinit.cpp.o"
+      )
 
   def deploy_file(self, name, target_filename):
     atheris = self.get_ext_fullpath("atheris")

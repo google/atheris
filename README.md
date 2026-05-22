@@ -35,7 +35,7 @@ If you don't have `clang` installed or it's too old, you'll need to download and
 
 #### Mac
 
-Apple Clang doesn't come with libFuzzer, so you'll need to install a new version of LLVM from head. Follow the instructions in Installing Against New LLVM below.
+Apple Clang doesn't come with libFuzzer, so you'll need a non-Apple LLVM. The easiest option is Homebrew (`brew install llvm`). Alternatively, follow the instructions in "Installing Against New LLVM" below to build LLVM from source.
 
 #### Installing Against New LLVM
 

@@ -18,11 +18,15 @@ cp -r . "${TMP_DIR?}"
 cd "${TMP_DIR?}"
 
 # Set up virtual env
-"$PYTHON" -m virtualenv .
+"$PYTHON" -m venv .
 source bin/activate  # After this, use `python` to get the venv, not $PYTHON
-python -m pip install setuptools pybind11
+python -m pip install setuptools pybind11 wheel
 python -m pip install . --no-build-isolation
-(cd contrib/libprotobuf_mutator && python -m pip install . --no-build-isolation)
+if [[ "$(uname)" != "Darwin" ]]; then
+  # libprotobuf_mutator's bundled zlib build is currently broken on macOS
+  # SDKs (zlib's fdopen macro collides with stdio.h). Skip on Darwin.
+  (cd contrib/libprotobuf_mutator && python -m pip install . --no-build-isolation)
+fi
 python -m pip install PyInstaller
 python -m pip install protobuf
 

@@ -27,21 +27,35 @@ are the two options:
 
 ### Option A: Sanitizer+libFuzzer preloads
 
-If you can use this option, we recommend it; it is significantly easier than option #2. (However, this option is not yet supported on Mac). When Atheris is installed, it attempts to generate custom ASan and UBSan shared libraries that have libFuzzer linked in. You can find these libraries in the directory returned by this command:
+If you can use this option, we recommend it; it is significantly easier than option #2. When Atheris is installed, it attempts to generate custom ASan and UBSan shared libraries that have libFuzzer linked in. You can find these libraries in the directory returned by this command:
 
 ```
 python -c "import atheris; print(atheris.path())"
 ```
 
-These files will be called:
- - `asan_with_fuzzer.so`
- - `ubsan_with_fuzzer.so`
- - `ubsan_cxx_with_fuzzer.so`
+On Linux these files will be called:
 
-If these files are present, it means Atheris successfully generated the files at installation time, and you can use this option. Simply `LD_PRELOAD` the right `.so` file, and you're good to go. Here's a complete example:
+- `asan_with_fuzzer.so`
+- `ubsan_with_fuzzer.so`
+- `ubsan_cxx_with_fuzzer.so`
+
+On macOS they use the `.dylib` extension (and there is no separate `ubsan_cxx_with_fuzzer.dylib` — the standard ubsan dylib covers C++ checks):
+
+- `asan_with_fuzzer.dylib`
+- `ubsan_with_fuzzer.dylib`
+
+If these files are present, it means Atheris successfully generated the files at installation time, and you can use this option. Simply preload the right library, and you're good to go.
+
+Linux example:
 
 ```
 LD_PRELOAD="$(python -c "import atheris; print(atheris.path())")/asan_with_fuzzer.so" python ./my_fuzzer.py
+```
+
+macOS example:
+
+```
+DYLD_INSERT_LIBRARIES="$(python -c "import atheris; print(atheris.path())")/asan_with_fuzzer.dylib" python ./my_fuzzer.py
 ```
 
 ### Option B: Linking libFuzzer into Python
@@ -105,5 +119,5 @@ Python is known to leak certain data, such as at interpreter initialization time
 
 ## What if I'm not using a Sanitizer?
 
-While we recommend that you use a sanitizer when fuzzing native code, it's not mandatory. If you'd like to use Atheris to fuzz native code without a sanitizer, you should still build your extension with `-fsanitize=fuzzer-no-link`, and still `LD_PRELOAD` `asan_with_fuzzer.so`. Just remove the `address` entries from
+While we recommend that you use a sanitizer when fuzzing native code, it's not mandatory. If you'd like to use Atheris to fuzz native code without a sanitizer, you should still build your extension with `-fsanitize=fuzzer-no-link`, and still preload `asan_with_fuzzer.so` (or `asan_with_fuzzer.dylib` via `DYLD_INSERT_LIBRARIES` on macOS). Just remove the `address` entries from
 the build command.
