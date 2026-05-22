@@ -56,3 +56,23 @@ jobs:
       run: pip3 install virtualenv
     - name: Build Atheris & run tests
       run: PYTHON=python ./run_tests.sh
+  test-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        python-version: ["3.13"]
+        llvm-version: ["21"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Homebrew LLVM and Python
+      run: |
+        brew install llvm@${{ matrix.llvm-version }} python@${{ matrix.python-version }}
+        echo "$(brew --prefix llvm@${{ matrix.llvm-version }})/bin" >> "$GITHUB_PATH"
+        echo "$(brew --prefix python@${{ matrix.python-version }})/libexec/bin" >> "$GITHUB_PATH"
+    - name: Install build deps
+      run: python3 -m pip install virtualenv
+    - name: Build Atheris & run tests
+      env:
+        CC: clang
+        CXX: clang++
+      run: PYTHON=python3 ./run_tests.sh

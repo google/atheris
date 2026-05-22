@@ -19,9 +19,8 @@ libfuzzer="$1"
 sanitizer="$2"
 strip_preinit="$3"
 
+uname="$(uname)"
 tmpdir="$(mktemp -d)"
-tmp_sanitizer="${tmpdir}/sanitizer.a"
-tmp_merged="${tmpdir}/sanitizer.so"
 
 if [ -z "$CXX" ]; then
   if which clang++ > /dev/null 2>&1; then
@@ -31,11 +30,24 @@ if [ -z "$CXX" ]; then
   fi
 fi
 
-cp "$sanitizer" "$tmp_sanitizer"
+if [[ "$uname" == "Darwin" ]]; then
+  tmp_merged="${tmpdir}/sanitizer.dylib"
+  "$CXX" -dynamiclib \
+    -Wl,-force_load,"$libfuzzer" \
+    "$sanitizer" \
+    -lpthread -lc++ \
+    -Wl,-install_name,@rpath/$(basename "$tmp_merged") \
+    -o "$tmp_merged"
+else
+  tmp_sanitizer="${tmpdir}/sanitizer.a"
+  tmp_merged="${tmpdir}/sanitizer.so"
 
-ar d "$tmp_sanitizer" $strip_preinit  # Intentionally not quoted
+  cp "$sanitizer" "$tmp_sanitizer"
 
-"$CXX" -Wl,--whole-archive "$libfuzzer" "$tmp_sanitizer" -Wl,--no-whole-archive -lpthread -ldl -shared -o "$tmp_merged"
+  ar d "$tmp_sanitizer" $strip_preinit  # Intentionally not quoted
+
+  "$CXX" -Wl,--whole-archive "$libfuzzer" "$tmp_sanitizer" -Wl,--no-whole-archive -lpthread -ldl -shared -o "$tmp_merged"
+fi
 
 echo "$tmp_merged"
 exit 0
