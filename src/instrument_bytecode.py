@@ -33,6 +33,7 @@ from .version_dependent import call
 from .version_dependent import CALLABLE_STACK_ENTRIES
 from .version_dependent import CMP_OP_SHIFT_AMOUNT
 from .version_dependent import CONDITIONAL_JUMPS
+from .version_dependent import CONST_PUSH_INSTRS
 from .version_dependent import ExceptionTable
 from .version_dependent import ExceptionTableEntry
 from .version_dependent import generate_exceptiontable
@@ -40,9 +41,11 @@ from .version_dependent import get_code_object
 from .version_dependent import get_instructions
 from .version_dependent import get_lnotab
 from .version_dependent import get_name
+from .version_dependent import has_argument
 from .version_dependent import HAVE_ABS_REFERENCE
 from .version_dependent import HAVE_REL_REFERENCE
 from .version_dependent import INSERT_AFTER_INSTRS
+from .version_dependent import is_func_start_resume
 from .version_dependent import jump_arg_bytes
 from .version_dependent import offset_delta_to_jump_arg
 from .version_dependent import parse_exceptiontable
@@ -189,7 +192,7 @@ class Instruction:
     return dis.stack_effect(self.opcode, stack_effect_arg)
 
   def has_argument(self) -> bool:
-    return self.opcode >= dis.HAVE_ARGUMENT
+    return has_argument(self.opcode)
 
   @classmethod
   def get_fixed_size(cls) -> int:
@@ -401,7 +404,7 @@ class Instrumentor:
       )
 
       assert instr.mnemonic == instruction.opname
-      if instruction.opname == "RESUME" and instruction.arg == 0:
+      if is_func_start_resume(instruction.opname, instruction.arg):
         assert before_resume
         before_resume = False
 
@@ -579,6 +582,11 @@ class Instrumentor:
     Returns:
       The instructions to insert.
     """
+    # Note on 3.14's LOAD_FAST_BORROW: the two operands already on the stack
+    # may be borrowed stackrefs (tagged Py_TAG_REFCNT). SWAPing them into CALL
+    # argument slots is safe because PyStackRef_CLOSE on a tagged ref is a
+    # no-op, and the borrowed object outlives the call (the fast-local that
+    # owns it is still live in this frame).
 
     to_insert = []  # type: List[Instruction]
     const_atheris = self._get_const(sys.modules[_TARGET_MODULE])
@@ -810,7 +818,7 @@ class Instrumentor:
     seen_consts = []
 
     for c, instr in enumerate(self.instructions):
-      if instr.mnemonic == "LOAD_CONST":
+      if instr.mnemonic in CONST_PUSH_INSTRS:
         seen_consts.append(stack_size)
       elif instr.mnemonic == "COMPARE_OP" and (
           instr.arg >> CMP_OP_SHIFT_AMOUNT

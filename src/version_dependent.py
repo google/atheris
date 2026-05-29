@@ -24,6 +24,7 @@ Currently supported python versions are:
     - 3.11
     - 3.12
     - 3.13
+    - 3.14
 """
 
 import sys
@@ -34,11 +35,11 @@ from typing import List
 
 PYTHON_VERSION = sys.version_info[:2]
 
-if PYTHON_VERSION < (3, 6) or PYTHON_VERSION > (3, 13):
+if PYTHON_VERSION < (3, 11) or PYTHON_VERSION > (3, 14):
   raise RuntimeError(
       "You are fuzzing on an unsupported python version: "
-      + f"{PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.6 - 3.12 are "
-      + "supported by atheris 2.0. Use atheris 1.0 for older python versions."
+      + f"{PYTHON_VERSION[0]}.{PYTHON_VERSION[1]}. Only 3.11 - 3.14 are "
+      + "supported by atheris 3.0. Use atheris 2.0 for older python versions."
   )
 
 ### Instruction categories ###
@@ -108,6 +109,14 @@ HAVE_REL_REFERENCE = [
     "POP_JUMP_BACKWARD_IF_NONE",
 ]
 
+if PYTHON_VERSION >= (3, 11):
+  # SEND has carried a forward relative jump target (to END_SEND in 3.12+, or
+  # the post-loop POP_TOP in 3.11) since 3.11. Its oparg is used both for the
+  # StopIteration JUMPBY path and to compute frame->return_offset for inlined
+  # sub-generators, so it must be rewritten when we move the target.
+  CONDITIONAL_JUMPS.append("SEND")
+  HAVE_REL_REFERENCE.append("SEND")
+
 if PYTHON_VERSION >= (3, 12):
   CONDITIONAL_JUMPS.extend([
       "POP_JUMP_IF_NONE",
@@ -149,6 +158,16 @@ REL_REFERENCE_IS_INVERTED = [
     "POP_JUMP_BACKWARD_IF_NOT_NONE",
     "POP_JUMP_BACKWARD_IF_NONE",
 ]
+
+if PYTHON_VERSION >= (3, 14):
+  # END_ASYNC_FOR's oparg is a *backward* offset to the matching END_SEND. The
+  # plain opcode ignores it, but INSTRUMENTED_END_ASYNC_FOR (used under
+  # sys.monitoring) asserts (next_instr - oparg)->op.code == END_SEND, so we
+  # keep it accurate. END_SEND is in INSERT_AFTER_INSTRS, which means
+  # _insert_at never targets END_SEND directly and this reference stays pinned
+  # to the real END_SEND instruction.
+  HAVE_REL_REFERENCE.append("END_ASYNC_FOR")
+  REL_REFERENCE_IS_INVERTED.append("END_ASYNC_FOR")
 
 if PYTHON_VERSION <= (3, 10):
   HAVE_ABS_REFERENCE.extend([
@@ -653,7 +672,14 @@ INSERT_AFTER_INSTRS = {}
 if PYTHON_VERSION >= (3, 12):
   INSERT_AFTER_INSTRS["CACHE"] = 1
   INSERT_AFTER_INSTRS["END_FOR"] = 1
-if PYTHON_VERSION >= (3, 13):
+  # SEND's oparg is used to compute frame->return_offset for inlined
+  # sub-generators (yield from / await). The interpreter resumes at exactly
+  # SEND_instr + INSTRUCTION_SIZE + oparg, which by compiler convention is the
+  # END_SEND instruction. We must therefore never relocate END_SEND away from
+  # the slot SEND points at; instead, instrument the instruction after it.
+  # This also keeps END_ASYNC_FOR's debug assert happy (see above).
+  INSERT_AFTER_INSTRS["END_SEND"] = 1
+if PYTHON_VERSION == (3, 13):
   # The documentation says:
   #
   ## FOR_ITER(delta): ...If the iterator indicates it is exhausted then the byte
@@ -670,6 +696,66 @@ if PYTHON_VERSION >= (3, 13):
   # FOR_ITER instruction would jump over the first two instructions of our own
   # instrumentation.
   INSERT_AFTER_INSTRS["END_FOR"] = 2
+if PYTHON_VERSION >= (3, 14):
+  # In 3.14 FOR_ITER does JUMPBY(oparg + 1): it skips only END_FOR; the second
+  # pop is a real POP_ITER instruction that actually executes. So we may safely
+  # instrument between END_FOR and POP_ITER (END_FOR: 1 above is sufficient).
+  #
+  # Every forward POP_JUMP_IF_* is followed by a NOT_TAKEN op. On fall-through
+  # the interpreter does JUMPBY(next_instr->op.code == NOT_TAKEN), i.e. it
+  # silently skips one instruction iff the very next op is NOT_TAKEN. We put
+  # our fall-through instrumentation *after* the NOT_TAKEN so that:
+  #   (a) the canonical "branch not taken" PC is what we report, and
+  #   (b) if a POP_JUMP_IF_*'s *jump target* is itself a NOT_TAKEN (e.g. the
+  #       SEND/END_SEND/NOT_TAKEN sequence in `async for`), the interpreter's
+  #       implicit skip-one doesn't eat the first instruction of our block.
+  INSERT_AFTER_INSTRS["NOT_TAKEN"] = 1
+
+
+# Instructions that push a compile-time constant onto the stack. Used by
+# trace_data_flow to decide whether a COMPARE_OP operand is a constant and
+# should be routed to libFuzzer's const-cmp hooks.
+CONST_PUSH_INSTRS = {"LOAD_CONST"}
+if PYTHON_VERSION >= (3, 14):
+  # 3.14 emits LOAD_SMALL_INT for 0 <= n < 256 and LOAD_COMMON_CONSTANT for a
+  # handful of builtins (AssertionError, etc.).
+  CONST_PUSH_INSTRS.add("LOAD_SMALL_INT")
+  CONST_PUSH_INSTRS.add("LOAD_COMMON_CONSTANT")
+
+
+if PYTHON_VERSION >= (3, 13):
+
+  def is_func_start_resume(opname: str, arg: int | None) -> bool:
+    """Returns True if this is the function-entry RESUME instruction.
+
+    From 3.13 onward RESUME's oparg may have RESUME_OPARG_DEPTH1_MASK (0x4)
+    set when the resume point is one try-block deep, so only the low two bits
+    encode the resume kind (RESUME_AT_FUNC_START == 0).
+    """
+    return opname == "RESUME" and arg is not None and (arg & 0x3) == 0
+
+else:
+
+  def is_func_start_resume(opname: str, arg: int | None) -> bool:
+    return opname == "RESUME" and arg == 0
+
+
+if PYTHON_VERSION >= (3, 12):
+  _HASARG = frozenset(dis.hasarg)  # pytype: disable=module-attr
+
+  def has_argument(op: int) -> bool:
+    """Returns whether `op` takes an argument.
+
+    HAVE_ARGUMENT is no longer a reliable boundary in 3.12+ (and is formally
+    meaningless in 3.14, where e.g. TO_BOOL < HAVE_ARGUMENT yet RESUME >
+    HAVE_ARGUMENT). dis.hasarg is the authoritative source.
+    """
+    return op in _HASARG
+
+else:
+
+  def has_argument(op: int) -> bool:
+    return op >= dis.HAVE_ARGUMENT
 
 
 if (3, 12) <= PYTHON_VERSION:
