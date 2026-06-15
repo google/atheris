@@ -51,3 +51,14 @@ from .utils import path
 def get_hook_dirs() -> List[str]:
   import os  # pylint: disable=g-import-not-at-top
   return [os.path.dirname(__file__)]
+
+__all__ = (
+  "Fuzz",
+  "FuzzedDataProvider",
+  "Mutate",
+  "Setup",
+  "enabled_hooks",
+  "instrument_all",
+  "instrument_func",
+  "instrument_imports",
+)
