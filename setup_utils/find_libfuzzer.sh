@@ -22,18 +22,14 @@ uname="$(uname)"
 if [[ "$uname" == "Darwin" ]]; then
   libpath="lib/darwin/libclang_rt.fuzzer_no_main_osx.a"
 elif [[ "$uname" == "Linux" ]]; then
-  machine="$(uname -m)"
-  triple="$(clang -dumpmachine)"
-  if [[ "$machine" == "x86_64" ]]; then
-    libpath="lib/$triple/libclang_rt.fuzzer_no_main-x86_64.a"
-  elif [[ "$machine" == "i386" ]]; then
-    libpath="lib/$triple/libclang_rt.fuzzer_no_main-i386.a"
-  elif [[ "$machine" == "i686" ]]; then
-    libpath="lib/$triple/libclang_rt.fuzzer_no_main-i386.a"
-  elif [[ "$machine" == "aarch64" ]]; then
-    libpath="lib/$triple/libclang_rt.fuzzer_no_main-aarch64.a"
+  libpath="lib/*linux*/libclang_rt.fuzzer_no_main*.a"
+  if [ -z "$CLANG_BIN" ]; then
+    machine="$("$CLANG_BIN" -dumpmachine)"
   else
-    >&2 echo "Failed to identify platform machine (got $machine); set \$LIBFUZZER_LIB to point directly to your libfuzzer .a file."
+    machine="$(clang -dumpmachine)"
+  fi
+  if [ -f libpath]; then
+    >&2 echo "Failed to identify platform (got $machine); set \$LIBFUZZER_LIB to point directly to your libfuzzer .a file."
   fi
 else
   >&2 echo "Failed to identify platform (got $uname); set \$LIBFUZZER_LIB to point directly to your libfuzzer .a file."
