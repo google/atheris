@@ -27,7 +27,7 @@ from setuptools.command.build_ext import build_ext
 
 __version__ = os.getenv("ATHERIS_VERSION")
 if not __version__:
-    __version__ = "3.0.0"
+    __version__ = "3.1.0"
 
 
 if len(sys.argv) > 1 and sys.argv[1] == "print_version":

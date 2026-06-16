@@ -77,7 +77,7 @@ class BuildExtCommand(setuptools.command.build_ext.build_ext):
 
 setup(
     name="atheris_libprotobuf_mutator",
-    version="3.0.0",
+    version="3.1.0",
     author="atheris@google.com",
     author_email="atheris@google.com",
     url="https://github.com/google/atheris/",
