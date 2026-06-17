@@ -34,18 +34,18 @@ RUN set -e -x -v; \
 	make compiler-rt;
 
 RUN set -e -x -v; \
-	python3 -m pip install auditwheel;
+	/opt/python/cp313-cp313/bin/python3 -m pip install auditwheel;
 
 RUN set -e -x -v; \
-    /opt/python/cp311-cp311/bin/python3 -m pip install setuptools && \
     /opt/python/cp312-cp312/bin/python3 -m pip install setuptools && \
-    /opt/python/cp313-cp313/bin/python3 -m pip install setuptools;
+    /opt/python/cp313-cp313/bin/python3 -m pip install setuptools && \
+    /opt/python/cp314-cp314/bin/python3 -m pip install setuptools;
 
 WORKDIR /atheris
 
 CMD export LIBFUZZER_LIB="/root/llvm-project/build/lib/clang/$(ls /root/llvm-project/build/lib/clang/)/lib/x86_64-unknown-linux-gnu/libclang_rt.fuzzer_no_main.a"; \
-	/opt/python/cp311-cp311/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
 	/opt/python/cp312-cp312/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
 	/opt/python/cp313-cp313/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
-	( cd /tmp/dist && find /tmp/dist/* | xargs -I{} auditwheel repair --plat manylinux2014_x86_64 {} ) && \
+	/opt/python/cp314-cp314/bin/python3 setup.py bdist_wheel -d /tmp/dist && \
+	( cd /tmp/dist && find /tmp/dist/* | xargs -I{} /opt/python/cp313-cp313/bin/python3 -m auditwheel repair --plat manylinux2014_x86_64 {} ) && \
 	mkdir -p /atheris/dist && cp /tmp/dist/wheelhouse/* /atheris/dist/
