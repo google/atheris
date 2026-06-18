@@ -1,0 +1,95 @@
+# Build Linux wheels using Docker (requires building LLVM from source)
+# This is separate from the main wheels.yaml because it takes much longer
+#
+# Publishing is handled by release.yaml which waits for all build workflows.
+
+name: Build Linux Wheels
+
+on:
+  # Build on release tags (same as wheels.yaml)
+  push:
+    tags:
+      - 'v*'
+  # Manual trigger for testing (building LLVM takes ~30-60 minutes)
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: 'Architecture to build'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - x86_64
+          - aarch64
+          - both
+
+jobs:
+  build-x86_64:
+    name: Build Linux x86_64 wheels
+    runs-on: ubuntu-latest
+    # Build on tag pushes, or manual trigger with x86_64/both selected
+    if: github.event_name == 'push' || inputs.arch == 'x86_64' || inputs.arch == 'both'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build -t atheris-builder-x86_64 -f deployment/Dockerfile deployment/
+
+      - name: Build wheels
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/atheris \
+            atheris-builder-x86_64
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64-wheels
+          path: dist/*.whl
+
+  build-aarch64:
+    name: Build Linux aarch64 wheels
+    runs-on: ubuntu-latest
+    # Build on tag pushes, or manual trigger with aarch64/both selected
+    if: github.event_name == 'push' || inputs.arch == 'aarch64' || inputs.arch == 'both'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (this takes a while - building LLVM on QEMU)
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            -t atheris-builder-aarch64 \
+            -f deployment/Dockerfile.aarch64 \
+            --load \
+            deployment/
+        timeout-minutes: 180  # Building LLVM on QEMU is slow
+
+      - name: Build wheels
+        run: |
+          docker run --rm \
+            --platform linux/arm64 \
+            -v ${{ github.workspace }}:/atheris \
+            atheris-builder-aarch64
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-aarch64-wheels
+          path: dist/*.whl
+
+      # Linux wheels are published by the unified release.yaml workflow

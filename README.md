@@ -37,6 +37,14 @@ If you don't have `clang` installed or it's too old, you'll need to download and
 
 Apple Clang doesn't come with libFuzzer, so you'll need to install a new version of LLVM from head. Follow the instructions in Installing Against New LLVM below.
 
+**Note for macOS ARM64 (Apple Silicon) wheels:** The prebuilt wheels on PyPI for macOS ARM64 require Homebrew LLVM to be installed at runtime due to libc++ dependencies:
+
+```bash
+brew install llvm
+```
+
+This requirement exists because the wheels link against Homebrew's libc++ library. Future versions may bundle this dependency to make the wheels fully self-contained.
+
 #### Installing Against New LLVM
 
 ```bash

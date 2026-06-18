@@ -14,5 +14,34 @@ exclude = [
 exclude = ["src/benchmark/"]
 ignore-init-module-imports = true
 # E501 Line too long
-# F401 … imported but unused; consider adding to `__all__` or using a redundant alias
+# F401 ... imported but unused; consider adding to `__all__` or using a redundant alias
 ignore = ["E501", "F401"]
+
+
+[build-system]
+requires = ["setuptools>=45", "wheel", "pybind11>=2.5.0"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.cibuildwheel]
+# Build for CPython only, skip PyPy and musllinux
+skip = "pp* *-musllinux*"
+
+# Test that the built wheel can be imported (atheris doesn't have __version__)
+test-command = "python -c \"import atheris; print('atheris loaded, FuzzedDataProvider:', hasattr(atheris, 'FuzzedDataProvider'))\""
+
+# Build for Python 3.11, 3.12, 3.13
+build = "cp311-* cp312-* cp313-*"
+
+# Linux builds use Docker (see linux-wheels.yaml) because manylinux
+# containers don't have libFuzzer pre-installed and building LLVM is slow.
+
+[tool.cibuildwheel.macos]
+# Build for Apple Silicon only (x86_64 cross-compilation has issues)
+archs = ["arm64"]
+
+# Install LLVM from Homebrew (Apple Clang doesn't include libFuzzer)
+before-all = "brew install llvm"
+
+# Environment variables are set via CIBW_ENVIRONMENT_MACOS in the workflow
+# This is needed because $(brew --prefix) differs between Intel and ARM Macs

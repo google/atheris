@@ -1,0 +1,118 @@
+# Unified release workflow that publishes all wheels to PyPI
+#
+# This workflow waits for both build workflows to complete before publishing,
+# ensuring atomic releases with all artifacts (macOS + Linux + sdist).
+#
+# Triggered by tag pushes - waits for wheels.yaml and linux-wheels.yaml to finish.
+
+name: Release to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  wait-for-builds:
+    name: Wait for build workflows
+    runs-on: ubuntu-latest
+    # aarch64 build can take up to 180 min; add buffer for all builds
+    timeout-minutes: 240
+    permissions:
+      checks: read  # Required by lewagon/wait-on-check-action
+    steps:
+      - name: Wait for macOS wheels workflow
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'Build wheels on macos-latest'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 30
+
+      - name: Wait for Linux x86_64 wheels workflow
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'Build Linux x86_64 wheels'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 60
+
+      - name: Wait for Linux aarch64 wheels workflow
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'Build Linux aarch64 wheels'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 60
+
+      - name: Wait for sdist build
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'Build source distribution'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 30
+
+  publish:
+    name: Publish to PyPI
+    needs: wait-for-builds
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/atheris
+    permissions:
+      id-token: write  # Required for trusted publishing
+      actions: read     # Required to download artifacts
+
+    steps:
+      - name: Get workflow run IDs
+        id: get-runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the most recent successful run of each workflow for this commit
+          # Note: --commit filters by headSha, works correctly for tag pushes
+          MACOS_RUN=$(gh run list --repo ${{ github.repository }} \
+            --workflow "Build macOS Wheels" \
+            --commit ${{ github.sha }} \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId')
+          echo "macos_run=$MACOS_RUN" >> $GITHUB_OUTPUT
+
+          LINUX_RUN=$(gh run list --repo ${{ github.repository }} \
+            --workflow "Build Linux Wheels" \
+            --commit ${{ github.sha }} \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId')
+          echo "linux_run=$LINUX_RUN" >> $GITHUB_OUTPUT
+
+      - name: Download macOS wheels
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.get-runs.outputs.macos_run }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dist
+          merge-multiple: true
+
+      - name: Download Linux wheels
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.get-runs.outputs.linux_run }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Skip files already uploaded (allows retrying failed releases)
+          skip-existing: true
+        # Uses trusted publishing - no API token needed
+        # Configure at: https://pypi.org/manage/project/atheris/settings/publishing/
