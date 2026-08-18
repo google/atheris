@@ -74,3 +74,30 @@ def Setup(argv: List[Text],
       custom_mutator=_CustomMutator,
       custom_crossover=_CustomCrossOver,
       **kwargs)
+
+
+def RegisterPostProcessor(proto: Callable[..., Any],
+                          callback: Callable[[Any, int], Any]):
+  """Register a post-processor that runs after every mutation of `proto`.
+
+  libprotobuf-mutator mutates fields blindly, so it can produce messages that
+  break invariants the mutator knows nothing about (a length field that has to
+  match a repeated field, a checksum, an enum that's really a bitmask, ...).
+  A post-processor gets a chance to patch those up before the message reaches
+  your test function.
+
+  The callback receives the freshly mutated message and the mutation seed. Edit
+  the message in place, or return a new one of the same type. Returning None
+  keeps whatever edits you made in place. Registration is global per message
+  type, so call this once before atheris.Fuzz().
+
+  Args:
+    proto: the protobuf message type to post-process.
+    callback: called as callback(message, seed) after each mutation.
+  """
+
+  def _wrapped(message: Any, seed: int):
+    result = callback(message, seed)
+    return message if result is None else result
+
+  _mutator.RegisterPostProcessor(proto(), _wrapped)
