@@ -95,6 +95,21 @@ PYBIND11_MODULE(_mutator, m) {
           }
           return std::nullopt;
         });
+  m.def("RegisterPostProcessor",
+        [](std::unique_ptr<protobuf::Message> prototype, py::function callback) {
+          const protobuf::Descriptor* descriptor = prototype->GetDescriptor();
+          libfuzzer::RegisterPostProcessor(
+              descriptor,
+              [callback](protobuf::Message* message, unsigned int seed) {
+                py::gil_scoped_acquire gil;
+                py::object result = callback(message, seed);
+                if (!result.is_none()) {
+                  auto updated =
+                      result.cast<std::unique_ptr<protobuf::Message>>();
+                  message->CopyFrom(*updated);
+                }
+              });
+        });
 }
 
 }  // namespace protobuf_mutator
