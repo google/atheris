@@ -221,7 +221,7 @@ def hook_re_module() -> None:
       try:
         if original_compile_func(pattern, flags).search(generated) is None:
           sys.stderr.write(f"ERROR: generated match '{generated!r}' did not " +
-                           "match the RegEx pattern '{_pattern!r}'!\n")
+                           f"match the RegEx pattern '{pattern!r}'!\n")
       except Exception as e:  # pylint: disable=broad-except
         sys.stderr.write("Could not check the generated match against the " +
                          f"RegEx pattern: {e}\n")
