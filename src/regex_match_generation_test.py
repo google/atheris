@@ -121,6 +121,16 @@ class RegexMatchGeneration(unittest.TestCase):
     match = gen_match(pattern)
     self.assertRegex(match, pattern)
 
+  def test_bytes_any(self):
+    pattern = b"a.c"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
+  def test_bytes_any_and_class(self):
+    pattern = b"\\d.[ab]+$"
+    match = gen_match(pattern)
+    self.assertRegex(match, pattern)
+
   def test_utf8(self):
     match = gen_match("•".encode("utf-8"))
     self.assertEqual(match, b"\xe2\x80\xa2")
