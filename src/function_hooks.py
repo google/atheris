@@ -93,7 +93,7 @@ def gen_match_recursive(ops: Any,
             f"Expected return_type to be `str` or `bytes`, got {return_type}")
 
     elif tup[0] == _ANY:
-      literals += "a"
+      literals += to_correct_type("a", return_type)
 
     elif tup[0] == _BRANCH:
       # just generate the first branch
