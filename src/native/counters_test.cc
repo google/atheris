@@ -71,6 +71,22 @@ TEST_F(CountersTest, ReserveCountersIncrementsPastMaxCounters) {
   }
 }
 
+TEST_F(CountersTest, WarnsOnceWhenMoreThanMaxCountersReserved) {
+  atheris::SetMaxCounters(4);
+  for (int i = 0; i < 6; i++) atheris::ReserveCounter();
+
+  testing::internal::CaptureStderr();
+  atheris::AllocateCountersAndPcs();
+  EXPECT_THAT(testing::internal::GetCapturedStderr(),
+              testing::HasSubstr("-max_counters"));
+
+  // Reserving more does not repeat the warning.
+  atheris::ReserveCounter();
+  testing::internal::CaptureStderr();
+  atheris::AllocateCountersAndPcs();
+  EXPECT_EQ(testing::internal::GetCapturedStderr(), "");
+}
+
 TEST_F(CountersTest, NextCounterAndPcTableRange) {
   // Allocate space for 10 counters
   atheris::SetMaxCounters(10);

@@ -1350,6 +1350,80 @@ class InstrumentBytecodeTest(mockutils.MockLibFuzzerMixin, unittest.TestCase):
     mockutils.UpdateCounterArrays()
     self.assertEqual(f([1, 2, 3]), [1, 2, 3])
 
+  def test_control_flow_counters_reserved_in_bytecode_order(self):
+    """Counters must be assigned to basic blocks in a reproducible order.
+
+    libFuzzer treats a counter index as the identity of an edge (e.g. in -merge
+    control files and -print_pcs output), so the order in which blocks receive
+    their counters must not depend on memory addresses. Iterating the blocks
+    in instruction order gives block k of a function the k-th counter reserved
+    for that function, which this test checks by reading the counters back at
+    the inserted _trace_branch call sites.
+    """
+
+    def many_blocks(a, b, c):
+      total = 0
+      for i in range(a):
+        if i % 2:
+          total += i
+        elif i % 3:
+          total -= i
+        else:
+          total ^= i
+        if b and i > c:
+          break
+      while total > 100:
+        total //= 2
+        if total == 7:
+          return -1
+      try:
+        return total if b else c
+      except ValueError:
+        return 0
+
+    patched = instrument_bytecode.patch_code(
+        many_blocks.__code__, trace_dataflow=False
+    )
+    instrs = list(dis.get_instructions(patched))
+    counters = []
+    for i, instr in enumerate(instrs):
+      if instr.opname == "LOAD_ATTR" and instr.argval == "_trace_branch":
+        # The counter is the next constant loaded, as the single argument.
+        j = i + 1
+        while instrs[j].opname != "LOAD_CONST":
+          j += 1
+        counters.append(instrs[j].argval)
+
+    self.assertGreater(len(counters), 8, "expected many instrumented blocks")
+    self.assertEqual(len(counters), len(set(counters)))
+    self.assertEqual(
+        counters,
+        sorted(counters),
+        "basic blocks were not assigned counters in bytecode order; the "
+        "counter ids would differ between processes",
+    )
+
+  def test_instrument_all_order_is_independent_of_discovery_order(self):
+    """instrument_all must instrument functions in a reproducible order."""
+
+    def first():
+      return 1
+
+    def second():
+      return 2
+
+    class Holder:
+
+      def method(self):
+        return 3
+
+    funcs = [first, second, lambda: 0, Holder.method, instrument_bytecode.patch_code]
+    key = instrument_bytecode._instrumentation_order_key
+    self.assertEqual(len({key(f) for f in funcs}), len(funcs))
+    expected = sorted(funcs, key=key)
+    for permutation in (list(reversed(funcs)), funcs[2:] + funcs[:2]):
+      self.assertEqual(sorted(permutation, key=key), expected)
+
 
 
 if __name__ == "__main__":

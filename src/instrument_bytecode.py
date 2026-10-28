@@ -743,9 +743,16 @@ class Instrumentor:
 
   def trace_control_flow(self) -> None:
     """Instrument every basic block in the bytecode."""
-    # Find all the places to instrument.
+    # Find all the places to instrument, as indices into self.instructions.
     # First is start of the function.
-    locations_to_instrument: Set[Instruction] = set()
+    #
+    # Indices are used rather than Instruction objects (which hash by id()) so
+    # that the iteration order below, and with it the order in which counters
+    # are reserved for the blocks, does not depend on memory addresses.
+    # libFuzzer uses the counter index as the identity of an edge (e.g. in
+    # -merge control files and -print_pcs), so it must be the same in every
+    # process that instruments the same code.
+    locations_to_instrument: Set[int] = set()
 
     def queue_for_instrumentation(index):
       # This queues the instruction at index to be instrumented, or if it's in
@@ -775,7 +782,7 @@ class Instrumentor:
         if index >= len(self.instructions):
           return
 
-      locations_to_instrument.add(self.instructions[index])
+      locations_to_instrument.add(index)
 
     # Queue the first instruction.
     queue_for_instrumentation(0)
@@ -789,8 +796,13 @@ class Instrumentor:
       if instruction.mnemonic in CONDITIONAL_JUMPS:
         queue_for_instrumentation(i + 1)
 
-    # Apply instrumentation.
-    for i, instruction in enumerate(locations_to_instrument):
+    # Apply instrumentation in instruction order, so that block k of the
+    # function always receives the k-th counter reserved for it. Resolve the
+    # indices to instructions first, since _insert_at shifts later indices.
+    instructions_to_instrument = [
+        self.instructions[index] for index in sorted(locations_to_instrument)
+    ]
+    for i, instruction in enumerate(instructions_to_instrument):
       if (
           debug_instrument_only_blocks is not None
           and i not in debug_instrument_only_blocks
@@ -1015,6 +1027,21 @@ def _is_instrumentable(obj: Any) -> bool:
   return True
 
 
+def _instrumentation_order_key(func: Callable[..., Any]) -> Any:
+  """Sort key that gives instrument_all a reproducible instrumentation order.
+
+  Counter ids identify edges across processes, so functions must receive their
+  counters in an order that does not depend on gc.get_objects() order.
+  """
+  code = func.__code__
+  return (
+      str(func.__module__),
+      code.co_filename,
+      code.co_firstlineno,
+      str(getattr(func, "__qualname__", "")),
+  )
+
+
 def instrument_all() -> None:
   """Add Atheris instrementation to all Python code already imported.
 
@@ -1026,7 +1053,10 @@ def instrument_all() -> None:
   """
   progress_renderer = None
 
-  funcs = [obj for obj in gc.get_objects() if _is_instrumentable(obj)]
+  funcs = sorted(
+      (obj for obj in gc.get_objects() if _is_instrumentable(obj)),
+      key=_instrumentation_order_key,
+  )
   if sys.stderr.isatty():
     sys.stderr.write("INFO: Instrumenting functions: ")
     progress_renderer = utils.ProgressRenderer(sys.stderr, len(funcs))

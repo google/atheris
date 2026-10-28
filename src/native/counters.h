@@ -22,7 +22,8 @@
 // were added.
 //
 // If more than max_counters were registered, we'll wrap around to the start and
-// reuse existing counters. This lowers fuzzing quality. Its easier book keeping
+// reuse existing counters. This lowers fuzzing quality, so a warning is printed
+// once when it first happens. Its easier book keeping
 // to have it all in one array, and we need fast lookups for _trace_branch. Note
 // that we fill this array from low addresses going up. Un-written-to pages will
 // only cost virtual memory, VSS not RSS, so preallocating lots of memory is ok.

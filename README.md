@@ -347,6 +347,9 @@ This function is experimental.
 #### `Setup(args, test_one_input, internal_libfuzzer=None)`
  - `args`: A list of strings: the process arguments to pass to the fuzzer, typically `sys.argv`. This argument list may be modified in-place, to remove arguments consumed by the fuzzer.
    See [the LibFuzzer docs](https://llvm.org/docs/LibFuzzer.html#options) for a list of such options.
+   Atheris also consumes `-atheris_runs=<n>` (see above) and `-max_counters=<n>`, the number of
+   coverage counters available to instrumented Python code (default 1048576). If more are needed,
+   Atheris prints a warning and reuses counters, which merges the coverage of distinct code.
  - `test_one_input`: your fuzzer's entry point. Must take a single `bytes` argument. This will be repeatedly invoked with a single bytes container.
  - `internal_libfuzzer`: Indicates whether libfuzzer will be provided by atheris or by an external library (see [native_extension_fuzzing.md](./native_extension_fuzzing.md)). If unspecified, Atheris will determine this
    automatically. If fuzzing pure Python, leave this as `True`.

@@ -39,6 +39,8 @@ int counter_index_registered = 0;
 // Maximum number of counters and pctable entries that may be reserved and also
 // the number that are allocated.
 int max_counters = 0;
+// Whether the warning about reserving more than max_counters was printed.
+bool warned_too_many_counters = false;
 // Counter Allocations. These are allocated once, before __sanitize_... are
 // called and can only be deallocated by TestOnlyResetCounters.
 unsigned char* counters = nullptr;
@@ -57,6 +59,7 @@ void TestOnlyResetCounters() {
   max_counters = 0;
   counter_index = 0;
   counter_index_registered = 0;
+  warned_too_many_counters = false;
 }
 
 NO_SANITIZE
@@ -118,6 +121,15 @@ CounterAndPcTableRange AllocateCountersAndPcs() {
       std::cerr << "Atheris internal error: Failed to mmap counters.\n";
       exit(1);
     }
+  }
+
+  if (counter_index > max_counters && !warned_too_many_counters) {
+    warned_too_many_counters = true;
+    std::cerr << "WARNING: Atheris reserved " << counter_index
+              << " coverage counters but only " << max_counters
+              << " are available. Counters are being reused, so distinct code "
+              << "is reported as the same edge. Increase the limit with "
+              << "-max_counters=<n>.\n";
   }
 
   const int next_index = std::min(counter_index, max_counters);
