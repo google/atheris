@@ -93,7 +93,7 @@ def gen_match_recursive(ops: Any,
             f"Expected return_type to be `str` or `bytes`, got {return_type}")
 
     elif tup[0] == _ANY:
-      literals += "a"
+      literals += to_correct_type("a", return_type)
 
     elif tup[0] == _BRANCH:
       # just generate the first branch
@@ -221,7 +221,7 @@ def hook_re_module() -> None:
       try:
         if original_compile_func(pattern, flags).search(generated) is None:
           sys.stderr.write(f"ERROR: generated match '{generated!r}' did not " +
-                           "match the RegEx pattern '{_pattern!r}'!\n")
+                           f"match the RegEx pattern '{pattern!r}'!\n")
       except Exception as e:  # pylint: disable=broad-except
         sys.stderr.write("Could not check the generated match against the " +
                          f"RegEx pattern: {e}\n")
